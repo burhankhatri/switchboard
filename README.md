@@ -1,69 +1,97 @@
-# Daytona Switchboard
+# Switchboard
 
-Building blocks for running AI coding agents in isolated [Daytona](https://daytona.io) sandboxes. Can be used in your own projects or as a standalone NextJS app:
+Shared agent workspaces.
 
-https://github.com/user-attachments/assets/ee6de7e9-a32e-45bd-acfa-3da1763b80ea
+Someone on the team writes a few scripts and prompts that handle a chunk of
+their job. That work ends up trapped on their laptop: to reuse it a colleague
+needs their own agent subscription, the same API keys, and a replicated
+environment. In practice nobody does that, so every useful automation stays a
+personal tool.
 
-## Packages
-
-### Published packages
-
-On npm — use them in your own projects.
-
-| Package | Description | Maintainer |
-|---------|-------------|------------|
-| [`agent-configuration`](packages/agent-configuration) | Translation layer between coding agents' configuration formats | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> <a href="https://github.com/abdulrehmann231"><img src="https://github.com/abdulrehmann231.png?size=64" width="28" height="28"></a> |
-| [`claude-credentials`](packages/claude-credentials) | Claude Code OAuth credential generation via ccauth and Daytona | <a href="https://github.com/synacktraa"><img src="https://github.com/synacktraa.png?size=64" width="28" height="28"></a> |
-| [`launcher`](packages/launcher) | `npx switchboard` launcher that runs the desktop app | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
-| [`mcp`](packages/mcp) | MCP provider integrations | <a href="https://github.com/abdulrehmann231"><img src="https://github.com/abdulrehmann231.png?size=64" width="28" height="28"></a> |
-| [`sandbox-git`](packages/sandbox-git) | Git operations for Daytona sandboxes | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
-| [`sandbox-jobs`](packages/sandbox-jobs) | Run, observe, and reconnect to long-running shell processes in a Daytona sandbox via the filesystem | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
-| [`sandbox-skills`](packages/sandbox-skills) | Agent skills integration for Daytona sandboxes | <a href="https://github.com/pluuto19"><img src="https://github.com/pluuto19.png?size=64" width="28" height="28"></a> |
-| [`sandbox-terminal`](packages/sandbox-terminal) | WebSocket-based PTY terminal for Daytona sandboxes | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
-| [`sdk`](packages/sdk) | TypeScript SDK for running AI coding agents in Daytona sandboxes | <a href="https://github.com/pluuto19"><img src="https://github.com/pluuto19.png?size=64" width="28" height="28"></a> <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
-
-### Internal packages
-
-Not published — apps and shared internals used only in this repo.
-
-| Package | Description | Maintainer |
-|---------|-------------|------------|
-| [`common`](packages/common) | Shared utilities and types | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
-| [`desktop`](packages/desktop) | Electron desktop app for Switchboard | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
-| [`dev-cron`](packages/dev-cron) | Local development simulator for Vercel cron jobs | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
-| [`docs`](packages/docs) | Standalone docs site deployed to docs.switchboard.local | <a href="https://github.com/abdulrehmann231"><img src="https://github.com/abdulrehmann231.png?size=64" width="28" height="28"></a> |
-| [`sandbox-image`](packages/sandbox-image) | Custom Daytona sandbox image with pre-installed agent CLIs | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
-| [`web`](packages/web) | Standalone chat app for AI coding agents | <a href="https://github.com/jamesmurdza"><img src="https://github.com/jamesmurdza.png?size=64" width="28" height="28"></a> |
+Switchboard is one place the team reaches. **A workspace is a folder in a private
+git repo** carrying the skills, scripts and connections for one kind of work.
+Pick a workspace and an agent runs it in a disposable sandbox with everything
+already loaded — no setup, no keys to copy, nothing to stand up.
 
 ---
 
-## Prerequisites
+## How a run works
 
-- Node.js 20.9+ (required by Next.js 16)
+```
+person picks a workspace
+  └─ membership checked, then a Daytona sandbox from a prebuilt snapshot   ~2s
+       ├─ sparse clone: THIS workspace + the shared root         ~165KB
+       ├─ connections injected (CRM_KEY, …) — never held by the person
+       └─ agent starts with cwd INSIDE the workspace folder
+            └─ its skills and the shared skills load automatically
+```
 
-## Quick start (Web)
+The last line is the trick the whole design rests on. Claude Code discovers
+`.claude/skills/` in the working directory **and every parent up to the repo
+root**, so putting the agent's cwd inside the workspace folder gets both that
+workspace's skills and the shared ones — no extra flags, no config.
 
-Set up a local Postgres database and a `.env.local` file with the variables listed under [Development](packages/web/README.md#development).
+## The workspaces repo
+
+Workspaces live in a separate private repo (`WORKSPACES_REPO`):
+
+```
+.claude/skills/            shared — loads in every workspace
+workspaces/
+  marketing-automation/
+    .claude/skills/        this workspace only
+    scripts/
+    workspace.yaml
+  lead-gen/
+    ...
+```
+
+Adding a workspace is `mkdir`. Editing a skill in the UI commits to this repo,
+so the repo stays the single source of truth and an edit cannot drift from what
+the next run clones.
+
+## Quick start
+
+Requires Node 20.9+. Secrets are in `packages/web/.env.local`, which is tracked
+in this repo — you do not need to create it.
 
 ```bash
 npm install
-npm run prisma:migrate
-npm run dev
+npm run dev          # http://localhost:4000
 ```
 
-Open http://localhost:4000.
+Sign in with GitHub, create a workspace, and it is immediately runnable.
 
-## Quick start (Desktop)
-
-The desktop app loads the web app, so it has the same prerequisites as the Web quick start above.
+To verify against real infrastructure rather than mocks:
 
 ```bash
-npm install
-npm run dev:electron
+# spins a real sandbox, clones, runs the agent, asserts skill discovery + isolation
+WORKSPACE_PATH=workspaces/lead-gen npx dotenv -e packages/web/.env.local -- node scripts/slice-zero.mjs
+
+# 36 assertions against the running HTTP API
+cd packages/web && GH_TOKEN=$(gh auth token) npx dotenv -e .env.local -- node ../../scripts/e2e-workspace.mjs
 ```
 
-This starts the local web server and launches the Electron app.
+## Where things are
 
-## Deployment
+| | |
+|---|---|
+| [PROGRESS.md](./PROGRESS.md) | Architecture, decisions and why, what is verified, what is next |
+| [AGENTS.md](./AGENTS.md) | Orientation for coding agents, and the traps |
+| [CLAUDE.md](./CLAUDE.md) | Commit and working conventions |
+| `openspec/specs/` | What each capability must do, as testable requirements |
+| `packages/web` | The app — Next.js, Prisma, NextAuth |
+| `packages/sdk` | Agent registry and background sessions. Swapping Claude Code for OpenCode is one config value |
+| `packages/sandbox-*` | Sandbox primitives: git, job control, images, terminal |
 
-The `web` package deploys to Vercel. See [Deployment](packages/web/README.md#deployment) for env vars and configuration.
+## Status
+
+Working end to end and verified: workspace creation, membership, connections,
+file browsing and editing, sparse-cloned runs with skill discovery. 187 tests.
+
+Not done yet: gated joining, member removal, workspace-filtered chat history,
+and scheduled runs are wired but untested. See
+[PROGRESS.md](./PROGRESS.md#next).
+
+Built on [background-agents](https://github.com/jamesmurdza/background-agents)
+(Apache-2.0) — see [NOTICE](./NOTICE).
