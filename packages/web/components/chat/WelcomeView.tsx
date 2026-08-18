@@ -66,8 +66,11 @@ export function WelcomeView({
         {!ready ? null : openFile ? (
           <WorkspaceFileViewer />
         ) : active ? (
-          /* ── Workspace active: centred composer ── */
-          <div className="w-full max-w-3xl mx-auto">
+          /* ── Workspace active: centred composer ──
+             Width must match ChatInput's own max-w-[52rem]. When the wrapper was
+             narrower the composer overflowed its right edge while mx-auto held
+             its left, which read as the whole block being shifted left. */
+          <div className="w-full max-w-[52rem] mx-auto">
             <button
               onClick={() => setActive(null)}
               className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 cursor-pointer"
