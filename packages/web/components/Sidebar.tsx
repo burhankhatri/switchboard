@@ -4,7 +4,6 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { WorkspaceRuns } from "@/components/workspaces/WorkspaceRuns"
 import { WorkspaceConnections } from "@/components/workspaces/WorkspaceConnections"
 import { WorkspaceFiles } from "@/components/workspaces/WorkspaceFiles"
-import { WorkspaceMembers } from "@/components/workspaces/WorkspaceMembers"
 import { WorkspaceDropdown } from "@/components/workspaces/WorkspaceDropdown"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { BRAND } from "@/lib/brand"
@@ -23,6 +22,7 @@ import { clearAllStorage } from "@/lib/storage"
 import { isChatVisibleForFilter } from "@/lib/chat-tree"
 import type { Chat } from "@/lib/types"
 import { NEW_REPOSITORY } from "@/lib/types"
+import { clearActiveWorkspace } from "@/lib/contexts/WorkspaceContext"
 import {
   UserMenu,
   SidebarWorkspaceEmptyState,
@@ -410,8 +410,6 @@ export function Sidebar({
               <WorkspaceFiles />
               <div className="mx-6 my-2 border-t border-border" />
               <WorkspaceConnections />
-              <div className="mx-6 my-2 border-t border-border" />
-              <WorkspaceMembers />
               <WorkspaceRuns />
               <div className="h-8 shrink-0" />
             </>
@@ -489,6 +487,9 @@ export function Sidebar({
                     <button
                       onClick={() => {
                         clearAllStorage()
+                        // Leaving the workspace behind would show it to the next visitor on
+                        // this browser, and hand it to whoever signs in next.
+                        clearActiveWorkspace()
                         signOut()
                       }}
                       className="flex items-center gap-3 w-full px-4 py-3 text-base hover:bg-accent active:bg-accent cursor-pointer"
@@ -660,15 +661,13 @@ export function Sidebar({
       )}
 
       {activeWorkspace && !collapsed && (
-        // min-h-0 is required: without it a flex child will not shrink below its
-        // content, so this never scrolls and an expanded form is simply clipped.
+        // min-h-0 lets this shrink so Files + Connections can scroll instead
+        // of clipping against the pinned footer.
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-auto-hide">
           <div className="mx-4 my-2 border-t border-border" />
           <WorkspaceFiles />
           <div className="mx-4 my-2 border-t border-border" />
           <WorkspaceConnections />
-          <div className="mx-4 my-2 border-t border-border" />
-          <WorkspaceMembers />
           <WorkspaceRuns />
           {/* So the last control never sits flush against the footer. */}
           <div className="h-6 shrink-0" />

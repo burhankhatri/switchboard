@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { clearAllStorage } from "@/lib/storage"
 import { useClickOutside } from "@/lib/hooks/useClickOutside"
 import { useModals } from "@/lib/contexts"
+import { clearActiveWorkspace } from "@/lib/contexts/WorkspaceContext"
 
 interface UserMenuProps {
   user: {
@@ -102,6 +103,9 @@ export function UserMenu({ user, collapsed }: UserMenuProps) {
           <button
             onClick={() => {
               clearAllStorage()
+              // Leaving the workspace behind would show it to the next visitor on
+              // this browser, and hand it to whoever signs in next.
+              clearActiveWorkspace()
               signOut()
             }}
             className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent cursor-pointer"
