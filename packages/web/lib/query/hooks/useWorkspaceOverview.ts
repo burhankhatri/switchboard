@@ -36,6 +36,8 @@ export interface OverviewRun {
 
 export interface WorkspaceOverview {
   yourRole: string
+  /** Names of the workspace's own env vars. Never values. */
+  envKeys: string[]
   connections: OverviewConnection[]
   members: OverviewMember[]
   runs: OverviewRun[]

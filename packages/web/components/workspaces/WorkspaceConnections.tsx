@@ -4,7 +4,9 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Loader2, Plug, Plus, Trash2 } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { useWorkspaceOverview } from "@/lib/query/hooks/useWorkspaceOverview"
 import { WorkspaceConnectionDialog } from "./WorkspaceConnectionDialog"
+import { WorkspaceConnectionDetail } from "./WorkspaceConnectionDetail"
 
 interface Connection {
   id: string
@@ -34,6 +36,11 @@ async function json<T>(res: Response): Promise<T> {
 export function WorkspaceConnections() {
   const { activeWorkspace } = useWorkspace()
   const [adding, setAdding] = useState(false)
+  // Which connection's configuration is open in the centre dialog.
+  const [viewing, setViewing] = useState<Connection | null>(null)
+  // Names only — used to tell the user when a workspace is serving fixtures.
+  const { data: overview } = useWorkspaceOverview(activeWorkspace?.id)
+  const envKeys = overview?.envKeys ?? []
   const [error, setError] = useState<string | null>(null)
   const qc = useQueryClient()
   const key = ["workspace-connections", activeWorkspace?.id]
@@ -81,17 +88,27 @@ export function WorkspaceConnections() {
       )}
 
       {connections.map((c) => (
-        <div key={c.id} className="group flex items-start gap-1.5 px-2 py-1.5 rounded hover:bg-accent/40">
-          <Plug className="h-3 w-3 mt-0.5 shrink-0 text-primary" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs truncate">{c.name}</span>
-            <span className="block text-[10px] text-muted-foreground truncate">
-              {c.kind === "rest" ? c.env?.token : "MCP"}
+        <div key={c.id} className="group relative flex items-start gap-1.5 rounded hover:bg-accent/40">
+          {/* The row opens the configuration. The remove button is positioned
+              over it rather than nested inside, since a button cannot contain
+              another button. */}
+          <button
+            type="button"
+            onClick={() => setViewing(c)}
+            title={`${c.name} — view configuration`}
+            className="flex min-w-0 flex-1 items-start gap-1.5 px-2 py-1.5 text-left cursor-pointer"
+          >
+            <Plug className="h-3 w-3 mt-0.5 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs truncate">{c.name}</span>
+              <span className="block text-[10px] text-muted-foreground truncate">
+                {c.kind === "rest" ? c.env?.token : "MCP"}
+              </span>
             </span>
-          </span>
+          </button>
           <button
             onClick={() => remove.mutate(c.slug)}
-            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-destructive cursor-pointer"
+            className="absolute right-1 top-1.5 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-destructive cursor-pointer"
             title="Remove"
           >
             <Trash2 className="h-3 w-3" />
@@ -106,6 +123,11 @@ export function WorkspaceConnections() {
       {error && <p className="px-2 py-1 text-xs text-destructive">{error}</p>}
 
       <WorkspaceConnectionDialog open={adding} onClose={() => setAdding(false)} />
+      <WorkspaceConnectionDetail
+        connection={viewing}
+        envKeys={envKeys}
+        onClose={() => setViewing(null)}
+      />
     </div>
   )
 }
