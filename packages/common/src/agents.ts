@@ -744,7 +744,16 @@ export function resolveAgent(
   preferred: string | null | undefined,
   settingsDefault: string | null | undefined
 ): Agent {
-  return (preferred ?? settingsDefault ?? getDefaultAgent()) as Agent
+  // Resolve through the slug map rather than casting. These values arrive from
+  // places a human writes them — workspace.yaml, user settings, a URL — where
+  // "claude" is the obvious thing to type and is a documented alias for
+  // claude-code. A bare cast let it through unnormalised, so downstream lookups
+  // like agentModels[agent] missed, the harness was judged unusable, and the
+  // caller quietly substituted the default. The workspace's declared agent was
+  // ignored and nothing said so.
+  return (
+    resolveAgentSlug(preferred) ?? resolveAgentSlug(settingsDefault) ?? getDefaultAgent()
+  )
 }
 
 /**

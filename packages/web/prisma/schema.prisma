@@ -220,7 +220,7 @@ model Workspace {
 
   // Agent config, same vocabulary as Chat. `agent` is the harness: swapping
   // "claude" -> "opencode" is this one value (see the packages/sdk registry).
-  agent        String  @default("claude")
+  agent        String  @default("claude-code")
   model        String?
   systemPrompt String? @db.Text
 
