@@ -37,7 +37,7 @@ const MAX_UPLOAD_BYTES = 256 * 1024
 const GITKEEP = ".gitkeep"
 
 function TreeNode({ node, depth }: { node: Node; depth: number }) {
-  const { activeWorkspace, openFile, setOpenFile } = useWorkspace()
+  const { activeWorkspace, openFile, requestOpenFile } = useWorkspace()
   const [open, setOpen] = useState(depth < 2)
   const qc = useQueryClient()
   const pad = { paddingLeft: `${depth * 12 + 8}px` }
@@ -70,7 +70,8 @@ function TreeNode({ node, depth }: { node: Node; depth: number }) {
     const active = openFile === node.path
     return (
       <button
-        onClick={() => setOpenFile(node.path!)}
+        data-workspace-file
+        onClick={() => void requestOpenFile(node.path!)}
         onMouseEnter={() => prefetch(node.path!)}
         onFocus={() => prefetch(node.path!)}
         style={pad}
@@ -120,7 +121,7 @@ function TreeNode({ node, depth }: { node: Node; depth: number }) {
  * Anything added here is committed, so the next run clones it.
  */
 export function WorkspaceFiles() {
-  const { activeWorkspace, setOpenFile } = useWorkspace()
+  const { activeWorkspace } = useWorkspace()
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -344,15 +345,10 @@ export function WorkspaceFiles() {
       ))}
 
       {data && data.workspace.length === 0 && !isLoading && (
-        <p className="px-2 py-2 text-xs text-muted-foreground">
-          No files yet. Drop text files here.
+        <p className="px-2 py-2 text-xs text-muted-foreground leading-snug">
+          No files yet. Drop text files here — they commit for everyone on the next run.
         </p>
       )}
-
-      <p className="px-2 pt-2 text-[10px] text-muted-foreground/70 leading-snug">
-        Drag files here from your computer, or use the upload button. Shared with
-        everyone in this workspace; changes commit and load on the next run.
-      </p>
     </div>
   )
 }

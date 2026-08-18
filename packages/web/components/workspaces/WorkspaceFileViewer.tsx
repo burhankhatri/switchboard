@@ -33,7 +33,7 @@ interface FilePayload { path: string; content: string; truncated: boolean; sha: 
  * is why a failure restores the unsaved state rather than just logging.
  */
 export function WorkspaceFileViewer() {
-  const { activeWorkspace, openFile, setOpenFile } = useWorkspace()
+  const { activeWorkspace, openFile, closeOpenFile } = useWorkspace()
   const [draft, setDraft] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   // Selection is tracked as offsets rather than the text itself, so applying a
@@ -158,7 +158,10 @@ export function WorkspaceFileViewer() {
   }
 
   return (
-    <div className="flex h-full w-full max-w-3xl mx-auto flex-col min-h-0">
+    <div
+      data-workspace-file-editor
+      className="flex h-full w-full max-w-3xl mx-auto flex-col min-h-0"
+    >
       <div className="flex items-center gap-2 mb-3">
         <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="font-mono text-xs text-muted-foreground truncate flex-1">{openFile}</span>
@@ -184,7 +187,7 @@ export function WorkspaceFileViewer() {
           Save
         </button>
         <button
-          onClick={() => setOpenFile(null)}
+          onClick={() => void closeOpenFile()}
           className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
           aria-label="Close file"
         >
