@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
+import { WorkspaceConnections } from "@/components/workspaces/WorkspaceConnections"
 import { WorkspaceFiles } from "@/components/workspaces/WorkspaceFiles"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { BRAND } from "@/lib/brand"
@@ -478,6 +479,8 @@ export function Sidebar({
             <>
               <div className="mx-6 my-2 border-t border-border" />
               <WorkspaceFiles />
+              <div className="mx-6 my-2 border-t border-border" />
+              <WorkspaceConnections />
             </>
           )}
 
@@ -749,6 +752,8 @@ export function Sidebar({
         <>
           <div className="mx-4 my-2 border-t border-border" />
           <WorkspaceFiles />
+          <div className="mx-4 my-2 border-t border-border" />
+          <WorkspaceConnections />
         </>
       )}
 
