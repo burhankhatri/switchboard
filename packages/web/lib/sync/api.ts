@@ -144,6 +144,12 @@ export async function fetchChat(
  */
 export async function createChat(data: {
   repo: string
+  /**
+   * Bind the chat to a workspace. Without this the chat gets no repo, no
+   * skills and none of the workspace's connections — the agent lands in an
+   * empty sandbox and reports that it has nothing to work with.
+   */
+  workspaceId?: string
   baseBranch?: string
   parentChatId?: string
   agent?: string

@@ -84,7 +84,7 @@ interface ChatSyncStore {
   /** Functional update of the local chat state (queue/preview/draft maps). */
   setLocalChatState: (updater: (prev: LocalChatState) => LocalChatState) => void
   /** Begin a draft chat; returns its synthetic id. */
-  enterDraftMode: (repo: string, baseBranch: string, agent: string | null, model: string | null) => string
+  enterDraftMode: (repo: string, baseBranch: string, agent: string | null, model: string | null, workspaceId?: string | null) => string
   updateDraftChatConfig: (updates: Partial<Omit<DraftChatConfig, "id">>) => void
   /** Finalize a draft → real chat: migrate local state, clear the draft, select the real id. */
   completeMaterialize: (draftId: string, realId: string) => void
@@ -163,9 +163,9 @@ export const useChatSyncStore = create<ChatSyncStore>((set, get) => ({
     set((state) => ({ localChatState: updater(state.localChatState) }))
   },
 
-  enterDraftMode: (repo, baseBranch, agent, model) => {
+  enterDraftMode: (repo, baseBranch, agent, model, workspaceId) => {
     const draftId = `${DRAFT_CHAT_ID_PREFIX}${nanoid()}`
-    const config: DraftChatConfig = { id: draftId, repo, baseBranch, agent, model }
+    const config: DraftChatConfig = { id: draftId, repo, baseBranch, agent, model, workspaceId }
     set({ draftChatConfig: config, currentChatId: draftId })
     setDraftChatConfig(config)
     persistCurrentChatId(draftId)

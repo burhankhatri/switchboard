@@ -9,6 +9,7 @@ import {
   type SidebarContextValue,
 } from "@/lib/contexts"
 import { NEW_REPOSITORY, type Chat, type ChatStatus } from "@/lib/types"
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import type { GitHubRepo } from "@/lib/github"
 import {
   buildTreeOrderedChatIds,
@@ -35,6 +36,7 @@ interface UseChatNavigationOptions {
   repos: GitHubRepo[]
   isDraftChatId: (chatId: string) => boolean
   selectChat: (chatId: string | null) => void
+  closeOpenFile: () => Promise<boolean>
   startNewChat: (
     repo?: string,
     baseBranch?: string,
@@ -42,7 +44,8 @@ interface UseChatNavigationOptions {
     switchTo?: boolean,
     initialStatus?: ChatStatus,
     agent?: string | null,
-    model?: string | null
+    model?: string | null,
+    workspaceId?: string | null,
   ) => Promise<string | null>
   gitDialogs: GitDialogControls
 }
@@ -51,7 +54,7 @@ interface UseChatNavigationResult {
   /** Tree-ordered chat id list matching the sidebar (ignores collapsed state). */
   treeOrderedChatIds: string[]
   handleNewChat: () => Promise<void>
-  handleSelectChat: (chatId: string) => void
+  handleSelectChat: (chatId: string) => void | Promise<void>
   /**
    * Change the sidebar repo filter and ensure a chat from the newly filtered
    * list is selected (keeps the current chat if it survives the filter,
@@ -86,12 +89,17 @@ export function useChatNavigation({
   repos,
   isDraftChatId,
   selectChat,
+  closeOpenFile,
   startNewChat,
   gitDialogs,
 }: UseChatNavigationOptions): UseChatNavigationResult {
+  // A new chat belongs to whichever workspace is open, so this hook needs it.
+  const { activeWorkspace } = useWorkspace()
+
   // Handler for selecting a chat - switch to chat view and update URL
   const handleSelectChat = useCallback(
-    (chatId: string) => {
+    async (chatId: string) => {
+      if (!await closeOpenFile()) return
       selectChat(chatId)
       sidebar.setViewMode("chat")
       sidebar.setSelectedScheduledJob(null)
@@ -99,7 +107,7 @@ export function useChatNavigation({
       // Using window.history.pushState avoids the component remount router.push causes.
       window.history.pushState(null, "", ROUTES.chat.build(chatId))
     },
-    [selectChat, sidebar]
+    [closeOpenFile, selectChat, sidebar]
   )
 
   // Handler for changing the repo filter from the sidebar. After switching the
@@ -124,6 +132,7 @@ export function useChatNavigation({
       modals.setSignInModalOpen(true)
       return
     }
+    if (!await closeOpenFile()) return
     // Switch to chat view
     sidebar.setViewMode("chat")
     sidebar.setSelectedScheduledJob(null) // Clear selected job when switching to chat
@@ -131,7 +140,23 @@ export function useChatNavigation({
     // Sibling chat — no parentChatId, and use baseBranch (not the working branch) so the
     // new chat starts from the same point the current one did.
     let newChatId: string | null = null
-    if (displayCurrentChat && displayCurrentChat.repo !== NEW_REPOSITORY) {
+    if (activeWorkspace) {
+      // A workspace wins over everything else. Without this the chat is created
+      // unbound: the sandbox clones nothing, no skill is discovered and none of
+      // the workspace's connections are injected — the agent lands in an empty
+      // directory and reports that it has no data source, which is exactly what
+      // it looks like from the outside.
+      newChatId = await startNewChat(
+        undefined,
+        undefined,
+        undefined,
+        true,
+        undefined,
+        null,
+        null,
+        activeWorkspace.id
+      )
+    } else if (displayCurrentChat && displayCurrentChat.repo !== NEW_REPOSITORY) {
       newChatId = await startNewChat(displayCurrentChat.repo, displayCurrentChat.baseBranch)
     } else if (
       sidebar.repoFilter !== ALL_REPOSITORIES &&
@@ -151,15 +176,16 @@ export function useChatNavigation({
     if (newChatId) {
       window.history.pushState(null, "", ROUTES.home.build())
     }
-  }, [session, modals, sidebar, displayCurrentChat, repos, startNewChat])
+  }, [session, modals, closeOpenFile, sidebar, displayCurrentChat, repos, startNewChat, activeWorkspace])
 
   // Handler for opening scheduled jobs view
-  const handleOpenScheduledJobs = useCallback(() => {
+  const handleOpenScheduledJobs = useCallback(async () => {
+    if (!await closeOpenFile()) return
     sidebar.setViewMode("scheduled-jobs")
     sidebar.setSelectedScheduledJob(null)
     selectChat(null)
     window.history.pushState(null, "", ROUTES.jobs.build())
-  }, [sidebar, selectChat])
+  }, [closeOpenFile, sidebar, selectChat])
 
   // Handler for navigating to a job (updates URL and sidebar state)
   const handleNavigateToJob = useCallback(

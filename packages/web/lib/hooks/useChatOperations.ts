@@ -81,12 +81,14 @@ export function useChatOperations({
     initialStatus: Chat["status"] = "pending",
     agent?: string | null,
     model?: string | null,
+    workspaceId?: string | null,
   ): Promise<string | null> => {
     // Branch chats (with parentChatId) are created immediately since they need to reference the parent
     if (parentChatId) {
       try {
         const newChat = await createChatMutation.mutateAsync({
           repo,
+          workspaceId: workspaceId ?? undefined,
           baseBranch,
           parentChatId,
           agent,
@@ -104,7 +106,9 @@ export function useChatOperations({
     }
 
     // For regular new chats, enter draft mode instead of creating in DB
-    return useChatSyncStore.getState().enterDraftMode(repo, baseBranch, agent ?? null, model ?? null)
+    return useChatSyncStore
+      .getState()
+      .enterDraftMode(repo, baseBranch, agent ?? null, model ?? null, workspaceId ?? null)
   }, [createChatMutation])
 
   const removeChat = useCallback(

@@ -27,6 +27,12 @@ const UNSEEN_KEY = "simple-chat-unseen-completions"
 export interface DraftChatConfig {
   id: string // draft-{nanoid} - used for local keying only
   repo: string
+  /**
+   * The workspace this chat belongs to, carried from the moment the draft is
+   * started. Without it the chat materialises unbound: no repo, no skills and
+   * none of the workspace's connections reach the run.
+   */
+  workspaceId?: string | null
   baseBranch: string
   agent: string | null
   model: string | null

@@ -8,6 +8,8 @@ import { NEW_REPOSITORY } from "@/lib/types"
 
 interface CreateChatParams {
   repo?: string
+  /** Binds the chat to a workspace, which supplies its repo, skills and connections. */
+  workspaceId?: string
   baseBranch?: string
   parentChatId?: string
   agent?: string | null
@@ -27,6 +29,7 @@ export function useCreateChatMutation() {
     mutationFn: async (params: CreateChatParams): Promise<Chat> => {
       const serverChat = await apiCreateChat({
         repo: params.repo ?? NEW_REPOSITORY,
+        workspaceId: params.workspaceId,
         baseBranch: params.baseBranch,
         parentChatId: params.parentChatId,
         agent: params.agent ?? undefined,

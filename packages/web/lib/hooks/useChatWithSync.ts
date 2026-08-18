@@ -166,6 +166,8 @@ export function useChatWithSync() {
     try {
       const newChat = await createChatMutation.mutateAsync({
         repo: config.repo,
+        // The binding that makes this a workspace chat rather than an empty one.
+        workspaceId: config.workspaceId ?? undefined,
         baseBranch: config.baseBranch,
         agent: config.agent,
         model: config.model,
