@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ChevronDown, Layers, Lock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useModals } from "@/lib/contexts"
@@ -9,6 +9,7 @@ import { getAgentModels, agentLabels, getModelLabel, hasCredentialsForModel, age
 import { useSettingsQuery } from "@/lib/query/hooks/useSettingsQuery"
 import { AgentIcon } from "../icons/agent-icons"
 import { PillButton } from "../glass-ui/Buttons"
+import { AnchoredMenu } from "../ui/AnchoredMenu"
 import { MobileSelect } from "../ui/MobileBottomSheet"
 import type { HighlightKey } from "../modals/SettingsModal"
 import {
@@ -327,11 +328,15 @@ export function AgentModelSelector({
     )
   }
 
+  // Portalled menus need an element to measure, since they no longer live
+  // inside the trigger's layout.
+  const agentAnchor = useRef<HTMLDivElement>(null)
+
   // Desktop dropdowns
   return (
     <>
       {/* Agent selector - Desktop */}
-      <div className="relative" data-dropdown>
+      <div className="relative" data-dropdown ref={agentAnchor}>
         <PillButton
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation()
@@ -346,8 +351,14 @@ export function AgentModelSelector({
         >
           <ChevronDown className="h-3.5 w-3.5" />
         </PillButton>
-        {showAgentDropdown && (
-          <div className="absolute bottom-full right-0 mb-1 bg-popover border border-border rounded-md shadow-lg py-1 z-50 w-48">
+        <AnchoredMenu
+          anchorRef={agentAnchor}
+          open={showAgentDropdown}
+          onClose={() => setShowAgentDropdown(false)}
+          align="left"
+          width={192}
+        >
+          <div>
             {agents.map((agent) => {
               const status = getAgentStatus(agent, credentialFlags)
               return (
@@ -377,7 +388,7 @@ export function AgentModelSelector({
               )
             })}
           </div>
-        )}
+        </AnchoredMenu>
       </div>
 
       {/* Model selector - Desktop */}

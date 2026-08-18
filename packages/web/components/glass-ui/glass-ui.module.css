@@ -95,10 +95,11 @@
   width: 100%;
   margin-inline: auto;
   position: relative;
-  /* isolate + overflow so the sweep canvas is clipped to the panel and cannot
-     paint over anything outside it. */
+  /* isolate so the sweep canvas's negative z-index stays inside this panel.
+     Deliberately NOT overflow:hidden — the canvas clips itself via its inherited
+     border-radius, and hiding overflow here clipped every menu that opens out of
+     the composer. */
   isolation: isolate;
-  overflow: hidden;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .glassContainerFocus {

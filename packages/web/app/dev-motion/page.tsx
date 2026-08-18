@@ -7,7 +7,9 @@ import { SelectionActions } from "@/components/workspaces/SelectionActions"
 import { GlassContainer } from "@/components/glass-ui/GlassContainer"
 import { PillButton, IconButton, PrimaryAction } from "@/components/glass-ui/Buttons"
 import { TextInputArea } from "@/components/glass-ui/TextInputArea"
-import { Plus, Pencil, ArrowUp } from "lucide-react"
+import { Plus, Pencil, ArrowUp, ChevronDown } from "lucide-react"
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu"
+import { useRef, useState } from "react"
 
 /**
  * Visual harness for the motion primitives.
@@ -16,6 +18,35 @@ import { Plus, Pencil, ArrowUp } from "lucide-react"
  * scale can be checked in a real browser without needing a signed-in session
  * and a running agent to reach them.
  */
+function MenuDemo() {
+  const anchor = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+  return (
+    <GlassContainer className="flex flex-col relative">
+      <div className="relative z-10 w-full">
+        <TextInputArea value="" onChange={() => {}} placeholder="Menu must escape this panel" />
+      </div>
+      <div className="relative z-10 flex items-center gap-1 px-1 pb-0.5">
+        <div ref={anchor} className="relative">
+          <PillButton onClick={() => setOpen((v) => !v)} label="Claude Code" data-testid="menu-trigger">
+            <ChevronDown className="h-3.5 w-3.5" />
+          </PillButton>
+        </div>
+        <AnchoredMenu anchorRef={anchor} open={open} onClose={() => setOpen(false)} width={192}>
+          <div data-testid="menu-body">
+            {["Claude Code", "OpenCode"].map((n) => (
+              <button key={n} className="w-full text-left hover:bg-accent flex items-center gap-2 px-3 py-1.5 text-sm rounded-[6px] cursor-pointer">
+                <span className="flex-1">{n}</span>
+                <span className="h-2 w-2 rounded-full bg-green-500" />
+              </button>
+            ))}
+          </div>
+        </AnchoredMenu>
+      </div>
+    </GlassContainer>
+  )
+}
+
 function SweepDemo() {
   const { canvas, play } = useModelSweep()
   return (
@@ -50,6 +81,11 @@ export default function MotionDevPage() {
           <LoadingState label="Responding" variant="Dots" />
           <LoadingState label="Thinking" variant="Orbit" />
         </div>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-ink-2 text-sm">Anchored menu (must escape the panel)</h2>
+        <div className="w-full max-w-[36rem]"><MenuDemo /></div>
       </section>
 
       <section className="space-y-2">

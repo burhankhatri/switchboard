@@ -4,6 +4,7 @@ import { useRef, useEffect, useCallback, useState } from "react"
 import { AlertTriangle, ArrowUp, Square, ChevronDown, X, Plus, Pencil, ListChecks, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { GlassContainer } from "../glass-ui/GlassContainer"
+import { AnchoredMenu } from "../ui/AnchoredMenu"
 import { DictationControl } from "./DictationControl"
 import { MentionMenu, parseMention, useMentionItems, type MentionItem } from "./MentionMenu"
 import { useModelSweep } from "./ModelSweep"
@@ -346,6 +347,10 @@ export function ChatInput({
     return () => document.removeEventListener('click', handleClickOutside)
   }, [isMobile])
 
+  // Menus are portalled out of the composer, so they need an element to
+  // measure from.
+  const modeAnchor = useRef<HTMLDivElement>(null)
+
   // Changing model updates a label and nothing else, so it is easy to be
   // unsure it took. The sweep is the acknowledgement.
   const { canvas: sweepCanvas, play: playSweep } = useModelSweep()
@@ -562,7 +567,7 @@ export function ChatInput({
                   />
                 </>
               ) : (
-                <div className="relative" data-dropdown>
+                <div className="relative" data-dropdown ref={modeAnchor}>
                   <PillButton
                     onClick={(e: React.MouseEvent) => {
                       e.stopPropagation()
@@ -572,8 +577,14 @@ export function ChatInput({
                     icon={planModeEnabled ? <ListChecks className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
                     label={<span className="hidden sm:inline">{planModeEnabled ? "Plan" : "Edit"}</span>}
                   />
-                  {showModeDropdown && (
-                    <div className="absolute bottom-full right-0 mb-1 bg-popover/85 backdrop-blur-md border border-border/40 rounded-md shadow-lg py-1 z-50 w-32">
+                  <AnchoredMenu
+                    anchorRef={modeAnchor}
+                    open={showModeDropdown}
+                    onClose={() => setShowModeDropdown(false)}
+                    align="left"
+                    width={128}
+                  >
+                    <div>
                       <button
                         onClick={() => {
                           onSetPlanMode(false)
@@ -601,7 +612,7 @@ export function ChatInput({
                         Plan
                       </button>
                     </div>
-                  )}
+                  </AnchoredMenu>
                 </div>
               )
             )}
