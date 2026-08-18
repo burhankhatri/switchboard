@@ -58,6 +58,67 @@ async function ghFetch(url: string, init: RequestInit, attempts = 4): Promise<Re
   return last as Response
 }
 
+/**
+ * ETag cache for GitHub reads.
+ *
+ * Reading a workspace file used to be an unconditional GET on every open, so
+ * opening the same unchanged file ten times cost ten full transfers. GitHub
+ * supports conditional requests and — importantly — a 304 does not count
+ * against the rate limit, so revalidating is close to free.
+ *
+ * Keyed by URL, bounded by entry count rather than bytes: entries are small
+ * JSON payloads and an exact byte budget is not worth the bookkeeping. Insert
+ * order is eviction order (Map iterates oldest-first).
+ */
+const GH_CACHE_MAX = 200
+const ghCache = new Map<string, { etag: string; body: unknown }>()
+
+/** Clear the ETag cache. Called after a write so the next read sees it. */
+export function invalidateRepoCache(): void {
+  ghCache.clear()
+}
+
+/**
+ * GET JSON from GitHub, revalidating with If-None-Match when we have seen this
+ * URL before. Returns the cached body on 304.
+ */
+async function ghCachedJson<T>(url: string, token: string): Promise<T> {
+  const hit = ghCache.get(url)
+  const res = await ghFetch(url, {
+    headers: {
+      ...headers(token),
+      ...(hit ? { "If-None-Match": hit.etag } : {}),
+    },
+    // Next would otherwise apply its own caching to this fetch; the ETag map
+    // above is the cache, and two layers with different lifetimes is a bug.
+    cache: "no-store",
+  })
+
+  if (res.status === 304 && hit) {
+    // Refresh recency so a hot file is not evicted by a cold sweep.
+    ghCache.delete(url)
+    ghCache.set(url, hit)
+    return hit.body as T
+  }
+
+  if (!res.ok) {
+    const err = new Error(`GitHub ${res.status}`) as Error & { status: number }
+    err.status = res.status
+    throw err
+  }
+
+  const body = (await res.json()) as T
+  const etag = res.headers.get("etag")
+  if (etag) {
+    if (ghCache.size >= GH_CACHE_MAX) {
+      const oldest = ghCache.keys().next().value
+      if (oldest !== undefined) ghCache.delete(oldest)
+    }
+    ghCache.set(url, { etag, body })
+  }
+  return body
+}
+
 function headers(token: string) {
   return {
     Authorization: `Bearer ${token}`,
@@ -132,6 +193,8 @@ async function putFile(
   if (!res.ok) {
     throw new Error(`Could not write ${path}: ${res.status} ${await res.text()}`)
   }
+  // Scaffolding a workspace adds files; the cached tree would not show them.
+  invalidateRepoCache()
   return true
 }
 
@@ -218,16 +281,18 @@ export async function listWorkspaceFiles(
   branch = "main"
 ): Promise<{ workspace: RepoFile[]; shared: RepoFile[] }> {
   const [owner, repo] = WORKSPACES_REPO.split("/")
-  const res = await ghFetch(
-    `${GH}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-    { headers: headers(repoAuth(token)) }
-  )
-  if (!res.ok) {
-    throw new Error(`Could not list files: ${res.status} ${await res.text()}`)
-  }
-  const data = (await res.json()) as {
+  let data: {
     truncated?: boolean
     tree: { path: string; type: string; size?: number }[]
+  }
+  try {
+    data = await ghCachedJson(
+      `${GH}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+      repoAuth(token)
+    )
+  } catch (err) {
+    const status = (err as { status?: number }).status
+    throw new Error(`Could not list files: ${status ?? "request failed"}`)
   }
   if (data.truncated) {
     // Surfaced rather than silently showing a partial tree.
@@ -264,16 +329,20 @@ export async function readWorkspaceFile(
     throw new Error(`unsafe path: ${path}`)
   }
   const [owner, repo] = WORKSPACES_REPO.split("/")
-  const res = await ghFetch(
-    `${GH}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}`,
-    { headers: headers(repoAuth(token)) }
-  )
-  if (!res.ok) throw new Error(`Could not read ${path}: ${res.status}`)
-  const data = (await res.json()) as {
+  let data: {
     content?: string
     encoding?: string
     size?: number
     sha?: string
+  }
+  try {
+    data = await ghCachedJson(
+      `${GH}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}`,
+      repoAuth(token)
+    )
+  } catch (err) {
+    const status = (err as { status?: number }).status
+    throw new Error(`Could not read ${path}: ${status ?? "request failed"}`)
   }
   if (data.encoding !== "base64" || typeof data.content !== "string") {
     throw new Error(`${path} is not a readable file`)
@@ -327,5 +396,9 @@ export async function writeWorkspaceFile(
   }
   if (!res.ok) throw new Error(`Could not save ${path}: ${res.status} ${await res.text()}`)
   const data = (await res.json()) as { content?: { sha?: string } }
+  // A commit moves both the blob and the tree, and the ETag cache is keyed by
+  // URL rather than by ref — so without this the author of a change would keep
+  // being served their own pre-edit copy.
+  invalidateRepoCache()
   return { sha: data.content?.sha ?? "" }
 }
