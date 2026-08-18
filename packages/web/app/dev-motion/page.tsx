@@ -2,6 +2,7 @@
 
 import { LoadingState } from "@/components/ui/LoadingState"
 import { DictationControl } from "@/components/chat/DictationControl"
+import { useModelSweep } from "@/components/chat/ModelSweep"
 
 /**
  * Visual harness for the motion primitives.
@@ -10,6 +11,28 @@ import { DictationControl } from "@/components/chat/DictationControl"
  * scale can be checked in a real browser without needing a signed-in session
  * and a running agent to reach them.
  */
+function SweepDemo() {
+  const { canvas, play } = useModelSweep()
+  return (
+    <div
+      className="relative isolate overflow-hidden rounded-[28px] border border-line bg-surface p-6 shadow-card"
+      style={{ backdropFilter: "blur(40px) saturate(140%)" }}
+      data-testid="sweep"
+    >
+      {canvas}
+      <p className="relative z-10 text-ink text-sm">Composer surface</p>
+      <button
+        type="button"
+        onClick={play}
+        data-testid="sweep-play"
+        className="relative z-10 mt-3 rounded-full bg-ink px-3 py-1.5 text-[12px] text-white cursor-pointer"
+      >
+        Play sweep
+      </button>
+    </div>
+  )
+}
+
 export default function MotionDevPage() {
   return (
     <div className="min-h-screen bg-canvas p-10 space-y-8">
@@ -22,6 +45,11 @@ export default function MotionDevPage() {
           <LoadingState label="Responding" variant="Dots" />
           <LoadingState label="Thinking" variant="Orbit" />
         </div>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-ink-2 text-sm">Model sweep (glimm)</h2>
+        <SweepDemo />
       </section>
 
       <section className="space-y-4">

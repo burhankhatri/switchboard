@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { GlassContainer } from "../glass-ui/GlassContainer"
 import { DictationControl } from "./DictationControl"
 import { MentionMenu, parseMention, useMentionItems, type MentionItem } from "./MentionMenu"
+import { useModelSweep } from "./ModelSweep"
 import { TextInputArea } from "../glass-ui/TextInputArea"
 import { PillButton, IconButton, PrimaryAction } from "../glass-ui/Buttons"
 import { useModals } from "@/lib/contexts"
@@ -332,6 +333,17 @@ export function ChatInput({
     return () => document.removeEventListener('click', handleClickOutside)
   }, [isMobile])
 
+  // Changing model updates a label and nothing else, so it is easy to be
+  // unsure it took. The sweep is the acknowledgement.
+  const { canvas: sweepCanvas, play: playSweep } = useModelSweep()
+  const lastModel = useRef(currentModel)
+  useEffect(() => {
+    if (lastModel.current !== currentModel) {
+      lastModel.current = currentModel
+      playSweep()
+    }
+  }, [currentModel, playSweep])
+
   // -- @ mentions ------------------------------------------------------------
   const mention = parseMention(input)
   const mentionQuery = mention?.query ?? ""
@@ -387,6 +399,7 @@ export function ChatInput({
           isDraggingOver && "border-primary ring-2 ring-primary/30"
         )}
       >
+        {sweepCanvas}
         <div
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
