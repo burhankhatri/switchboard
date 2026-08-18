@@ -158,7 +158,7 @@ export function WorkspaceFileViewer() {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className="flex h-full w-full max-w-3xl mx-auto flex-col min-h-0">
       <div className="flex items-center gap-2 mb-3">
         <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="font-mono text-xs text-muted-foreground truncate flex-1">{openFile}</span>
@@ -194,13 +194,15 @@ export function WorkspaceFileViewer() {
 
       {/* Only a file never opened before can show a loading state. */}
       {isPending && (
-        <div className="animate-pulse rounded-xl border border-border bg-card h-64" aria-label="Loading" />
+        <div className="flex-1 animate-pulse rounded-xl border border-border bg-card" aria-label="Loading" />
       )}
       {error && !data && <p className="text-sm text-muted-foreground py-6">Could not open this file.</p>}
       {save.error && <p className="text-sm text-destructive mb-2">{(save.error as Error).message}</p>}
 
       {data && (
-        <>
+        // min-h-0 is load-bearing: without it the textarea's own content height
+        // becomes the flex floor and the editor stops shrinking to its pane.
+        <div className="flex min-h-0 flex-1 flex-col">
           <textarea
             ref={textareaRef}
             value={value}
@@ -210,8 +212,9 @@ export function WorkspaceFileViewer() {
             onMouseUp={syncSelection}
             spellCheck={false}
             readOnly={data.truncated}
-            rows={22}
-            className="w-full rounded-xl border border-border bg-card p-4 text-xs leading-relaxed font-mono outline-none focus:ring-2 focus:ring-ring/40 resize-y"
+            // Fills the pane rather than a fixed 22 rows, which left the editor
+            // floating in a tall empty region.
+            className="min-h-0 w-full flex-1 resize-none rounded-xl border border-border bg-card p-4 text-xs leading-relaxed font-mono outline-none focus:ring-2 focus:ring-ring/40"
           />
           {wsId && (
             <SelectionActions
@@ -222,12 +225,12 @@ export function WorkspaceFileViewer() {
             />
           )}
 
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 shrink-0 text-xs text-muted-foreground">
             {data.truncated
               ? "Truncated — too large to edit here."
               : "Edits are kept in this browser as you type. Saving commits to the workspaces repo, and the next run picks it up."}
           </p>
-        </>
+        </div>
       )}
     </div>
   )
