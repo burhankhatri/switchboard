@@ -69,6 +69,19 @@ export const authOptions: NextAuthOptions = {
       }
       return baseUrl
     },
+    async signIn({ user, profile }) {
+      // Capture the GitHub handle. NextAuth's adapter stores name/email/image
+      // but not the login, and the login is the only identifier a teammate
+      // actually knows — "add burhankhatri" rather than an account id nobody
+      // has seen. Best-effort: a failure here must not block signing in.
+      const login = (profile as { login?: string } | undefined)?.login
+      if (user?.id && login) {
+        prisma.user
+          .update({ where: { id: user.id }, data: { githubLogin: login } })
+          .catch((err) => console.error("[auth] could not store githubLogin:", err))
+      }
+      return true
+    },
     async jwt({ token, user, account }) {
       // On initial sign in, persist user id
       if (user) {

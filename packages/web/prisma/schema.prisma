@@ -22,6 +22,10 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   githubId      String?   @unique
+  // The GitHub handle (e.g. "chemicoholic21"), as distinct from githubId, which
+  // is the numeric account id. This is what a colleague types when adding
+  // someone to a workspace, so it has to be stored and searchable.
+  githubLogin   String?
   name          String?
   image         String?
   createdAt     DateTime  @default(now())

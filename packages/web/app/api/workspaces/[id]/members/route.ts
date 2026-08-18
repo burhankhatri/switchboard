@@ -58,7 +58,7 @@ export async function GET(_req: NextRequest, { params }: Ctx): Promise<Response>
     select: {
       role: true,
       joinedAt: true,
-      user: { select: { id: true, name: true, email: true, image: true, githubId: true } },
+      user: { select: { id: true, name: true, email: true, image: true, githubLogin: true } },
     },
   })
 
@@ -68,6 +68,7 @@ export async function GET(_req: NextRequest, { params }: Ctx): Promise<Response>
       name: m.user.name,
       email: m.user.email,
       image: m.user.image,
+      githubLogin: m.user.githubLogin,
       role: m.role,
       joinedAt: m.joinedAt,
       isYou: m.user.id === auth.userId,
@@ -105,15 +106,20 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
 
     const role = body.role === "owner" ? "owner" : "member"
 
+    // GitHub handle first — it is what a colleague actually knows and the whole
+    // point of "just add their username". Email and display name are accepted
+    // too because not every account has a login stored yet.
+    const handle = identifier.replace(/^@/, "")
     const user = await prisma.user.findFirst({
       where: {
         OR: [
+          { githubLogin: { equals: handle, mode: "insensitive" } },
           { email: { equals: identifier, mode: "insensitive" } },
           { name: { equals: identifier, mode: "insensitive" } },
-          { githubId: identifier },
+          { githubId: handle },
         ],
       },
-      select: { id: true, name: true, email: true, image: true },
+      select: { id: true, name: true, email: true, image: true, githubLogin: true },
     })
     if (!user) {
       return badRequest(
@@ -149,6 +155,7 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
         name: user.name,
         email: user.email,
         image: user.image,
+        githubLogin: user.githubLogin,
         role,
         isYou: false,
       },
