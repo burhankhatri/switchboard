@@ -34,6 +34,7 @@ import {
   computeUnseenTransitions,
   isDraftChatId as isDraftChatIdPure,
 } from "@/lib/chat-state"
+import { readActiveWorkspaceId } from "@/lib/contexts/WorkspaceContext"
 
 // =============================================================================
 // Hook
@@ -164,10 +165,21 @@ export function useChatWithSync() {
 
     materializingDraft.current = true
     try {
+      // Read the active workspace at the last possible moment, and prefer it
+      // over whatever the draft was born with.
+      //
+      // The draft records a workspaceId when it is created, but that is a
+      // render away from the WorkspaceProvider hydrating its value out of
+      // localStorage. Start a chat inside that window — a fresh sign-in, a hard
+      // refresh — and the draft captured `null`, the chat was written unbound,
+      // and the run cloned nothing: an agent sitting in an empty directory
+      // insisting it has no ad data, in a workspace that plainly has some.
+      const activeWorkspaceId = readActiveWorkspaceId()
+
       const newChat = await createChatMutation.mutateAsync({
         repo: config.repo,
         // The binding that makes this a workspace chat rather than an empty one.
-        workspaceId: config.workspaceId ?? undefined,
+        workspaceId: config.workspaceId ?? activeWorkspaceId ?? undefined,
         baseBranch: config.baseBranch,
         agent: config.agent,
         model: config.model,
