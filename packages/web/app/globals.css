@@ -134,15 +134,15 @@
   --sidebar-border: rgba(255, 255, 255, 0.15);
 
   /* Glassmorphism System */
-  --glass-bg: rgba(255, 255, 255, 0.15);
-  --glass-border: rgba(255, 255, 255, 0.25);
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(15, 15, 20, 0.14);
   --glass-blur: blur(24px);
-  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  --glass-shadow: 0 8px 28px rgba(15, 15, 20, 0.10);
   
   /* Button System */
-  --pill-bg: rgba(255, 255, 255, 0.2);
-  --pill-bg-hover: rgba(255, 255, 255, 0.3);
-  --pill-bg-active: rgba(255, 255, 255, 0.4);
+  --pill-bg: rgba(255, 255, 255, 0.70);
+  --pill-bg-hover: rgba(255, 255, 255, 0.88);
+  --pill-bg-active: rgba(255, 255, 255, 1);
   
   /* Colors */
   --text-primary: #111111;
