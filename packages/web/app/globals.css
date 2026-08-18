@@ -120,7 +120,7 @@
   --secondary: rgba(255, 255, 255, 0.25);
   --secondary-foreground: oklch(0.10 0 0);
   --muted: rgba(255, 255, 255, 0.15);
-  --muted-foreground: oklch(0.20 0 0);
+  --muted-foreground: oklch(0 0 0);
   --accent: rgba(255, 255, 255, 0.3);
   --accent-foreground: oklch(0 0 0);
   --destructive: oklch(0.55 0.2 25);
@@ -328,6 +328,17 @@ body::before {
   }
   body {
     @apply text-foreground;
+  }
+  /* Light mode: force all muted/secondary text to full opacity so that
+     Tailwind opacity variants like /50 /60 /70 still render as readable
+     dark text rather than washed-out grey on the gradient background. */
+  :root:not(.dark) .text-muted-foreground,
+  :root:not(.dark) [class*="text-muted-foreground/"] {
+    color: oklch(0 0 0) !important;
+  }
+  :root:not(.dark) .text-sidebar-foreground,
+  :root:not(.dark) [class*="text-sidebar-foreground/"] {
+    color: oklch(0 0 0) !important;
   }
 }
 
