@@ -1,4 +1,9 @@
 import { decryptSecret } from "@/lib/db/encryption"
+import {
+  CONNECTION_SELECT,
+  describeRestConnections,
+  type StoredConnection,
+} from "@/lib/workspace-connections"
 
 /**
  * Workspace runtime resolution.
@@ -22,6 +27,7 @@ export const WORKSPACE_RUNTIME_SELECT = {
   model: true,
   systemPrompt: true,
   environmentVariables: true,
+  connections: { select: CONNECTION_SELECT },
 } as const
 
 export interface WorkspaceRuntime {
@@ -35,6 +41,7 @@ export interface WorkspaceRuntime {
   model: string | null
   systemPrompt: string | null
   environmentVariables: unknown
+  connections: StoredConnection[]
 }
 
 /**
@@ -45,12 +52,24 @@ export interface WorkspaceRuntime {
  * which is the pre-workspace behaviour.
  */
 export function workspaceSessionOptions(
-  workspace: Pick<WorkspaceRuntime, "path" | "systemPrompt"> | null | undefined
+  workspace:
+    | (Pick<WorkspaceRuntime, "path" | "systemPrompt"> & { connections?: StoredConnection[] })
+    | null
+    | undefined
 ): { workspacePath?: string; workspaceSystemPrompt?: string } {
   if (!workspace) return {}
+  // The connection descriptions ride along with the workspace's own prompt: a
+  // token in the environment is useless if the agent does not know what it is
+  // for or how the API expects it to be sent.
+  const described =
+    "connections" in workspace
+      ? describeRestConnections((workspace as { connections: StoredConnection[] }).connections)
+      : ""
+  const prompt = [workspace.systemPrompt ?? "", described].filter(Boolean).join("\n")
+
   return {
     workspacePath: workspace.path,
-    ...(workspace.systemPrompt ? { workspaceSystemPrompt: workspace.systemPrompt } : {}),
+    ...(prompt.trim() ? { workspaceSystemPrompt: prompt } : {}),
   }
 }
 

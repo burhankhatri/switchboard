@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma"
 import { decrypt } from "@/lib/db/encryption"
 import { decryptWorkspaceEnv } from "@/lib/workspace"
+import { restConnectionEnv } from "@/lib/workspace-connections"
 import { NEW_REPOSITORY } from "@/lib/types"
 import { getEnvForModel, type CustomEndpoint } from "@switchboard/common"
 import type { Agent } from "@/lib/agent-session"
@@ -77,7 +78,15 @@ export async function buildAgentEnv(params: {
     }
     // Throws if a value cannot be decrypted, so a broken connection fails at
     // spin-up rather than mid-task or by sending garbage to the CRM as a key.
-    workspaceEnv = decryptWorkspaceEnv(chat.workspace)
+    // REST connections are merged in with the workspace's own variables: both
+    // are workspace-owned, so neither may be shadowed by a user's chat vars.
+    workspaceEnv = {
+      ...decryptWorkspaceEnv(chat.workspace),
+      ...restConnectionEnv(
+        chat.workspace?.connections ?? [],
+        chat.workspace?.slug ?? "workspace"
+      ),
+    }
   }
 
   const shadowed = Object.keys(workspaceEnv).filter((k) => k in userEnv)

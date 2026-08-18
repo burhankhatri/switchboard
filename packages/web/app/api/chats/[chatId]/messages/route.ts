@@ -31,6 +31,7 @@ import { runPreRunPull } from "./_lib/pre-run-pull"
 import { buildAgentHistory } from "./_lib/history"
 import { buildAgentEnv } from "./_lib/agent-env"
 import { workspaceSessionOptions } from "@/lib/workspace"
+import { mcpConnectionServers } from "@/lib/workspace-connections"
 import { persistTurn } from "./_lib/persist-turn"
 
 
@@ -192,6 +193,14 @@ export async function POST(
     let mcpServers: Awaited<ReturnType<typeof loadMcpConnections>> = []
     try {
       mcpServers = await loadMcpConnections({ kind: "chat", id: chatId })
+      // A workspace's MCP connections load for everyone who opens it, on top of
+      // whatever this chat attached for itself.
+      if (chat.workspace) {
+        mcpServers = [
+          ...mcpServers,
+          ...mcpConnectionServers(chat.workspace.connections, chat.workspace.slug),
+        ]
+      }
     } catch (err) {
       console.error("[messages] loadMcpConnections failed:", err)
     }

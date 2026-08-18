@@ -23,6 +23,10 @@ export type ActivityAction =
   // A workspace connection was set or removed. Metadata records the variable
   // NAMES only — a value must never reach an audit row.
   | "workspace_env_updated"
+  // A connection (REST or MCP) was added to or removed from a workspace.
+  // Metadata records identifiers only — never a URL credential or secret.
+  | "workspace_connection_added"
+  | "workspace_connection_removed"
 
 /**
  * Metadata types for different actions
@@ -48,6 +52,8 @@ export type ActivityMetadata = {
   workspaceSlug?: string
   set?: string[]
   removed?: string[]
+  connectionSlug?: string
+  connectionKind?: string
   [key: string]: unknown
 }
 
