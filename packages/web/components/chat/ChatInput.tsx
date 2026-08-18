@@ -1,9 +1,10 @@
 "use client"
 
 import { useRef, useEffect, useCallback, useState } from "react"
-import { AlertTriangle, ArrowUp, Square, ChevronDown, X, Plus, Pencil, ListChecks, Mic, GitBranch } from "lucide-react"
+import { AlertTriangle, ArrowUp, Square, ChevronDown, X, Plus, Pencil, ListChecks, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { GlassContainer } from "../glass-ui/GlassContainer"
+import { DictationControl } from "./DictationControl"
 import { TextInputArea } from "../glass-ui/TextInputArea"
 import { PillButton, IconButton, PrimaryAction } from "../glass-ui/Buttons"
 import { useModals } from "@/lib/contexts"
@@ -547,30 +548,13 @@ export function ChatInput({
           <div className="flex items-center" style={{ gap: '10px' }}>
             {/* Voice dictation */}
             {speech.isSupported && (
-              <IconButton
-                type="button"
-                onClick={toggleListening}
-                disabled={speech.permissionDenied}
-                aria-pressed={speech.isListening}
-                className={cn(
-                  speech.permissionDenied ? "opacity-50 cursor-not-allowed" : "",
-                  speech.isListening ? "bg-red-500 hover:bg-red-600 active:bg-red-700 animate-pulse text-white" : ""
-                )}
-                title={
-                  speech.permissionDenied
-                    ? "Microphone access denied"
-                    : speech.isListening
-                    ? "Stop dictation"
-                    : "Dictate prompt"
-                }
-                aria-label={
-                  speech.permissionDenied
-                    ? "Microphone access denied"
-                    : speech.isListening
-                    ? "Stop voice dictation"
-                    : "Start voice dictation"
-                }
-                icon={<Mic className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />}
+              <DictationControl
+                isListening={speech.isListening}
+                permissionDenied={speech.permissionDenied}
+                transcript={speech.transcript}
+                error={speech.error}
+                onToggle={toggleListening}
+                isMobile={isMobile}
               />
             )}
 

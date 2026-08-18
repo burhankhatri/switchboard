@@ -1,6 +1,7 @@
 "use client"
 
 import { LoadingState } from "@/components/ui/LoadingState"
+import { DictationControl } from "@/components/chat/DictationControl"
 
 /**
  * Visual harness for the motion primitives.
@@ -20,6 +21,16 @@ export default function MotionDevPage() {
           <LoadingState label="Creating sandbox" variant="Drive" />
           <LoadingState label="Responding" variant="Dots" />
           <LoadingState label="Thinking" variant="Orbit" />
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-ink-2 text-sm">DictationControl</h2>
+        <div className="flex flex-wrap items-center gap-4 rounded-xl bg-surface p-6 shadow-card" data-testid="dictation">
+          <DictationControl isListening={false} permissionDenied={false} transcript="" error={null} onToggle={() => {}} />
+          <DictationControl isListening permissionDenied={false} transcript="" error={null} onToggle={() => {}} />
+          <DictationControl isListening permissionDenied={false} transcript="compare pistachio weekends to last summer" error={null} onToggle={() => {}} />
+          <DictationControl isListening={false} permissionDenied transcript="" error={null} onToggle={() => {}} />
         </div>
       </section>
 
