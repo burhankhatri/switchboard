@@ -24,7 +24,7 @@ function ToastItem({ toast }: { toast: Toast }) {
           {toast.title}
         </div>
         {toast.body && (
-          <div className="mt-0.5 break-words text-xs text-neutral-600 dark:text-neutral-400">
+          <div className="mt-0.5 break-words text-xs text-neutral-900 dark:text-neutral-400">
             {toast.body}
           </div>
         )}
