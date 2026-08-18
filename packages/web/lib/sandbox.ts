@@ -202,65 +202,81 @@ export async function createSandboxForChat(
     },
   })
 
-  await sandbox.process.executeCommand(`mkdir -p ${PATHS.LOGS_DIR}`)
-
   const repoPath = `${PATHS.SANDBOX_HOME}/${repoName}`
 
+  // Not awaited in sequence: nothing below needs the logs directory to exist,
+  // and the agent process creates its own log files later.
+  const logsDir = sandbox.process.executeCommand(`mkdir -p ${PATHS.LOGS_DIR}`)
+
   if (isNewRepo) {
-    await sandbox.process.executeCommand(`mkdir -p ${repoPath}`)
-    await sandbox.process.executeCommand(`cd ${repoPath} && git init`)
+    // One exec, not five. Every executeCommand is a round trip to the sandbox
+    // and a process spawn; these commands are plain shell with no branching, so
+    // there is nothing to be gained from issuing them separately.
     await sandbox.process.executeCommand(
-      `cd ${repoPath} && git config user.email "agent@simplechat.dev" && git config user.name "Simple Chat Agent"`
-    )
-    await sandbox.process.executeCommand(
-      `cd ${repoPath} && echo "# Project" > README.md && git add . && git commit -m "Initial commit"`
-    )
-    await sandbox.process.executeCommand(
-      `cd ${repoPath} && git checkout -b ${newBranch}`
+      [
+        `mkdir -p ${repoPath}`,
+        `cd ${repoPath}`,
+        "git init",
+        'git config user.email "agent@simplechat.dev"',
+        'git config user.name "Simple Chat Agent"',
+        'echo "# Project" > README.md',
+        "git add .",
+        'git commit -m "Initial commit"',
+        `git checkout -b ${newBranch}`,
+      ].join(" && ")
     )
   } else {
     const cloneUrl = `https://github.com/${owner}/${repoApiName}.git`
     const git = createSandboxGit(sandbox)
+
+    // Started before the clone rather than after it: this is a call to
+    // api.github.com that the clone does not depend on, so awaiting it in
+    // sequence just added its latency to spin-up. Kicked off here, collected
+    // below.
+    const identity = fetch("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        Accept: "application/vnd.github.v3+json",
+      },
+    })
+      .then(async (res) => (res.ok ? await res.json() : null))
+      .catch(() => null)
+
     await git.clone(cloneUrl, repoPath, baseBranch, undefined, githubToken!)
 
     let gitName = "Simple Chat Agent"
     let gitEmail = "noreply@example.com"
-    try {
-      const ghRes = await fetch("https://api.github.com/user", {
-        headers: {
-          Authorization: `Bearer ${githubToken}`,
-          Accept: "application/vnd.github.v3+json",
-        },
-      })
-      if (ghRes.ok) {
-        const ghUser = await ghRes.json()
-        gitName = ghUser.name || ghUser.login
-        gitEmail = `${ghUser.login}@users.noreply.github.com`
-      }
-    } catch {
-      /* use defaults */
+    const ghUser = await identity
+    if (ghUser) {
+      gitName = ghUser.name || ghUser.login
+      gitEmail = `${ghUser.login}@users.noreply.github.com`
     }
-    await sandbox.process.executeCommand(
-      `cd ${repoPath} && git config user.email "${gitEmail}" && git config user.name "${gitName}"`
-    )
 
     // Branch setup: either restore existing branch from remote or create new
     if (restoreExistingBranch) {
       try {
         await git.fetchBranch(repoPath, newBranch, githubToken!)
-        await git.checkoutBranch(repoPath, newBranch)
+        // One exec for identity + checkout. Each executeCommand is a round trip
+        // to the sandbox plus a process spawn, and these were four of them.
+        await sandbox.process.executeCommand(
+          `cd ${repoPath} && git config user.email "${gitEmail}" && git config user.name "${gitName}" && git checkout ${newBranch}`
+        )
         branchRestored = true
       } catch {
         // Branch doesn't exist on remote, create fresh from baseBranch
-        await git.createBranch(repoPath, newBranch)
-        await git.checkoutBranch(repoPath, newBranch)
+        await sandbox.process.executeCommand(
+          `cd ${repoPath} && git config user.email "${gitEmail}" && git config user.name "${gitName}" && git checkout -b ${newBranch}`
+        )
         branchRestored = false
       }
     } else {
-      await git.createBranch(repoPath, newBranch)
-      await git.checkoutBranch(repoPath, newBranch)
+      await sandbox.process.executeCommand(
+        `cd ${repoPath} && git config user.email "${gitEmail}" && git config user.name "${gitName}" && git checkout -b ${newBranch}`
+      )
     }
   }
+
+  await logsDir
 
   let previewUrlPattern: string | undefined
   try {
