@@ -6,6 +6,10 @@ import { ENDPOINT_MODEL_PREFIX } from "@switchboard/common"
 import type { Agent } from "@/lib/agent-session"
 import type { Credentials } from "@/lib/credentials"
 import type { MessagePayload } from "./types"
+import {
+  claudeCredentialStatus,
+  describeClaudeCredential,
+} from "@/lib/claude-credential-status"
 
 export interface ResolvedCredentials {
   credentials: Credentials
@@ -61,6 +65,24 @@ export async function resolveSendCredentials(
       },
       { status: 429 }
     )
+  }
+
+  // A user's own Claude credential is never refreshed — the cron and the admin
+  // endpoint both act on the shared-pool row — so a pasted blob simply stops
+  // working after about eight hours. Caught here it is one clear message;
+  // uncaught it is an opaque agent failure hours after the paste that looked
+  // like it succeeded.
+  if (payload.agent === "claude-code" && credentials.CLAUDE_CODE_CREDENTIALS) {
+    const state = claudeCredentialStatus(credentials.CLAUDE_CODE_CREDENTIALS)
+    if (state.status === "expired" || state.status === "unparseable") {
+      return Response.json(
+        {
+          error: "CLAUDE_CREDENTIAL_INVALID",
+          message: `Your Claude Code credential is not usable. ${describeClaudeCredential(state)}`,
+        },
+        { status: 400 }
+      )
+    }
   }
 
   // Shared-pool fallback for Claude Code: when the user hasn't stored their own
