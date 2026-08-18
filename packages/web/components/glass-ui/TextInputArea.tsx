@@ -42,7 +42,6 @@ export const TextInputArea: React.FC<TextInputAreaProps> = ({
     >
       {showCustomPlaceholder && !isFocused && (
         <div className={styles.customPlaceholderContainer}>
-          <div className={`${styles.cursor} ${styles.cursorBlinking}`}></div>
           <span className={styles.placeholder}>{placeholder}</span>
         </div>
       )}
