@@ -474,6 +474,7 @@ export function Sidebar({
               <div className="mx-6 my-2 border-t border-border" />
               <WorkspaceConnections />
               <WorkspaceRuns />
+              <div className="h-8 shrink-0" />
             </>
           )}
 
@@ -673,7 +674,10 @@ export function Sidebar({
           </div>
 
           {/* Chat List */}
-          <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-2 pt-0">
+          {/* Bounded rather than flex-1: it used to take every remaining
+              pixel, leaving the workspace sections below squeezed against the
+              pinned footer with nowhere to scroll. */}
+          <div className="max-h-[38vh] overflow-y-auto scrollbar-auto-hide p-2 pt-0">
             <div className="space-y-0">
               {isLoadingChats ? (
                 /* Chat list skeleton while loading */
@@ -729,13 +733,17 @@ export function Sidebar({
       )}
 
       {activeWorkspace && !collapsed && (
-        <>
+        // min-h-0 is required: without it a flex child will not shrink below its
+        // content, so this never scrolls and an expanded form is simply clipped.
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-auto-hide">
           <div className="mx-4 my-2 border-t border-border" />
           <WorkspaceFiles />
           <div className="mx-4 my-2 border-t border-border" />
           <WorkspaceConnections />
           <WorkspaceRuns />
-        </>
+          {/* So the last control never sits flush against the footer. */}
+          <div className="h-6 shrink-0" />
+        </div>
       )}
 
       {/* Spacer when collapsed */}
