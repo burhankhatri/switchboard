@@ -125,7 +125,20 @@ export function WorkspaceFiles() {
   })
 
   if (!activeWorkspace) return null
+
+  // A workspace persisted by an older build may lack `path`. Without it every
+  // write would post "undefined/<file>" and be refused by the containment
+  // check — which looked exactly like the upload doing nothing.
   const base = activeWorkspace.path
+  if (!base) {
+    return (
+      <div className="px-2 pb-2">
+        <p className="px-2 py-2 text-xs text-destructive">
+          This workspace is missing its path. Re-pick it from the dropdown.
+        </p>
+      </div>
+    )
+  }
 
   async function addFiles(files: File[]) {
     // Sequential: each write is a commit, and GitHub rejects concurrent writes

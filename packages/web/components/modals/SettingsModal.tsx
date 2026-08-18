@@ -117,6 +117,9 @@ export function SettingsModal({ open, onClose, settings, credentialFlags, onSave
     () => initialCredValues(credentialFlags),
     [credentialFlags]
   )
+  // Settings persist on close, but pasting a long credential and closing with
+  // no acknowledgement is indistinguishable from it not working.
+  const [saved, setSaved] = useState(false)
 
   // Working copy of the custom-endpoint list, edited in the Custom endpoints tab.
   const [endpoints, setEndpoints] = useState<CustomEndpoint[]>(initialEndpoints)
@@ -347,7 +350,14 @@ export function SettingsModal({ open, onClose, settings, credentialFlags, onSave
 
   const setCredValue = useCallback((id: CredentialId, value: string) => {
     setCredValues((prev) => ({ ...prev, [id]: value }))
+    setSaved(false)
   }, [])
+
+  const handleSaveNow = useCallback(() => {
+    const data = buildSaveData()
+    if (data) void onSave(data)
+    setSaved(true)
+  }, [buildSaveData, onSave])
 
   // Cmd/Ctrl+Enter closes (and thereby saves) the modal.
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -494,6 +504,17 @@ export function SettingsModal({ open, onClose, settings, credentialFlags, onSave
                   <div key={s.key}>{renderSection(s.key)}</div>
                 ))}
               </div>
+              {/* Explicit save. Closing still persists, but this gives the
+                  acknowledgement that a pasted credential actually landed. */}
+              <div className="flex items-center justify-end gap-3 border-t border-border px-4 py-3">
+                {saved && <span className="text-xs text-primary">Saved</span>}
+                <button
+                  onClick={handleSaveNow}
+                  className="rounded-lg bg-primary text-primary-foreground px-3.5 py-1.5 text-sm font-medium hover:opacity-90 cursor-pointer"
+                >
+                  Save
+                </button>
+              </div>
             </>
           ) : (
             <div className="flex flex-1 min-h-0">
@@ -537,6 +558,15 @@ export function SettingsModal({ open, onClose, settings, credentialFlags, onSave
                     {activeTitle}
                   </Dialog.Title>
                   {renderSection(activeSection)}
+                </div>
+                <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-3">
+                  {saved && <span className="text-xs text-primary">Saved</span>}
+                  <button
+                    onClick={handleSaveNow}
+                    className="rounded-lg bg-primary text-primary-foreground px-3.5 py-1.5 text-sm font-medium hover:opacity-90 cursor-pointer"
+                  >
+                    Save
+                  </button>
                 </div>
               </div>
             </div>
