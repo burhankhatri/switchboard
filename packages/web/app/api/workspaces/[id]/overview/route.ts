@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server"
 import { prisma } from "@/lib/db/prisma"
 import { requireAuth, isAuthError, internalError } from "@/lib/db/api-helpers"
-import { gateWorkspace } from "@/lib/workspace"
+import { gateWorkspace } from "@/lib/workspace-gate"
 import { CONNECTION_SELECT, restEnvNames } from "@/lib/workspace-connections"
+import { workspaceEnvKeys } from "@/lib/workspace"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -30,7 +31,11 @@ export async function GET(_req: NextRequest, { params }: Ctx): Promise<Response>
   if (!gate.ok) return gate.response
 
   try {
-    const [connections, members, runs] = await Promise.all([
+    const [envRow, connections, members, runs] = await Promise.all([
+      prisma.workspace.findUnique({
+        where: { id },
+        select: { environmentVariables: true },
+      }),
       prisma.workspaceConnection.findMany({
         where: { workspaceId: id },
         orderBy: { name: "asc" },
@@ -57,6 +62,10 @@ export async function GET(_req: NextRequest, { params }: Ctx): Promise<Response>
 
     return Response.json({
       yourRole: gate.role,
+      // NAMES only — never values. Surfaced so the UI can say what the sandbox
+      // will actually see, which is how someone spots that a workspace is
+      // running against fixtures rather than the live API.
+      envKeys: workspaceEnvKeys(envRow),
       // Secrets never leave the server; only whether one is set, and the names
       // of the variables it becomes.
       connections: connections.map(({ encryptedSecret, ...c }) => ({
