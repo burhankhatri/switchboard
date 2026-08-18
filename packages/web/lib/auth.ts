@@ -3,6 +3,7 @@ import GitHubProvider from "next-auth/providers/github"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/prisma"
 import { logActivityAsync } from "@/lib/db/activity-log"
+import { invalidateGitHubToken } from "@/lib/db/api-helpers"
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
@@ -49,6 +50,9 @@ export const authOptions: NextAuthOptions = {
       // On initial sign in, persist user id
       if (user) {
         token.sub = user.id
+        // Re-read on every sign-in so a promotion or demotion lands on the next
+        // login instead of being pinned for the life of the token.
+        token.isAdmin = undefined
       }
       if (account) {
         // Sync the fresh token to the Account table. The PrismaAdapter only
@@ -65,6 +69,12 @@ export const authOptions: NextAuthOptions = {
               },
               data: { access_token: account.access_token },
             })
+            .then(() => {
+              // The token cache in api-helpers is keyed by user and outlives
+              // this write, so a re-authorization would otherwise keep serving
+              // the revoked token until its TTL expired.
+              if (token.sub) invalidateGitHubToken(token.sub)
+            })
             .catch((err) => {
               console.error("[auth] Failed to sync access_token to Account table:", err)
             })
@@ -77,12 +87,18 @@ export const authOptions: NextAuthOptions = {
       if (session.user && token.sub) {
         session.user.id = token.sub
 
-        // Fetch isAdmin status from database
-        const user = await prisma.user.findUnique({
-          where: { id: token.sub },
-          select: { isAdmin: true },
-        })
-        session.user.isAdmin = user?.isAdmin ?? false
+        // isAdmin comes off the token. It used to be a findUnique here, which
+        // meant EVERY getServerSession() — so every authenticated API request —
+        // paid a round trip to a cross-region Neon pooler before the route did
+        // any of its own work. Tokens minted before this back-fill once.
+        if (token.isAdmin === undefined) {
+          const user = await prisma.user.findUnique({
+            where: { id: token.sub },
+            select: { isAdmin: true },
+          })
+          token.isAdmin = user?.isAdmin ?? false
+        }
+        session.user.isAdmin = token.isAdmin
       }
       return session
     },

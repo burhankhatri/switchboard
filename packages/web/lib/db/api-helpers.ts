@@ -236,15 +236,43 @@ export interface GitHubAuthResult {
 }
 
 /**
- * Gets the GitHub access token for a user from the database.
+ * Process-local cache of GitHub access tokens.
+ *
+ * Every authenticated request used to re-read the Account row to get this, and
+ * the database is a cross-region Neon pooler — so a file read paid a full
+ * round trip just to learn a credential that had not changed. A user's GitHub
+ * token changes only on re-authorization, which writes through
+ * `invalidateGitHubToken` below, so a short TTL is a safety net rather than the
+ * correctness mechanism.
+ *
+ * Deliberately NOT stored on the session JWT. That would remove the query too,
+ * but it would also put a live `repo`-scoped GitHub credential inside a cookie
+ * that travels to the browser on every request. Keeping it server-side means a
+ * stolen session cookie is still only a session.
+ */
+const TOKEN_TTL_MS = 60_000
+const tokenCache = new Map<string, { token: string; expires: number }>()
+
+/** Drop a cached token — call after writing a new one to the Account row. */
+export function invalidateGitHubToken(userId: string): void {
+  tokenCache.delete(userId)
+}
+
+/**
+ * Gets the GitHub access token for a user, from cache when warm.
  * Returns null if no GitHub account is linked or no token is stored.
  */
 export async function getGitHubToken(userId: string): Promise<string | null> {
+  const hit = tokenCache.get(userId)
+  if (hit && hit.expires > Date.now()) return hit.token
+
   const account = await prisma.account.findFirst({
     where: { userId, provider: "github" },
     select: { access_token: true },
   })
-  return account?.access_token ?? null
+  const token = account?.access_token ?? null
+  if (token) tokenCache.set(userId, { token, expires: Date.now() + TOKEN_TTL_MS })
+  return token
 }
 
 /**
@@ -259,17 +287,12 @@ export async function requireGitHubAuth(): Promise<GitHubAuthResult | Response> 
     return unauthorized()
   }
 
-  // Get the GitHub account access token
-  const account = await prisma.account.findFirst({
-    where: { userId, provider: "github" },
-    select: { access_token: true },
-  })
-
-  if (!account?.access_token) {
+  const token = await getGitHubToken(userId)
+  if (!token) {
     return Response.json({ error: "GitHub account not linked" }, { status: 401 })
   }
 
-  return { userId, token: account.access_token }
+  return { userId, token }
 }
 
 /**
