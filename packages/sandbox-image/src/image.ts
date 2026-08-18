@@ -32,13 +32,27 @@ const SNAPSHOT_STATE_ACTIVE = "active"
  *
  * Throws if no snapshot is ready — caller should handle first-run bootstrap.
  */
+/**
+ * Cache of the resolved snapshot name.
+ *
+ * This is called on EVERY sandbox creation and probes the Daytona control plane
+ * one snapshot at a time — network round trips to answer a question whose
+ * answer only changes when someone rebuilds the image. The TTL is what lets a
+ * rebuild be picked up without a restart.
+ */
+let cachedSnapshot: { name: string; expires: number } | null = null
+const SNAPSHOT_TTL_MS = 5 * 60_000
+
 export async function getActiveSnapshotName(
   daytona: import("@daytonaio/sdk").Daytona
 ): Promise<string> {
+  if (cachedSnapshot && cachedSnapshot.expires > Date.now()) return cachedSnapshot.name
+
   for (const name of ALL_SNAPSHOT_NAMES) {
     try {
       const snapshot = await daytona.snapshot.get(name)
       if (snapshot.state === SNAPSHOT_STATE_ACTIVE) {
+        cachedSnapshot = { name, expires: Date.now() + SNAPSHOT_TTL_MS }
         return name
       }
       // exists but not ready (building/removing/error) — skip it
