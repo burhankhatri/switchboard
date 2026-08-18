@@ -32,6 +32,10 @@ packages/web/lib/generated/prisma
 
 # Claude
 .claude/
+# ...but OpenSpec's slash commands and skills are project tooling, not personal
+# settings — everyone working here should get them.
+!.claude/commands/
+!.claude/skills/
 
 # Build artifacts
 tsconfig.tsbuildinfo

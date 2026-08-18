@@ -1,0 +1,50 @@
+schema: spec-driven
+
+context: |
+  Switchboard — shared agent workspaces, derived from background-agents.
+  A workspace is a folder in one private git repo carrying the skills, scripts
+  and connections for one kind of work. A run spawns a Daytona sandbox,
+  sparse-clones that folder, and starts a headless agent with cwd inside it.
+
+  Stack: TypeScript, Next.js 16 (App Router), Prisma 7 + Neon Postgres,
+  NextAuth v4 (GitHub OAuth, JWT sessions), Tailwind 4, Daytona SDK,
+  Claude Code CLI headless. npm workspaces monorepo.
+
+  Conventions:
+  - Conventional commits. Commit messages explain WHY, not what.
+  - Comments explain reasoning and non-obvious constraints, never narrate code.
+  - Read AGENTS.md before running anything; it lists the pre-existing type
+    errors and the traps.
+  - Security-relevant changes to workspace connections must keep the
+    membership checks at BOTH bind time and run time.
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

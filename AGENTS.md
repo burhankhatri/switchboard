@@ -2,45 +2,73 @@
 
 Primary reference for coding agents working in this repo.
 
-- **Repo overview / packages**: [README.md](./README.md)
+- **What this is, decisions, status, next steps**: [PROGRESS.md](./PROGRESS.md)
+- **Capability specs**: `openspec/specs/` — read these before changing behaviour
+  in that capability. Use `/opsx:propose` for a change that alters a spec.
 
-## What the user has to provide
+## What this project is
 
-The agent can follow the setup and workflow instructions in this repo on its own. The user provides values for these env vars by exporting them in the current shell environment.
+Switchboard: shared agent workspaces. A **workspace is a folder in one private
+git repo** (`WORKSPACES_REPO`) carrying the skills, scripts and connections for
+one kind of work. A run spawns a Daytona sandbox, sparse-clones that folder, and
+starts a headless agent with its cwd inside it.
 
-> **Note for agents:** check whether these env vars are set by running the `env` command (e.g. `env | grep DAYTONA_API_KEY`). Do not assume they are unset — they are exported in the shell, not stored in a tracked file.
+Derived from background-agents (Apache-2.0, see NOTICE).
 
-**Required for dev server and tests**
+## Setup
 
-- `DAYTONA_API_KEY` — exported in the shell (reused by `.env.test`).
+Secrets live in **`packages/web/.env.local`, which is tracked in this repo** — do
+not expect them in the shell and do not recreate the file. It holds
+`DATABASE_URL` + `DIRECT_URL`, `DAYTONA_API_KEY`, GitHub OAuth,
+`NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, `WORKSPACES_REPO`.
 
-**Required for dev server**
-
-- Auth: `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` (GitHub OAuth app).
-
-**Optional** (only if those integrations are in scope)
-
-- `SMITHERY_*` — remote MCP servers from the Smithery registry.
-- `GITHUB_APP_*` — authenticated GitHub MCP server.
-
-Before running tests or a dev server, confirm the required env vars above are exported, then follow [DEVELOPMENT.md](./DEVELOPMENT.md).
+```bash
+npm install && npm run prisma:generate
+npm run dev            # http://localhost:4000
+```
 
 ## After editing code
 
-Before running typecheck for the first time (or after pulling new changes), ensure dependencies are installed:
-
 ```bash
-npm install
-npm run prisma:generate
+cd packages/web && npx tsc --noEmit -p tsconfig.json
 ```
 
-Then run `npm run typecheck` to verify there are no type errors. This is much faster than a full build (~5 seconds vs 2-3 minutes).
+**There are 21 pre-existing type errors**, all in `components/sidebar.tsx`,
+`lib/hooks/usePaletteProps.ts` and `app/page.tsx` — a filename-casing conflict on
+case-insensitive filesystems. Compare the count against 21; do not try to reach
+zero and do not treat them as yours.
 
-Editing `prisma/schema.prisma`? See [Database migration](./packages/web/README.md#database-migration).
+```bash
+cd packages/web && npx vitest run        # 187 tests; run from packages/web, the @/ alias breaks from the repo root
+```
 
-## Debugging
+## Verifying real behaviour
 
-- Investigate with console logs.
-- Prefer integration and end-to-end tests over narrow unit tests.
-- Write a test that reproduces the bug before fixing it.
-- After fixing, keep only the general-case tests — drop the one written to pin down this specific bug.
+Neither of these is a unit test — both hit real infrastructure.
+
+```bash
+# spins a real sandbox, sparse-clones, runs the agent, asserts skill discovery + isolation
+WORKSPACE_PATH=workspaces/lead-gen npx dotenv -e packages/web/.env.local -- node scripts/slice-zero.mjs
+
+# 36 assertions against the real HTTP API (needs the dev server up); creates a real
+# workspace and commits a real folder
+cd packages/web && GH_TOKEN=$(gh auth token) npx dotenv -e .env.local -- node ../../scripts/e2e-workspace.mjs
+```
+
+## Things that will bite you
+
+- **Two sidebars.** `components/Sidebar.tsx` renders separate mobile and desktop
+  trees. A change to one is invisible on the other.
+- **Migrations need `DIRECT_URL`.** Neon's pgbouncer pooler cannot take the
+  advisory locks `prisma migrate` requires.
+- **`repoPath` means the clone root, everywhere.** The agent's cwd is a
+  subdirectory of it. Conflating them makes the agent commit from a folder it
+  believes is the repo root.
+- **Workspace connections merge LAST**, above user variables. This is deliberate
+  and is an authorization boundary — see `openspec/specs/workspace-connections`.
+- **Secrets use `encryptSecret`/`decryptSecret`, not `encrypt`/`decrypt`.** The
+  plain pair returns ciphertext on failure, which would be sent to the CRM as a
+  credential.
+- **Rebuilding the sandbox image** (`npm run build:snapshot`) is only needed when
+  `packages/sandbox-image` changes. The image has `python3` but **no `pip`** and
+  **no `gh`**.
