@@ -1,7 +1,11 @@
 "use client"
 
-import { Key, Check, RefreshCw, X } from "lucide-react"
+import { Key, Check, RefreshCw, X, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  claudeCredentialStatus,
+  describeClaudeCredential,
+} from "@/lib/claude-credential-status"
 import { Textarea } from "@/components/ui/textarea"
 import {
   CREDENTIAL_KEYS,
@@ -15,6 +19,7 @@ import {
   CopyCode,
   ToggleSwitch,
   MobileSectionHeader,
+  MASK,
 } from "./shared"
 
 /** Which provider's API key field to highlight with a red outline. */
@@ -249,7 +254,12 @@ export function ApiKeysSection({
                 onChange={(v) => setCredValue(field.id, v)}
                 onClear={() => setCredValue(field.id, "")}
               />
-              {field.id === "CLAUDE_CODE_CREDENTIALS" && <ClaudeCredentialsHint />}
+              {field.id === "CLAUDE_CODE_CREDENTIALS" && (
+                <>
+                  <ClaudeCredentialStatus value={value} />
+                  <ClaudeCredentialsHint />
+                </>
+              )}
             </SettingsRow>
           )
         }
@@ -267,5 +277,37 @@ export function ApiKeysSection({
         )
       })}
     </div>
+  )
+}
+
+/**
+ * Whether the pasted credential is actually usable.
+ *
+ * A subscription token lasts about eight hours and nothing refreshes a user's
+ * own stored copy, so a blob can be structurally perfect, save without
+ * complaint, and already be dead. Saying so here turns a mysterious agent
+ * failure hours later into something visible at the moment you paste.
+ */
+function ClaudeCredentialStatus({ value }: { value: string }) {
+  // The masked placeholder means "unchanged", not "this is the credential".
+  if (!value || value === MASK) return null
+  const state = claudeCredentialStatus(value)
+  if (state.status === "missing") return null
+
+  const bad = state.status === "expired" || state.status === "unparseable"
+  return (
+    <p
+      className={cn(
+        "mt-1.5 flex items-start gap-1.5 text-xs",
+        bad ? "text-destructive" : "text-muted-foreground"
+      )}
+    >
+      {bad ? (
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      ) : (
+        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+      )}
+      <span>{describeClaudeCredential(state)}</span>
+    </p>
   )
 }
