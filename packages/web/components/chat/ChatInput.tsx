@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowUp, Square, ChevronDown, X, Plus, Pencil, ListCheck
 import { cn } from "@/lib/utils"
 import { GlassContainer } from "../glass-ui/GlassContainer"
 import { DictationControl } from "./DictationControl"
+import { MentionMenu, parseMention, useMentionItems, type MentionItem } from "./MentionMenu"
 import { TextInputArea } from "../glass-ui/TextInputArea"
 import { PillButton, IconButton, PrimaryAction } from "../glass-ui/Buttons"
 import { useModals } from "@/lib/contexts"
@@ -331,6 +332,44 @@ export function ChatInput({
     return () => document.removeEventListener('click', handleClickOutside)
   }, [isMobile])
 
+  // -- @ mentions ------------------------------------------------------------
+  const mention = parseMention(input)
+  const mentionQuery = mention?.query ?? ""
+  const mentionItems = useMentionItems(mentionQuery)
+  const mentionOpen = mention !== null
+  const [mentionIndex, setMentionIndex] = useState(0)
+
+  useEffect(() => {
+    setMentionIndex(0)
+  }, [mentionQuery])
+
+  const applyMention = (item: MentionItem) => {
+    if (!mention) return
+    onInputChange(`${input.slice(0, mention.start)}@${item.token} `)
+    textareaRef?.current?.focus()
+  }
+
+  // Runs before the composer's own handler so the mention menu owns the arrow
+  // keys while it is open — otherwise Enter would send the message instead of
+  // accepting the highlighted row.
+  const handleKeyDownWithMentions = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionOpen && mentionItems.length > 0) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault()
+        setMentionIndex(
+          (i) => (i + (e.key === "ArrowDown" ? 1 : mentionItems.length - 1)) % mentionItems.length
+        )
+        return
+      }
+      if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+        e.preventDefault()
+        applyMention(mentionItems[mentionIndex])
+        return
+      }
+    }
+    onKeyDown(e)
+  }
+
   // Mode options for mobile bottom sheet
   const modeOptions = [
     { value: "edit", label: "Edit", icon: <Pencil className="h-5 w-5" /> },
@@ -404,13 +443,23 @@ export function ChatInput({
             />
           )}
 
+          {mentionOpen && (
+            <MentionMenu
+              items={mentionItems}
+              activeIndex={mentionIndex}
+              onActiveIndexChange={setMentionIndex}
+              onSelect={applyMention}
+              query={mentionQuery}
+            />
+          )}
+
           <TextInputArea
             textareaRef={textareaRef}
             data-chat-prompt
             data-testid="chat-input"
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
-            onKeyDown={onKeyDown}
+            onKeyDown={handleKeyDownWithMentions}
             onPaste={onPaste}
             placeholder={
               isCreating
