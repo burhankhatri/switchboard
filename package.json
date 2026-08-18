@@ -29,7 +29,8 @@
     "seed:ccauth": "dotenv -e packages/web/.env -e .env -c -- npm run seed:ccauth -w @switchboard/web",
     "start:electron": "dotenv -e packages/desktop/.env -e packages/web/.env -e .env -c -- sh -c 'BACKGROUND_AGENTS_URL=\"${BACKGROUND_AGENTS_URL:-https://switchboard.local}\" npm run start -w @switchboard/desktop'",
     "clean": "npm run clean --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "vercel-build": "npm run build --workspaces --if-present --workspace @switchboard/common --workspace @switchboard/agent-configuration --workspace @switchboard/claude-credentials --workspace @switchboard/mcp --workspace @switchboard/sandbox-git --workspace @switchboard/sandbox-jobs --workspace @switchboard/sandbox-skills --workspace @switchboard/sandbox-terminal --workspace @switchboard/sdk && npm run build -w @switchboard/web"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
@@ -41,5 +42,15 @@
   "dependencies": {
     "@types/ssh2": "^1.15.5",
     "ssh2": "^1.17.0"
+  },
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "0.20.2",
+    "@img/sharp-libvips-linux-x64": "1.2.4",
+    "@img/sharp-linux-x64": "0.34.5",
+    "@napi-rs/canvas-linux-x64-gnu": "0.1.100",
+    "@next/swc-linux-x64-gnu": "16.1.6",
+    "@rollup/rollup-linux-x64-gnu": "4.60.4",
+    "@tailwindcss/oxide-linux-x64-gnu": "4.3.0",
+    "lightningcss-linux-x64-gnu": "1.32.0"
   }
 }
