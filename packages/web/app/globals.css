@@ -109,54 +109,183 @@
 }
 
 :root {
-  --background: oklch(0.99 0.001 60);
+  --background: transparent;
   --foreground: oklch(0.15 0.005 60);
-  --card: oklch(1 0 0);
+  --card: rgba(255, 255, 255, 0.18);
   --card-foreground: oklch(0.15 0.005 60);
-  --popover: oklch(1 0 0);
+  --popover: rgba(255, 255, 255, 0.7);
   --popover-foreground: oklch(0.15 0.005 60);
   --primary: oklch(0.62 0.16 62);
   --primary-foreground: oklch(0.16 0.02 60);
-  --secondary: oklch(0.95 0.005 60);
+  --secondary: rgba(255, 255, 255, 0.25);
   --secondary-foreground: oklch(0.25 0 0);
-  --muted: oklch(0.95 0.005 60);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.96 0.005 60);
+  --muted: rgba(255, 255, 255, 0.15);
+  --muted-foreground: oklch(0.4 0 0);
+  --accent: rgba(255, 255, 255, 0.3);
   --accent-foreground: oklch(0.15 0.005 60);
   --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.88 0.005 60);
-  --input: oklch(0.88 0.005 60);
+  --border: rgba(255, 255, 255, 0.18);
+  --input: rgba(255, 255, 255, 0.15);
   --ring: oklch(0.62 0.16 62);
   --radius: 0.75rem;
-  --sidebar: oklch(0.95 0.005 60);
+  --sidebar: rgba(255, 255, 255, 0.12);
   --sidebar-foreground: oklch(0.15 0.005 60);
-  --sidebar-border: oklch(0.92 0.003 60);
+  --sidebar-border: rgba(255, 255, 255, 0.15);
 }
 
 .dark {
-  --background: oklch(0.13 0.005 60);
+  --background: transparent;
   --foreground: oklch(0.95 0 0);
-  --card: oklch(0.16 0.005 60);
+  --card: rgba(15, 15, 20, 0.25);
   --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.18 0.005 60);
+  --popover: rgba(20, 20, 25, 0.85);
   --popover-foreground: oklch(0.95 0 0);
   --primary: oklch(0.78 0.15 72);
   --primary-foreground: oklch(0.16 0.02 60);
-  --secondary: oklch(0.22 0.005 60);
+  --secondary: rgba(255, 255, 255, 0.05);
   --secondary-foreground: oklch(0.88 0 0);
-  --muted: oklch(0.20 0.005 60);
+  --muted: rgba(255, 255, 255, 0.04);
   --muted-foreground: oklch(0.63 0 0);
-  --accent: oklch(0.22 0.008 60);
+  --accent: rgba(255, 255, 255, 0.08);
   --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(0.95 0 0);
-  --border: oklch(0.30 0.005 60);
-  --input: oklch(0.22 0.005 60);
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.06);
   --ring: oklch(0.78 0.15 72);
-  --sidebar: oklch(0.11 0.005 60);
+  --sidebar: rgba(15, 15, 20, 0.3);
   --sidebar-foreground: oklch(0.93 0 0);
-  --sidebar-border: oklch(0.25 0.005 60);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+}
+
+/* Premium grainy gradient background */
+.premium-bg {
+  background-color: #cb8bb4 !important;
+  background-image: 
+    radial-gradient(circle at 0% 0%, rgba(252, 234, 210, 0.95), transparent 60%),
+    radial-gradient(circle at 100% 0%, rgba(231, 142, 117, 0.95), transparent 65%),
+    radial-gradient(circle at 100% 100%, rgba(212, 137, 164, 0.95), transparent 60%),
+    radial-gradient(circle at 0% 100%, rgba(125, 133, 222, 0.95), transparent 60%) !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+}
+
+body::before {
+  content: "" !important;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  opacity: 0.065 !important;
+  mix-blend-mode: overlay !important;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E") !important;
+  background-repeat: repeat !important;
+}
+
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.055;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+.premium-grid-line-v-left {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 8%;
+  width: 1px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 15%, rgba(255, 255, 255, 0.12) 85%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.premium-grid-line-v-right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 8%;
+  width: 1px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 15%, rgba(255, 255, 255, 0.12) 85%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.premium-grid-line-h-top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8%;
+  height: 1px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 15%, rgba(255, 255, 255, 0.12) 85%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.premium-grid-line-h-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8%;
+  height: 1px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 15%, rgba(255, 255, 255, 0.12) 85%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Glassmorphism panel styles */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(24px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(120%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05) !important;
+}
+
+.dark .glass-panel {
+  background: rgba(15, 15, 20, 0.25) !important;
+  backdrop-filter: blur(24px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(120%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2) !important;
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark .glass-input {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 9999px !important;
+}
+
+.dark .glass-pill {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 9999px !important;
 }
 
 @theme inline {
@@ -198,7 +327,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
   }
 }
 

@@ -345,7 +345,7 @@ export function ChatInput({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
-          "relative flex flex-col border shadow-sm bg-card border-border",
+          "relative flex flex-col glass-panel shadow-sm",
           isMobile ? "rounded-xl" : "rounded-2xl",
           "focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20",
           isDraggingOver && "border-primary ring-2 ring-primary/30"
@@ -643,7 +643,7 @@ export function ChatInput({
                     <ChevronDown className="h-3.5 w-3.5" />
                   </button>
                   {showModeDropdown && (
-                    <div className="absolute bottom-full right-0 mb-1 bg-popover border border-border rounded-md shadow-lg py-1 z-50 w-32">
+                    <div className="absolute bottom-full right-0 mb-1 bg-popover/85 backdrop-blur-md border border-border/40 rounded-md shadow-lg py-1 z-50 w-32">
                       <button
                         onClick={() => {
                           onSetPlanMode(false)

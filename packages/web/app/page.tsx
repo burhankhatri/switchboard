@@ -561,7 +561,14 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
     <ChatProvider value={chatContextValue}>
     <GitProvider value={gitContextValue}>
     <LocalSyncManager />
-    <div className={`flex overflow-hidden ${isMobile ? 'h-screen-mobile' : 'h-screen'}`}>
+    <div className={`flex overflow-hidden relative premium-bg ${isMobile ? 'h-screen-mobile' : 'h-screen'}`}>
+      {/* Premium grain overlay and technical layout/grid lines */}
+      <div className="grain-overlay" />
+      <div className="premium-grid-line-v-left" />
+      <div className="premium-grid-line-v-right" />
+      <div className="premium-grid-line-h-top" />
+      <div className="premium-grid-line-h-bottom" />
+
       {/* Sidebar — desktop renders inline, mobile renders as a drawer.
           The Sidebar component branches on isMobile internally, so the only
           props that actually differ are the collapse/width controls (no-op on

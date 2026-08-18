@@ -229,7 +229,7 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
   // Chat with messages
   return (
     <div
-      className="flex-1 flex flex-col bg-background min-h-0"
+      className="flex-1 flex flex-col bg-transparent backdrop-blur-xl border-l border-border/10 min-h-0"
       data-testid="chat-container"
       data-chat-status={chat?.status}
       data-chat-id={chat?.id}
@@ -281,7 +281,7 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
 
       {/* Input - fixed at bottom on mobile */}
       <div className={cn(
-        "bg-background",
+        "bg-transparent",
         isMobile
           ? (hasQueued ? "px-[27px] pt-0 pb-3 pb-safe" : "px-[27px] py-3 pb-safe")
           : (hasQueued ? "px-[31px] pt-0 pb-4" : "px-[31px] pb-4 pt-2")

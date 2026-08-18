@@ -25,7 +25,7 @@ import {
   renderChatTree,
   renderMobileChatTree,
   getChatRepos,
-} from "./sidebar"
+} from "./sidebar/index"
 
 // Re-export from context for backward compatibility
 export { ALL_REPOSITORIES, NO_REPOSITORY, ARCHIVED_CHATS } from "@/lib/contexts"
@@ -356,7 +356,7 @@ export function Sidebar({
         {/* Mobile drawer */}
         <div
           ref={sidebarRef}
-          className="fixed inset-y-0 left-0 z-50 w-[280px] flex flex-col bg-background border-r border-sidebar-border transition-transform duration-300 ease-out"
+          className="fixed inset-y-0 left-0 z-50 w-[280px] flex flex-col bg-sidebar border-r border-sidebar-border backdrop-blur-xl transition-transform duration-300 ease-out"
           style={{
             transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
           }}
@@ -466,7 +466,7 @@ export function Sidebar({
                   onBranch: showingArchived ? undefined : onBranchChat,
                   onArchive: showingArchived ? undefined : onArchiveChat,
                   onUnarchive: showingArchived ? onUnarchiveChat : undefined,
-                  onRequestRename: (id, name) => modals.setMobileRenameChat({ id, name }),
+                  onRequestRename: (id: string, name: string) => modals.setMobileRenameChat({ id, name }),
                 })
               )}
             </div>
@@ -585,7 +585,7 @@ export function Sidebar({
     <div
       ref={sidebarRef}
       className={cn(
-        "relative flex h-full flex-col bg-background border-r border-sidebar-border hide-mobile",
+        "relative flex h-full flex-col bg-sidebar border-r border-sidebar-border backdrop-blur-xl hide-mobile",
         isAnimating && "transition-[width] duration-200 ease-in-out"
       )}
       style={{ width: collapsed ? COLLAPSED_WIDTH : width }}
@@ -722,16 +722,16 @@ export function Sidebar({
                   onUnarchive: showingArchived ? onUnarchiveChat : undefined,
                   onRenameChat,
                   // Merge/rebase and drag-to-merge apply to active chats only.
-                  onMerge: showingArchived || !onRequestMergeChats ? undefined : (id) => onRequestMergeChats(id),
-                  onRebase: showingArchived || !onRequestRebaseChat ? undefined : (id) => onRequestRebaseChat(id),
+                  onMerge: showingArchived || !onRequestMergeChats ? undefined : (id: string) => onRequestMergeChats(id),
+                  onRebase: showingArchived || !onRequestRebaseChat ? undefined : (id: string) => onRequestRebaseChat(id),
                   dragSourceId: showingArchived ? null : dragSourceId,
                   dragOverId: showingArchived ? null : dragOverId,
                   canDrop: showingArchived ? undefined : canDrop,
-                  onDragStartChat: showingArchived ? undefined : (id) => setDragSourceId(id),
+                  onDragStartChat: showingArchived ? undefined : (id: string) => setDragSourceId(id),
                   onDragEndChat: showingArchived ? undefined : () => { setDragSourceId(null); setDragOverId(null) },
-                  onDragEnterChat: showingArchived ? undefined : (id) => setDragOverId(id),
-                  onDragLeaveChat: showingArchived ? undefined : (id) => setDragOverId((prev) => (prev === id ? null : prev)),
-                  onDropChat: showingArchived ? undefined : (id) => {
+                  onDragEnterChat: showingArchived ? undefined : (id: string) => setDragOverId(id),
+                  onDragLeaveChat: showingArchived ? undefined : (id: string) => setDragOverId((prev) => (prev === id ? null : prev)),
+                  onDropChat: showingArchived ? undefined : (id: string) => {
                     if (onRequestMergeChats && dragSourceId) {
                       onRequestMergeChats(dragSourceId, id)
                     }
