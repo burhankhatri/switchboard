@@ -55,7 +55,7 @@ export function MobileBottomSheet({
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-black/15 backdrop-blur-[1px] transition-opacity duration-300",
+          "fixed inset-0 app-scrim transition-opacity duration-300",
           elevated ? "z-[60]" : "z-50",
           open ? "opacity-100" : "opacity-0"
         )}

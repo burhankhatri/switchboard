@@ -205,7 +205,7 @@ export function SkillSearchView({ open, onOpenChange, chatId, repo }: SkillSearc
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-in fade-in-0"
+        className="app-scrim fixed inset-0 z-50 animate-in fade-in-0"
         onClick={() => onOpenChange(false)}
       />
 

@@ -223,7 +223,7 @@ export function EnvironmentVariablesModal({
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className={cn(
-          "fixed inset-0 z-50 bg-black/15 backdrop-blur-[1px] transition-opacity duration-300",
+          "fixed inset-0 z-50 app-scrim transition-opacity duration-300",
           open ? "opacity-100" : "opacity-0"
         )} />
         <Dialog.Content

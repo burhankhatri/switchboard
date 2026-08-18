@@ -35,7 +35,7 @@ export function BaseDialog({ open, onClose, title, icon, children, isMobile = fa
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/15 backdrop-blur-[1px]" />
+        <Dialog.Overlay className="fixed inset-0 z-50 app-scrim" />
         <Dialog.Content
           onOpenAutoFocus={(e) => {
             if (initialFocusRef?.current) {

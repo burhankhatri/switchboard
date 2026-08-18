@@ -54,7 +54,7 @@ export function FilePreviewModal({ file, fileContent, onClose, onRemove, isMobil
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="app-scrim fixed inset-0 z-50 flex items-center justify-center"
       onClick={(e) => {
         // Close when clicking outside the modal content
         if (e.target === e.currentTarget) {

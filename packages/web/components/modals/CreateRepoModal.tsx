@@ -124,7 +124,7 @@ export function CreateRepoModal({
       <Dialog.Portal>
         <Dialog.Overlay
           className={cn(
-            "fixed inset-0 z-50 transition-opacity duration-300 bg-black/15 backdrop-blur-[1px]",
+            "fixed inset-0 z-50 transition-opacity duration-300 app-scrim",
             open ? "opacity-100" : "opacity-0"
           )}
         />
