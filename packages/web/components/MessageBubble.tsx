@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, memo } from "react"
+import { StreamingPending } from "@/components/agent/StreamingText"
 import { GitMerge, FileText, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Message } from "@/lib/types"
@@ -106,11 +107,9 @@ function AssistantContent({ message, isStreaming, isMobile = false, repo, onOpen
   // Error messages should still render even when they have no content yet.
   if (isEmpty && !isErrorMessage) {
     if (!isStreaming) return null
-    return (
-      <div className="text-2xl text-muted-foreground animate-pulse">
-        ...
-      </div>
-    )
+    // Elapsed time matters here: this gap covers sandbox boot and can run to
+    // tens of seconds, and a bare "..." reads as hung rather than working.
+    return <StreamingPending startedAt={new Date(message.timestamp).getTime()} />
   }
 
   // Git operation messages use SystemMessage component
