@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import "tw-animate-css";
 @import "xterm/css/xterm.css";
 
 @custom-variant dark (&:is(.dark *));
@@ -152,6 +153,35 @@
   --pill-bg-hover: rgba(255, 255, 255, 0.96);
   --pill-bg-active: rgba(255, 255, 255, 1);
 
+  /* ---------------------------------------------------------------------
+     Named scale used by the shared components. The semantic tokens above are
+     shadcn's vocabulary; these are the vocabulary the design work is written
+     in. They alias the same values rather than introducing a second palette —
+     change a value above and both stay in step.
+
+     ink   = text, three tiers. surface/canvas/inset/field = backgrounds.
+     line  = hairlines. hover = interactive fills.
+     --------------------------------------------------------------------- */
+  --ink: #111114;
+  --ink-2: rgba(17, 17, 20, 0.66);
+  --ink-3: rgba(17, 17, 20, 0.45);
+  --surface: rgba(255, 255, 255, 0.92);
+  --canvas: #f7f6fa;
+  --inset: rgba(17, 17, 20, 0.05);
+  --field: rgba(255, 255, 255, 0.92);
+  --line: rgba(17, 17, 20, 0.14);
+  --line-strong: rgba(17, 17, 20, 0.28);
+  --hover: rgba(17, 17, 20, 0.07);
+  --hover-2: rgba(17, 17, 20, 0.04);
+  --accent-tint: rgba(224, 122, 43, 0.14);
+  --accent-ink: #b45309;
+  --green: #15803d;
+  --radius-chip: 8px;
+  --shadow-hairline: 0 0 0 1px rgba(17, 17, 20, 0.08);
+  --shadow-card: 0 1px 2px rgba(15, 15, 20, 0.06), 0 4px 12px rgba(15, 15, 20, 0.06);
+  --shadow-raised: 0 2px 6px rgba(15, 15, 20, 0.08), 0 12px 32px rgba(15, 15, 20, 0.14);
+  --shadow-overlay: 0 8px 24px rgba(15, 15, 20, 0.16);
+
   /* Colors */
   --text-primary: #111111;
   /* Secondary text sits ON a light surface — this must be dark. It was white,
@@ -184,6 +214,79 @@
   --sidebar: rgba(15, 15, 20, 0.3);
   --sidebar-foreground: oklch(0.95 0 0);
   --sidebar-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================================================
+   Motion
+   ============================================================================
+   The app had no keyframes at all, so every "animated" component was really a
+   class swap or nothing. These are the primitives the shared components below
+   build on. Two easing curves, named rather than repeated: `--ease-drawer` is
+   what the mobile drawer and bottom sheet already used, `--ease-spring` is the
+   overshoot-free settle used by anything that pops into place.
+   ========================================================================== */
+
+:root {
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* A cell in the pixel-grid loader lighting up as the wavefront passes. */
+@keyframes pixel-on {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 1; }
+}
+
+/* Sweeps a highlight across a text gradient. The element must set
+   background-clip: text and a background wider than itself. */
+@keyframes shimmer-text {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Menus, chips and popovers arriving. Scale from just under 1 so the motion
+   reads as "settling into place" rather than "growing". */
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* A word resolving out of blur as it streams in. */
+@keyframes stream-in {
+  from { opacity: 0; filter: blur(4px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Staggered list items. Small offset — a large one reads as a page transition. */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Dictation level meter. Scaled rather than sized so it stays on the compositor. */
+@keyframes eq-bounce {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+/* Anyone who has asked their system to stop moving things means it. Animation
+   is turned off rather than shortened, because these are decorative — the
+   information they carry (a state, a count, an elapsed time) is in the text
+   beside them, not in the motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Modal / dialog scrim. Every overlay uses this one class so "focus the thing
@@ -354,6 +457,25 @@ body::before {
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-surface: var(--surface);
+  --color-canvas: var(--canvas);
+  --color-inset: var(--inset);
+  --color-field: var(--field);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-hover: var(--hover);
+  --color-hover-2: var(--hover-2);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-ink: var(--accent-ink);
+  --color-green: var(--green);
+  --radius-chip: var(--radius-chip);
+  --shadow-hairline: var(--shadow-hairline);
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-border: var(--sidebar-border);
@@ -366,16 +488,24 @@ body::before {
   body {
     @apply text-foreground;
   }
-  /* Light mode: force all muted/secondary text to full opacity so that
-     Tailwind opacity variants like /50 /60 /70 still render as readable
-     dark text rather than washed-out grey on the gradient background. */
+  /* Secondary text is a real tier again.
+
+     This used to force every .text-muted-foreground — and every opacity
+     variant of it — to pure black !important, on the theory that anything
+     lighter washed out against the gradient. The effect was that the app had
+     exactly one text colour: headings, labels, captions and hints all rendered
+     identically, which is why sections read as undifferentiated slabs.
+
+     The fix for "washed out" is a secondary tier dark enough to read on the
+     mesh, not the absence of one. --ink-2 is that tier, and it clears WCAG AA
+     on the lightest part of the gradient. */
   :root:not(.dark) .text-muted-foreground,
   :root:not(.dark) [class*="text-muted-foreground/"] {
-    color: oklch(0 0 0) !important;
+    color: var(--ink-2);
   }
   :root:not(.dark) .text-sidebar-foreground,
   :root:not(.dark) [class*="text-sidebar-foreground/"] {
-    color: oklch(0 0 0) !important;
+    color: var(--ink-2);
   }
 }
 
