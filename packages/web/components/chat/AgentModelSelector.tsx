@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { ChevronDown, Cpu, Lock } from "lucide-react"
+import { ChevronDown, Layers, Lock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useModals } from "@/lib/contexts"
 import type { Agent, ModelOption, CredentialFlags, Chat } from "@/lib/types"
@@ -302,7 +302,7 @@ export function AgentModelSelector({
           onClick={() => setShowModelSheet(true)}
           className={!hasRequiredCredentials ? "text-red-500" : ""}
           title={getModelLabel(currentAgent, currentModel, endpoints)}
-          icon={!hasRequiredCredentials ? <Lock className="h-4 w-4" /> : <Cpu className="h-4 w-4 @[18rem]/row2:hidden" />}
+          icon={!hasRequiredCredentials ? <Lock className="h-4 w-4" /> : <Layers className="h-4 w-4 @[18rem]/row2:hidden" />}
           label={<span className="hidden @[18rem]/row2:inline">{getModelLabel(currentAgent, currentModel, endpoints)}</span>}
         />
 
@@ -394,7 +394,7 @@ export function AgentModelSelector({
           <PillButton
             className={!hasRequiredCredentials ? "text-red-500" : ""}
             title={getModelLabel(currentAgent, currentModel, endpoints)}
-            icon={!hasRequiredCredentials ? <Lock className="h-3.5 w-3.5" /> : <Cpu className="h-3.5 w-3.5 @[32rem]:hidden" />}
+            icon={!hasRequiredCredentials ? <Lock className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5 @[32rem]:hidden" />}
             label={<span className="hidden @[32rem]:inline">{getModelLabel(currentAgent, currentModel, endpoints)}</span>}
           >
             <ChevronDown className="h-3.5 w-3.5" />

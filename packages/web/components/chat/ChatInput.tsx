@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useEffect, useCallback, useState } from "react"
-import { AlertTriangle, ArrowUp, Square, ChevronDown, X, Paperclip, Pencil, ListChecks, Mic, GitBranch } from "lucide-react"
+import { AlertTriangle, ArrowUp, Square, ChevronDown, X, Plus, Pencil, ListChecks, Mic, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { GlassContainer } from "../glass-ui/GlassContainer"
 import { TextInputArea } from "../glass-ui/TextInputArea"
@@ -456,7 +456,7 @@ export function ChatInput({
               onClick={() => fileInputRef.current?.click()}
               title="Attach files"
               aria-label="Attach files"
-              icon={<Paperclip className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />}
+              icon={<Plus className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />}
             />
 
             {/* Repo picker and MCP picker removed: the workspace supplies the
