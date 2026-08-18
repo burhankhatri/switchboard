@@ -4,7 +4,6 @@ import type { ReactNode } from "react"
 import { ChevronLeft, Boxes, ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
-import { WorkspaceFileViewer } from "@/components/workspaces/WorkspaceFileViewer"
 
 interface WelcomeViewProps {
   isMobile: boolean
@@ -26,7 +25,7 @@ export function WelcomeView({
   chatInput,
   filePreviewModal,
 }: WelcomeViewProps) {
-  const { activeWorkspace: active, setActiveWorkspace: setActive, ready, openFile } = useWorkspace()
+  const { activeWorkspace: active, setActiveWorkspace: setActive, ready } = useWorkspace()
 
   return (
     <>
@@ -38,9 +37,7 @@ export function WelcomeView({
         )}
       >
 
-        {!ready ? null : openFile ? (
-          <WorkspaceFileViewer />
-        ) : active ? (
+        {!ready ? null : active ? (
           /* ── Workspace active: centred composer ──
              Width must match ChatInput's own max-w-[52rem]. When the wrapper was
              narrower the composer overflowed its right edge while mx-auto held

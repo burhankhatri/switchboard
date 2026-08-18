@@ -15,6 +15,7 @@ import { NEW_REPOSITORY, agentSupportsPlanMode } from "@/lib/types"
 import type { SlashCommandType } from "./SlashCommandMenu"
 import { useChatComposer } from "@/lib/hooks/useChatComposer"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { WorkspaceFileViewer } from "@/components/workspaces/WorkspaceFileViewer"
 
 interface ChatPanelProps {
   chat: Chat | null
@@ -68,7 +69,7 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
     onUpdateChat,
     onSlashCommand,
   })
-  const { activeWorkspace } = useWorkspace()
+  const { activeWorkspace, openFile } = useWorkspace()
   const {
     modals,
     git,
@@ -108,6 +109,21 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
     removeFile,
     setPreviewFile,
   } = composer
+
+  // A file opened from the sidebar takes over the centre pane, whichever view
+  // would otherwise be here. This used to live inside WelcomeView, which only
+  // renders for a chat with no messages — so in any real chat, clicking a file
+  // set the state, highlighted the row, and displayed nothing.
+  if (openFile) {
+    return (
+      <div
+        className="flex-1 flex flex-col bg-transparent backdrop-blur-xl border-l border-border/10 min-h-0 overflow-y-auto p-4"
+        data-testid="workspace-file-view"
+      >
+        <WorkspaceFileViewer />
+      </div>
+    )
+  }
 
   // No chat selected - show a skeleton while the first chat is being created.
   if (!chat) {
