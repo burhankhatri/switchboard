@@ -193,6 +193,14 @@ export async function createSandboxForChat(
     name: generateSandboxName(userId),
     snapshot: await getActiveSnapshotName(daytona),
     autoStopInterval: 5,
+    // Archive an hour after it stops. Archiving moves the filesystem to cold
+    // storage and releases the disk, and the sandbox still starts again on the
+    // next message — so this costs a slower resume and buys the quota back.
+    //
+    // Without it the SDK default is SEVEN DAYS, and every chat holds 5GiB for
+    // that whole time. Six chats in a day is a 30GiB org limit exhausted, which
+    // presents as "Total disk limit exceeded" on an unrelated new chat.
+    autoArchiveInterval: 60,
     autoDeleteInterval: 5760, // 4 days - auto-delete after being stopped for four days
     public: true,
     labels: {
