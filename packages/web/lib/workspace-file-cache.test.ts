@@ -5,6 +5,7 @@ import {
   readDraft,
   writeDraft,
   clearDraft,
+  isWorkspaceFileDirty,
 } from "@/lib/workspace-file-cache"
 
 /**
@@ -67,6 +68,16 @@ describe("workspace file cache", () => {
     expect(readDraft(WS, PATH)).toEqual({ content: "half-written", baseSha: "abc" })
     clearDraft(WS, PATH)
     expect(readDraft(WS, PATH)).toBeNull()
+  })
+
+  it("detects dirty drafts against the cached server copy", () => {
+    installStorage()
+    writeCachedFile(WS, PATH, { content: "original", sha: "abc", truncated: false })
+    expect(isWorkspaceFileDirty(WS, PATH)).toBe(false)
+    writeDraft(WS, PATH, { content: "edited", baseSha: "abc" })
+    expect(isWorkspaceFileDirty(WS, PATH)).toBe(true)
+    writeDraft(WS, PATH, { content: "original", baseSha: "abc" })
+    expect(isWorkspaceFileDirty(WS, PATH)).toBe(false)
   })
 
   it("evicts cached files under quota pressure but never drafts", () => {

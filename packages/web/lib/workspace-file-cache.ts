@@ -114,3 +114,12 @@ export function writeDraft(workspaceId: string, path: string, draft: Draft): voi
 export function clearDraft(workspaceId: string, path: string): void {
   remove(key(DRAFT_PREFIX, workspaceId, path))
 }
+
+/** True when a draft exists and differs from the last cached server copy. */
+export function isWorkspaceFileDirty(workspaceId: string, path: string): boolean {
+  const draft = readDraft(workspaceId, path)
+  if (!draft) return false
+  const cached = readCachedFile(workspaceId, path)
+  if (!cached) return true
+  return draft.content !== cached.content
+}

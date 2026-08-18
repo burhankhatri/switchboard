@@ -29,6 +29,7 @@ import { useChatNavigation } from "@/lib/hooks/useChatNavigation"
 import { useRepoSelectHandler } from "@/lib/hooks/useRepoSelectHandler"
 import { BackgroundSystem } from "@/components/glass-ui/BackgroundSystem"
 import { LocalSyncManager } from "@/lib/hooks/useLocalSync"
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import {
   ChatProvider,
   ModalProvider,
@@ -36,6 +37,7 @@ import {
   GitProvider,
   SidebarProvider,
   useSidebar,
+  COLLAPSED_WIDTH,
   type ChatContextValue,
   type GitContextValue,
 } from "@/lib/contexts"
@@ -94,6 +96,7 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
   const { githubTokenInvalid, dismissReAuthBanner } = useGitHubTokenCheck()
   const modals = useModals()
   const sidebar = useSidebar()
+  const { closeOpenFile } = useWorkspace()
 
   // Derived route state for page title (uses Next.js pathname for SSR compatibility)
   const isJobsRoute = pathname?.startsWith("/jobs") ?? false
@@ -233,6 +236,20 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
     }
   }, [isMobile, sidebar])
 
+  // Command/search palettes center in the main column; the sidebar is excluded via this variable.
+  useEffect(() => {
+    const root = document.documentElement
+    if (isMobile) {
+      root.style.removeProperty("--app-sidebar-width")
+      return
+    }
+    const sidebarWidth = sidebar.collapsed ? COLLAPSED_WIDTH : sidebar.width
+    root.style.setProperty("--app-sidebar-width", `${sidebarWidth}px`)
+    return () => {
+      root.style.removeProperty("--app-sidebar-width")
+    }
+  }, [isMobile, sidebar.collapsed, sidebar.width])
+
   // Auto-select first chat on mobile when no chat is selected
   useEffect(() => {
     if (isMobile && isHydrated && !currentChatId && chats.length > 0) {
@@ -334,6 +351,7 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
     repos,
     isDraftChatId,
     selectChat,
+    closeOpenFile,
     startNewChat,
     gitDialogs,
   })
