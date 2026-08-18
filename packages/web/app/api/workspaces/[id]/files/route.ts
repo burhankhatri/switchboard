@@ -25,21 +25,30 @@ type Ctx = { params: Promise<{ id: string }> }
  * run will clone.
  */
 export async function GET(req: NextRequest, { params }: Ctx): Promise<Response> {
-  const auth = await requireGitHubAuth()
-  if (isGitHubAuthError(auth)) return auth
-  const { userId, token } = auth
   const { id } = await params
 
-  const workspace = await prisma.workspace.findFirst({
-    where: { id, archived: false },
-    select: {
-      path: true,
-      baseBranch: true,
-      members: { where: { userId }, select: { role: true } },
-    },
-  })
+  // Auth and the workspace row were resolved one after the other, which meant
+  // two serial round trips to a cross-region database before any real work
+  // started. The workspace lookup does not depend on the auth result — only the
+  // membership filter does, and that is applied below — so they overlap.
+  const [auth, workspace] = await Promise.all([
+    requireGitHubAuth(),
+    prisma.workspace.findFirst({
+      where: { id, archived: false },
+      select: {
+        path: true,
+        baseBranch: true,
+        members: { select: { userId: true } },
+      },
+    }),
+  ])
+  if (isGitHubAuthError(auth)) return auth
+  const { userId, token } = auth
+
   if (!workspace) return notFound("Workspace not found")
-  if (workspace.members.length === 0) return forbidden("Join this workspace first")
+  if (!workspace.members.some((m) => m.userId === userId)) {
+    return forbidden("Join this workspace first")
+  }
 
   const path = req.nextUrl.searchParams.get("path")
 
@@ -81,21 +90,28 @@ interface SaveBody {
  * identity: every change to what an agent does is attributable in git history.
  */
 export async function PUT(req: NextRequest, { params }: Ctx): Promise<Response> {
-  const auth = await requireGitHubAuth()
-  if (isGitHubAuthError(auth)) return auth
-  const { userId, token } = auth
   const { id } = await params
 
-  const workspace = await prisma.workspace.findFirst({
-    where: { id, archived: false },
-    select: {
-      slug: true,
-      path: true,
-      members: { where: { userId }, select: { role: true } },
-    },
-  })
+  // Same overlap as GET. The user row is only wanted for the commit author's
+  // display name, so it rides along rather than adding a fourth serial hop.
+  const [auth, workspace] = await Promise.all([
+    requireGitHubAuth(),
+    prisma.workspace.findFirst({
+      where: { id, archived: false },
+      select: {
+        slug: true,
+        path: true,
+        members: { select: { userId: true } },
+      },
+    }),
+  ])
+  if (isGitHubAuthError(auth)) return auth
+  const { userId, token } = auth
+
   if (!workspace) return notFound("Workspace not found")
-  if (workspace.members.length === 0) return forbidden("Join this workspace first")
+  if (!workspace.members.some((m) => m.userId === userId)) {
+    return forbidden("Join this workspace first")
+  }
 
   try {
     const body: SaveBody = await req.json()
@@ -111,6 +127,7 @@ export async function PUT(req: NextRequest, { params }: Ctx): Promise<Response> 
     if (path.includes("..")) return badRequest("Invalid path")
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+
     const { sha } = await writeWorkspaceFile(
       token,
       path,
