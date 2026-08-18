@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useLayoutEffect } from "react"
+import { useRef, useState, useLayoutEffect, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -11,10 +11,12 @@ import {
   Loader2,
   Plus,
   ArrowRight,
+  Users,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useWorkspace, type ActiveWorkspace } from "@/lib/contexts/WorkspaceContext"
-import { useClickOutside } from "@/lib/hooks/useClickOutside"
+import { WorkspaceCreatingPanel } from "./WorkspaceCreatingPanel"
+import { WorkspaceMembersDialog } from "./WorkspaceMembers"
 
 interface WorkspaceSummary {
   id: string
@@ -46,21 +48,24 @@ interface WorkspaceDropdownProps {
  *
  * Always visible at the top of the sidebar. Shows the active workspace name
  * (or a placeholder) and opens a popover to switch, join, or create workspaces.
+ * People live here too — membership is a property of the workspace, not another
+ * scrolling sidebar section.
  */
 export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDropdownProps) {
   const { activeWorkspace, setActiveWorkspace } = useWorkspace()
   const [open, setOpen] = useState(false)
+  const [peopleOpen, setPeopleOpen] = useState(false)
   const [mode, setMode] = useState<"list" | "create">("list")
   const [name, setName] = useState("")
   const [systemPrompt, setSystemPrompt] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [createStartedAt, setCreateStartedAt] = useState<number | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   // Anchors the portalled panel; it cannot position itself relative to a
   // parent it deliberately escapes.
   const triggerRef = useRef<HTMLElement | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
-
-  useClickOutside(wrapperRef, () => setOpen(false), open)
 
   const { data, isLoading, error: loadError } = useQuery({
     queryKey: ["workspaces"],
@@ -81,10 +86,17 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
       // Auto-select the newly created workspace
       const w = res.workspace
       setActiveWorkspace({ id: w.id, slug: w.slug, name: w.name, path: w.path, agent: w.agent })
-      setMode("list"); setName(""); setSystemPrompt(""); setError(null)
+      setMode("list")
+      setName("")
+      setSystemPrompt("")
+      setError(null)
+      setCreateStartedAt(null)
       setOpen(false)
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => {
+      setCreateStartedAt(null)
+      setError(e.message)
+    },
   })
 
   const join = useMutation({
@@ -93,6 +105,21 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
     onSuccess: () => qc.invalidateQueries({ queryKey: ["workspaces"] }),
     onError: (e: Error) => setError(e.message),
   })
+
+  // The panel is portalled to body, so clicks inside it are "outside" wrapperRef.
+  // Creating a workspace is a 10–30s GitHub commit — do not dismiss that wait.
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (wrapperRef.current?.contains(target)) return
+      if (panelRef.current?.contains(target)) return
+      if (create.isPending) return
+      setOpen(false)
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [open, create.isPending])
 
   const workspaces = data?.workspaces ?? []
   const mine = workspaces.filter((w) => w.joined)
@@ -104,13 +131,29 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
     setOpen(false)
   }
 
+  function openPeople() {
+    setOpen(false)
+    setPeopleOpen(true)
+  }
+
+  useEffect(() => {
+    if (!activeWorkspace) setPeopleOpen(false)
+  }, [activeWorkspace])
+
+  const peopleDialog = (
+    <WorkspaceMembersDialog open={peopleOpen} onClose={() => setPeopleOpen(false)} />
+  )
+
   // ── Collapsed state: just a Boxes icon ──────────────────────────────────
   if (collapsed) {
     return (
       <div ref={wrapperRef} className={cn("relative flex justify-center", className)}>
         <button
           ref={triggerRef as React.RefObject<HTMLButtonElement>}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            if (create.isPending) return
+            setOpen((v) => !v)
+          }}
           className={cn(
             "p-1.5 rounded-md transition-colors cursor-pointer",
             activeWorkspace
@@ -133,10 +176,15 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
           mine={mine} others={others}
           activeWorkspace={activeWorkspace}
           create={create} join={join}
+          createStartedAt={createStartedAt}
+          setCreateStartedAt={setCreateStartedAt}
           selectWorkspace={selectWorkspace}
+          onOpenPeople={openPeople}
           side="left"
           anchorRef={triggerRef}
+          panelRef={panelRef}
         />}
+        {peopleDialog}
       </div>
     )
   }
@@ -144,33 +192,50 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
   // ── Expanded state: full-width trigger ──────────────────────────────────
   return (
     <div ref={wrapperRef} className={cn("relative", className)}>
-      <button
-        ref={triggerRef as React.RefObject<HTMLButtonElement>}
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        className={cn(
-          "w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer group",
-          "hover:bg-accent/60",
-          open && "bg-accent/40"
-        )}
-      >
-        <Boxes className={cn(
-          "h-4 w-4 shrink-0 transition-colors",
-          activeWorkspace ? "text-primary" : "text-muted-foreground"
-        )} />
-        <span className="min-w-0 flex-1 text-left">
-          {activeWorkspace ? (
-            <span className="block text-sm font-medium truncate">{activeWorkspace.name}</span>
-          ) : (
-            <span className="block text-sm text-muted-foreground">Select workspace</span>
+      <div className="flex items-center gap-0.5">
+        <button
+          ref={triggerRef as React.RefObject<HTMLButtonElement>}
+          onClick={() => {
+            if (create.isPending) return
+            setOpen((v) => !v)
+          }}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          className={cn(
+            "min-w-0 flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer group",
+            "hover:bg-accent/60",
+            open && "bg-accent/40"
           )}
-        </span>
-        <ChevronDown className={cn(
-          "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
-          open && "rotate-180"
-        )} />
-      </button>
+        >
+          <Boxes className={cn(
+            "h-4 w-4 shrink-0 transition-colors",
+            activeWorkspace ? "text-primary" : "text-muted-foreground"
+          )} />
+          <span className="min-w-0 flex-1 text-left">
+            {activeWorkspace ? (
+              <span className="block text-sm font-medium truncate">{activeWorkspace.name}</span>
+            ) : (
+              <span className="block text-sm text-muted-foreground">Select workspace</span>
+            )}
+          </span>
+          <ChevronDown className={cn(
+            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
+            open && "rotate-180"
+          )} />
+        </button>
+        {activeWorkspace && (
+          // Members belong to the workspace, not the file tree.
+          <button
+            type="button"
+            onClick={openPeople}
+            title="People"
+            aria-label="People in this workspace"
+            className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:bg-accent/60 hover:text-foreground transition-colors cursor-pointer"
+          >
+            <Users className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       {open && <DropdownPanel
         mode={mode} setMode={setMode}
@@ -181,10 +246,15 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
         mine={mine} others={others}
         activeWorkspace={activeWorkspace}
         create={create} join={join}
+        createStartedAt={createStartedAt}
+        setCreateStartedAt={setCreateStartedAt}
         selectWorkspace={selectWorkspace}
+        onOpenPeople={openPeople}
         side="bottom"
-        anchorRef={triggerRef}
+        anchorRef={wrapperRef}
+        panelRef={panelRef}
       />}
+      {peopleDialog}
     </div>
   )
 }
@@ -207,37 +277,45 @@ interface PanelProps {
   activeWorkspace: ActiveWorkspace | null
   create: ReturnType<typeof useMutation<{ workspace: WorkspaceSummary }, Error, { name: string; systemPrompt?: string }>>
   join: ReturnType<typeof useMutation<unknown, Error, string>>
+  createStartedAt: number | null
+  setCreateStartedAt: (t: number | null) => void
   selectWorkspace: (w: WorkspaceSummary) => void
+  onOpenPeople: () => void
   side: "bottom" | "left"
   anchorRef: React.RefObject<HTMLElement | null>
+  panelRef: React.RefObject<HTMLDivElement | null>
 }
 
 function DropdownPanel({
   mode, setMode, name, setName, systemPrompt, setSystemPrompt,
   error, setError, isLoading, loadError, mine, others,
-  activeWorkspace, create, join, selectWorkspace, side, anchorRef,
+  activeWorkspace, create, join, createStartedAt, setCreateStartedAt,
+  selectWorkspace, onOpenPeople, side, anchorRef, panelRef,
 }: PanelProps) {
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
   // The panel is portalled to <body> and positioned from the trigger's rect
   // rather than being absolutely positioned inside the sidebar.
   //
   // The sidebar carries backdrop-filter for the glass effect, and an element
-  // with a backdrop-filter clips its descendants to its own bounds — so a 288px
-  // panel inside a ~190px sidebar was being cut off mid-word. Escaping the
-  // sidebar is the only fix that keeps both the glass and the full panel.
+  // with a backdrop-filter clips its descendants to its own bounds — so an
+  // in-sidebar absolute panel was cut off mid-word. Escaping the sidebar is the
+  // only fix that keeps both the glass and the full panel. Width follows the
+  // trigger in the expanded sidebar so the menu does not spill into the main
+  // pane; collapsed mode still opens a full-width panel to the right of the icon.
   useLayoutEffect(() => {
     const el = anchorRef.current
     if (!el) return
     const update = () => {
       const r = el.getBoundingClientRect()
-      const width = 288
+      const width = side === "bottom" ? r.width : 288
       const top = side === "bottom" ? r.bottom + 4 : r.top
       const left = side === "bottom" ? r.left : r.right + 4
       setPos({
         top: Math.min(top, window.innerHeight - 120),
         // Keep it on screen if the trigger sits near the right edge.
         left: Math.max(8, Math.min(left, window.innerWidth - width - 8)),
+        width,
       })
     }
     update()
@@ -253,9 +331,10 @@ function DropdownPanel({
 
   return createPortal(
     <div
-      style={{ top: pos.top, left: pos.left }}
+      ref={panelRef}
+      style={{ top: pos.top, left: pos.left, width: pos.width }}
       className={cn(
-        "fixed z-[100] w-72 rounded-lg border border-border bg-popover shadow-xl py-1",
+        "fixed z-[100] rounded-lg border border-border bg-popover shadow-xl py-1",
         "max-h-[min(420px,calc(100vh-8rem))] overflow-y-auto"
       )}
     >
@@ -344,6 +423,15 @@ function DropdownPanel({
           {!loadError && (
             <>
               <div className="mx-3 my-1 border-t border-border" />
+              {activeWorkspace && (
+                <button
+                  onClick={onOpenPeople}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent text-left cursor-pointer transition-colors"
+                >
+                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                  People
+                </button>
+              )}
               <button
                 onClick={() => { setMode("create"); setError(null) }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent text-left cursor-pointer transition-colors"
@@ -354,12 +442,19 @@ function DropdownPanel({
             </>
           )}
         </>
+      ) : create.isPending ? (
+        <WorkspaceCreatingPanel
+          name={name.trim()}
+          startedAt={createStartedAt ?? undefined}
+          className="m-2 border-0 shadow-none"
+        />
       ) : (
         <form
           className="p-3 space-y-2.5"
           onSubmit={(e) => {
             e.preventDefault()
             if (!name.trim()) return
+            setCreateStartedAt(Date.now())
             create.mutate({ name: name.trim(), systemPrompt: systemPrompt.trim() || undefined })
           }}
         >
@@ -393,13 +488,13 @@ function DropdownPanel({
               disabled={create.isPending || !name.trim()}
               className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
             >
-              {create.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Create
             </button>
             <button
               type="button"
               onClick={() => { setMode("list"); setError(null) }}
-              className="text-sm px-3 py-1.5 rounded-md hover:bg-accent cursor-pointer"
+              disabled={create.isPending}
+              className="text-sm px-3 py-1.5 rounded-md hover:bg-accent cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
