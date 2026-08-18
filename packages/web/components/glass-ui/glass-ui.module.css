@@ -90,13 +90,13 @@
   box-shadow: var(--glass-shadow);
   padding: 20px 24px 16px 24px;
   width: 100%;
-  max-width: 680px;
+  margin-inline: auto;
   position: relative;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .glassContainerFocus {
-  border-color: rgba(255, 255, 255, 0.4);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border-color: rgba(17, 17, 20, 0.28);
+  box-shadow: 0 12px 36px rgba(15, 15, 20, 0.16);
 }
 
 /* C. TextInputArea */
@@ -105,7 +105,7 @@
   align-items: flex-start;
   margin-bottom: 24px;
   font-size: 20px;
-  color: white;
+  color: var(--text-primary);
   cursor: text;
   position: relative;
   min-height: 28px;
@@ -123,7 +123,7 @@
 .cursor {
   width: 2px;
   height: 22px;
-  background-color: white;
+  background-color: var(--text-primary);
   margin-right: 4px;
 }
 @keyframes blink {
@@ -151,7 +151,7 @@
   background: transparent;
   border: none;
   outline: none;
-  color: white;
+  color: var(--text-primary);
   font-size: 20px;
   resize: none;
   line-height: 1.4;
@@ -161,7 +161,7 @@
   overflow: hidden;
 }
 .realTextarea::placeholder {
-  color: transparent;
+  color: var(--text-secondary);
 }
 
 /* D. PillButton */
