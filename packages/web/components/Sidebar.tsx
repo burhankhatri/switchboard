@@ -6,6 +6,7 @@ import { WorkspaceFiles } from "@/components/workspaces/WorkspaceFiles"
 import { WorkspaceDropdown } from "@/components/workspaces/WorkspaceDropdown"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { BRAND } from "@/lib/brand"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useSession, signOut } from "next-auth/react"
 import { signInWithGitHub } from "@/lib/auth-utils"
@@ -364,7 +365,8 @@ export function Sidebar({
         >
           {/* Header with close button */}
           <div className="flex items-center justify-between px-4 pt-safe">
-            <h1 className="text-base font-semibold text-foreground">
+            <h1 className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <Image src="/maloewe-logo.svg" alt="MaLoewe logo" width={24} height={24} className="dark:invert" />
               {BRAND.name}
             </h1>
             <button
@@ -592,9 +594,10 @@ export function Sidebar({
       >
         {!collapsed && (
           <h1 className={cn(
-            "text-sm font-semibold text-foreground truncate",
+            "flex items-center gap-1.5 text-sm font-semibold text-foreground truncate",
             isDesktopApp && "invisible" // Hide text but keep space for window controls
           )}>
+            <Image src="/maloewe-logo.svg" alt="MaLoewe logo" width={20} height={20} className="shrink-0 dark:invert" />
             {BRAND.name}
           </h1>
         )}

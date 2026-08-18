@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" fill="none">
+  <path
+    d="M 60 240 L 60 120 Q 60 60 110 60 Q 160 60 160 120 L 160 180 L 200 110 L 240 180 L 240 120 Q 240 60 290 60 Q 295 58 300 57 Q 315 54 325 47 Q 338 38 342 28 Q 344 22 342 17 Q 338 10 328 10 Q 318 10 310 18 Q 305 23 303 30 Q 301 37 303 44 Q 306 54 315 60 Q 320 63 326 65 Q 336 68 342 75 Q 352 87 352 105 Q 352 130 338 148 Q 330 158 318 163 Q 308 167 296 167 Q 286 167 278 162 L 278 240"
+    stroke="currentColor"
+    stroke-width="18"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="344" cy="17" r="6" fill="currentColor"/>
+</svg>

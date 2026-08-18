@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Redirecting to Switchboard...</title>
+  <title>Redirecting to MaLoewe...</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 <body>
   <div class="container">
     <h1>✓ Signed in successfully!</h1>
-    <p>Redirecting to Switchboard app...</p>
+    <p>Redirecting to MaLoewe app...</p>
     <p><a href="${electronUrl}">Click here if you're not redirected automatically</a></p>
   </div>
   <script>

@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
   ],
   // Keep @daytonaio/sdk on the server side
   serverExternalPackages: ["@daytonaio/sdk"],
+  // Allow SVG images via next/image
+  images: {
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "attachment",
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
   // Silences turbopack warning since we're using webpack
   turbopack: {},
 }

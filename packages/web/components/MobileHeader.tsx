@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from "react"
 import { BRAND } from "@/lib/brand"
+import Image from "next/image"
 import { Menu, MoreVertical, ChevronDown, Pencil, Github, Trash2, Clock, Command } from "lucide-react"
 import { useModals, useSidebar } from "@/lib/contexts"
 import type { Chat } from "@/lib/types"
@@ -64,7 +65,10 @@ export function MobileHeader({
             onClick={() => chat && modals.setMobileTitleMenuOpen(!modals.mobileTitleMenuOpen)}
             className="flex items-center gap-1 text-base font-semibold truncate max-w-full hover:bg-accent active:bg-accent rounded-md px-2 py-1 -ml-2 transition-colors"
           >
-            <span className="truncate">{chat?.displayName || BRAND.name}</span>
+            <span className="flex items-center gap-2 truncate">
+              {!chat && <Image src="/maloewe-logo.svg" alt="MaLoewe logo" width={20} height={20} className="shrink-0 dark:invert" />}
+              {chat?.displayName || BRAND.name}
+            </span>
             {chat && <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
           </button>
 

@@ -5,7 +5,7 @@
  * is one edit rather than a grep across the app.
  */
 export const BRAND = {
-  name: "Switchboard",
+  name: "MaLoewe",
   /** Shown under the name on the launcher. */
   tagline: "Your team's agents, in one place",
   /** Used for <title> and PWA metadata. */

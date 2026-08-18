@@ -110,11 +110,11 @@
 
 :root {
   --background: transparent;
-  --foreground: oklch(0.12 0 0);
+  --foreground: oklch(0 0 0);
   --card: rgba(255, 255, 255, 0.18);
-  --card-foreground: oklch(0.12 0 0);
+  --card-foreground: oklch(0 0 0);
   --popover: rgba(255, 255, 255, 0.7);
-  --popover-foreground: oklch(0.12 0 0);
+  --popover-foreground: oklch(0 0 0);
   --primary: oklch(0.62 0.16 62);
   --primary-foreground: oklch(0.98 0 0);
   --secondary: rgba(255, 255, 255, 0.25);
@@ -122,7 +122,7 @@
   --muted: rgba(255, 255, 255, 0.15);
   --muted-foreground: oklch(0.38 0 0);
   --accent: rgba(255, 255, 255, 0.3);
-  --accent-foreground: oklch(0.12 0 0);
+  --accent-foreground: oklch(0 0 0);
   --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(1 0 0);
   --border: rgba(255, 255, 255, 0.18);
@@ -130,7 +130,7 @@
   --ring: oklch(0.62 0.16 62);
   --radius: 0.75rem;
   --sidebar: rgba(255, 255, 255, 0.12);
-  --sidebar-foreground: oklch(0.12 0 0);
+  --sidebar-foreground: oklch(0 0 0);
   --sidebar-border: rgba(255, 255, 255, 0.15);
 }
 

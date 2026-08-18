@@ -2,7 +2,7 @@
  * Application configuration constants
  */
 
-export const APP_NAME = "Switchboard"
+export const APP_NAME = "MaLoewe"
 
 /**
  * Generate a page title with consistent formatting
