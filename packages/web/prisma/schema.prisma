@@ -244,6 +244,7 @@ model Workspace {
   chats         Chat[]
   scheduledJobs ScheduledJob[]
   members       WorkspaceMember[]
+  connections   WorkspaceConnection[]
 
   @@index([archived, name])
 }
@@ -271,6 +272,57 @@ model WorkspaceMember {
 
   @@unique([workspaceId, userId])
   @@index([userId])
+}
+
+// A connection a workspace can reach: either a REST API or an MCP server.
+//
+// Both kinds are the same thing from the user's side — "this workspace can talk
+// to X" — so they share one model and one UI rather than two parallel systems.
+// They differ only in how they reach the agent: a REST connection is injected as
+// environment variables plus a description the agent can read, while an MCP
+// connection is written into the agent's MCP config before the CLI spawns.
+//
+// Secrets live in `encryptedSecret` using the marked format (encryptSecret), NOT
+// the plain encrypt/decrypt pair — a failure to decrypt must be loud rather than
+// handing ciphertext to a remote API as a credential.
+model WorkspaceConnection {
+  id          String @id @default(cuid())
+  workspaceId String
+
+  /// "rest" | "mcp"
+  kind String
+
+  /// Human label, e.g. "Sunzi CRM".
+  name String
+  /// Stable, uppercase-safe identifier used to derive env var names, e.g. "SUNZI".
+  slug String
+
+  /// What this is for, shown to the agent so it knows when to reach for it.
+  description String? @db.Text
+
+  // ---- REST ----
+  /// Base URL, e.g. "https://crm.sunzicloud.com".
+  baseUrl String?
+  /// "none" | "bearer" | "header" | "query" | "basic"
+  authType String?
+  /// Header or query-parameter name when authType is "header" or "query".
+  authParam String?
+
+  // ---- MCP ----
+  /// Remote MCP endpoint the agent CLI calls.
+  mcpUrl String?
+
+  /// Encrypted with encryptSecret. Never returned by any endpoint.
+  encryptedSecret String? @db.Text
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
 }
 
 // =============================================================================
