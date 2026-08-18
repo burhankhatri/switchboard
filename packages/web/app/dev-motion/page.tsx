@@ -3,6 +3,7 @@
 import { LoadingState } from "@/components/ui/LoadingState"
 import { DictationControl } from "@/components/chat/DictationControl"
 import { useModelSweep } from "@/components/chat/ModelSweep"
+import { SelectionActions } from "@/components/workspaces/SelectionActions"
 
 /**
  * Visual harness for the motion primitives.
@@ -44,6 +45,18 @@ export default function MotionDevPage() {
           <LoadingState label="Creating sandbox" variant="Drive" />
           <LoadingState label="Responding" variant="Dots" />
           <LoadingState label="Thinking" variant="Orbit" />
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-ink-2 text-sm">SelectionActions</h2>
+        <div className="rounded-xl bg-surface p-6 shadow-card">
+          <SelectionActions
+            workspaceId="dev"
+            selection="Churn it first thing Saturday so the batch has time to firm up."
+            onApply={() => {}}
+            onDismiss={() => {}}
+          />
         </div>
       </section>
 

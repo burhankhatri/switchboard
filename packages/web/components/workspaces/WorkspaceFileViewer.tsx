@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { X, FileText, Check, RefreshCw } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
@@ -11,6 +11,7 @@ import {
   writeCachedFile,
   writeDraft,
 } from "@/lib/workspace-file-cache"
+import { SelectionActions } from "./SelectionActions"
 import { cn } from "@/lib/utils"
 
 interface FilePayload { path: string; content: string; truncated: boolean; sha: string }
@@ -35,6 +36,10 @@ export function WorkspaceFileViewer() {
   const { activeWorkspace, openFile, setOpenFile } = useWorkspace()
   const [draft, setDraft] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  // Selection is tracked as offsets rather than the text itself, so applying a
+  // rewrite can splice it back into exactly the range that was highlighted.
+  const [range, setRange] = useState<{ start: number; end: number } | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const qc = useQueryClient()
   const wsId = activeWorkspace?.id ?? ""
 
@@ -128,6 +133,22 @@ export function WorkspaceFileViewer() {
   const value = draft ?? data?.content ?? ""
   const dirty = draft !== null && draft !== data?.content
 
+  const selected = range ? value.slice(range.start, range.end) : ""
+
+  const syncSelection = () => {
+    const el = textareaRef.current
+    if (!el) return
+    const { selectionStart: start, selectionEnd: end } = el
+    setRange(start === end ? null : { start, end })
+  }
+
+  /** Splice an accepted rewrite back over the range it was made from. */
+  const applyRewrite = (replacement: string) => {
+    if (!range) return
+    onEdit(value.slice(0, range.start) + replacement + value.slice(range.end))
+    setRange(null)
+  }
+
   const onEdit = (next: string) => {
     setDraft(next)
     setSaved(false)
@@ -181,13 +202,26 @@ export function WorkspaceFileViewer() {
       {data && (
         <>
           <textarea
+            ref={textareaRef}
             value={value}
             onChange={(e) => onEdit(e.target.value)}
+            onSelect={syncSelection}
+            onKeyUp={syncSelection}
+            onMouseUp={syncSelection}
             spellCheck={false}
             readOnly={data.truncated}
             rows={22}
             className="w-full rounded-xl border border-border bg-card p-4 text-xs leading-relaxed font-mono outline-none focus:ring-2 focus:ring-ring/40 resize-y"
           />
+          {wsId && (
+            <SelectionActions
+              workspaceId={wsId}
+              selection={selected}
+              onApply={applyRewrite}
+              onDismiss={() => setRange(null)}
+            />
+          )}
+
           <p className="mt-2 text-xs text-muted-foreground">
             {data.truncated
               ? "Truncated — too large to edit here."
