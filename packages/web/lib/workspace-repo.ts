@@ -71,7 +71,19 @@ async function ghFetch(url: string, init: RequestInit, attempts = 4): Promise<Re
  * order is eviction order (Map iterates oldest-first).
  */
 const GH_CACHE_MAX = 200
-const ghCache = new Map<string, { etag: string; body: unknown }>()
+
+/**
+ * How long a cached body is served without asking GitHub at all.
+ *
+ * A 304 is cheap in rate-limit terms but it is still a full HTTPS round trip to
+ * api.github.com, which was most of what remained in a warm read. Inside this
+ * window the answer is returned outright. The bound on staleness is this TTL
+ * plus the client's own staleTime, and any write from this app clears the map,
+ * so the only way to see something stale is if someone else pushed to the repo
+ * within the last few seconds.
+ */
+const GH_FRESH_MS = 10_000
+const ghCache = new Map<string, { etag: string; body: unknown; fetchedAt: number }>()
 
 /** Clear the ETag cache. Called after a write so the next read sees it. */
 export function invalidateRepoCache(): void {
@@ -84,6 +96,8 @@ export function invalidateRepoCache(): void {
  */
 async function ghCachedJson<T>(url: string, token: string): Promise<T> {
   const hit = ghCache.get(url)
+  if (hit && Date.now() - hit.fetchedAt < GH_FRESH_MS) return hit.body as T
+
   const res = await ghFetch(url, {
     headers: {
       ...headers(token),
@@ -95,9 +109,10 @@ async function ghCachedJson<T>(url: string, token: string): Promise<T> {
   })
 
   if (res.status === 304 && hit) {
-    // Refresh recency so a hot file is not evicted by a cold sweep.
+    // Refresh recency so a hot file is not evicted by a cold sweep, and restart
+    // the no-revalidate window — GitHub just confirmed this body is current.
     ghCache.delete(url)
-    ghCache.set(url, hit)
+    ghCache.set(url, { ...hit, fetchedAt: Date.now() })
     return hit.body as T
   }
 
@@ -114,7 +129,7 @@ async function ghCachedJson<T>(url: string, token: string): Promise<T> {
       const oldest = ghCache.keys().next().value
       if (oldest !== undefined) ghCache.delete(oldest)
     }
-    ghCache.set(url, { etag, body })
+    ghCache.set(url, { etag, body, fetchedAt: Date.now() })
   }
   return body
 }

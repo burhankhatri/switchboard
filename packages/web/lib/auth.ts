@@ -5,6 +5,29 @@ import { prisma } from "@/lib/db/prisma"
 import { logActivityAsync } from "@/lib/db/activity-log"
 import { invalidateGitHubToken } from "@/lib/db/api-helpers"
 
+/**
+ * Cache of the isAdmin flag, for sessions whose token predates it carrying one.
+ *
+ * Admin status changes roughly never, and the cost of being a minute stale is
+ * that a just-promoted user waits a minute for a nav link — against a database
+ * round trip on every single authenticated request.
+ */
+const IS_ADMIN_TTL_MS = 60_000
+const isAdminCache = new Map<string, { value: boolean; expires: number }>()
+
+async function lookupIsAdmin(userId: string): Promise<boolean> {
+  const hit = isAdminCache.get(userId)
+  if (hit && hit.expires > Date.now()) return hit.value
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true },
+  })
+  const value = user?.isAdmin ?? false
+  isAdminCache.set(userId, { value, expires: Date.now() + IS_ADMIN_TTL_MS })
+  return value
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
   providers: [
@@ -87,18 +110,17 @@ export const authOptions: NextAuthOptions = {
       if (session.user && token.sub) {
         session.user.id = token.sub
 
-        // isAdmin comes off the token. It used to be a findUnique here, which
-        // meant EVERY getServerSession() — so every authenticated API request —
-        // paid a round trip to a cross-region Neon pooler before the route did
-        // any of its own work. Tokens minted before this back-fill once.
-        if (token.isAdmin === undefined) {
-          const user = await prisma.user.findUnique({
-            where: { id: token.sub },
-            select: { isAdmin: true },
-          })
-          token.isAdmin = user?.isAdmin ?? false
-        }
-        session.user.isAdmin = token.isAdmin
+        // isAdmin used to be a findUnique right here, which meant EVERY
+        // getServerSession() — so every authenticated API request — paid a round
+        // trip to a cross-region Neon pooler before the route did any of its own
+        // work. It is read by exactly two client components (the admin link in
+        // the sidebar and the user menu); nothing on the request path needs it,
+        // and admin API routes do their own check via requireAdmin().
+        //
+        // Prefer the value on the token. Tokens minted before this existed have
+        // none, and a route handler cannot write a refreshed cookie back, so
+        // those would re-query forever — hence the process-local cache.
+        session.user.isAdmin = token.isAdmin ?? (await lookupIsAdmin(token.sub))
       }
       return session
     },
