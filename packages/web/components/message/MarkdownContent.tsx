@@ -11,12 +11,25 @@ interface MarkdownContentProps {
   text: string
   isMobile?: boolean
   constrainWidth?: boolean
+  /**
+   * This text is still arriving. Each newly completed block resolves out of
+   * blur instead of popping in. Blocks already on screen are untouched — see
+   * `.streaming-markdown` in globals.css for why that falls out of how React
+   * reuses DOM nodes.
+   */
+  streaming?: boolean
 }
 
-export function MarkdownContent({ text, isMobile = false, constrainWidth = true }: MarkdownContentProps) {
+export function MarkdownContent({
+  text,
+  isMobile = false,
+  constrainWidth = true,
+  streaming = false,
+}: MarkdownContentProps) {
   return (
     <div className={cn(
       "prose dark:prose-invert max-w-none w-full overflow-hidden min-w-0",
+      streaming && "streaming-markdown",
       // Spacing is controlled via component overrides below; prose-* utilities
       // here only set typography (leading, font-size). This avoids conflicts.
       "prose-p:leading-relaxed",

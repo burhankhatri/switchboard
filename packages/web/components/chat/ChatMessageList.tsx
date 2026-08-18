@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { LoadingState } from "@/components/ui/LoadingState"
 
 interface ChatMessageListProps {
   chat: Chat
@@ -103,12 +104,9 @@ export function ChatMessageList({
             chat.messages[chat.messages.length - 1]?.inherited && (
               <BranchDivider isMobile={isMobile} />
             )}
-          {/* Show loading indicator when sandbox is being created */}
-          {isCreating && (
-            <div className="text-2xl text-muted-foreground animate-pulse">
-              ...
-            </div>
-          )}
+          {/* Sandbox creation is the longest wait in the app — this is where an
+              elapsed timer earns its place most. */}
+          {isCreating && <LoadingState label="Creating sandbox" className="py-1" />}
           {/* Surface the latest agent/streaming failure inline so users see why
               their last run stopped. Cleared on the next send.
 

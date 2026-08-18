@@ -1,9 +1,9 @@
 "use client"
 
 import { useMemo, memo } from "react"
-import { StreamingPending } from "@/components/agent/StreamingText"
 import { GitMerge, FileText, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { LoadingState } from "@/components/ui/LoadingState"
 import type { Message } from "@/lib/types"
 import { basename } from "@/lib/format"
 import {
@@ -107,9 +107,13 @@ function AssistantContent({ message, isStreaming, isMobile = false, repo, onOpen
   // Error messages should still render even when they have no content yet.
   if (isEmpty && !isErrorMessage) {
     if (!isStreaming) return null
-    // Elapsed time matters here: this gap covers sandbox boot and can run to
-    // tens of seconds, and a bare "..." reads as hung rather than working.
-    return <StreamingPending startedAt={new Date(message.timestamp).getTime()} />
+    // The gap between "turn started" and "first token" covers sandbox boot and
+    // runs to tens of seconds. The counter this replaced recomputed from
+    // Date.now() at render time, so it sat frozen until something unrelated
+    // re-rendered it — which is worse than no counter.
+    return (
+      <LoadingState label="Thinking" startedAt={new Date(message.timestamp).getTime()} />
+    )
   }
 
   // Git operation messages use SystemMessage component
@@ -155,7 +159,7 @@ function AssistantContent({ message, isStreaming, isMobile = false, repo, onOpen
         // Render merged content blocks
         mergedBlocks.map((block, index) => {
           if (block.type === "text" && block.text.trim()) {
-            return <MarkdownContent key={index} text={block.text} isMobile={isMobile} />
+            return <MarkdownContent key={index} text={block.text} isMobile={isMobile} streaming={isStreaming} />
           }
           if (block.type === "tool_calls") {
             return (
@@ -172,7 +176,7 @@ function AssistantContent({ message, isStreaming, isMobile = false, repo, onOpen
       ) : (
         // Fallback: render content then tool calls (for messages without contentBlocks)
         <>
-          {hasContent && <MarkdownContent text={message.content} isMobile={isMobile} />}
+          {hasContent && <MarkdownContent text={message.content} isMobile={isMobile} streaming={isStreaming} />}
           {hasToolCalls && (
             <ToolCallGroup
               toolCalls={message.toolCalls!}
@@ -183,12 +187,10 @@ function AssistantContent({ message, isStreaming, isMobile = false, repo, onOpen
         </>
       )}
 
-      {/* Streaming indicator */}
-      {isStreaming && (
-        <div className="text-2xl text-muted-foreground animate-pulse">
-          ...
-        </div>
-      )}
+      {/* Streaming indicator. An elapsed counter rather than a static ellipsis:
+          an agent turn runs for tens of seconds and the only question a user
+          has while waiting is whether it is still moving. */}
+      {isStreaming && <LoadingState label="Responding" className="pt-1" />}
     </div>
   )
 }

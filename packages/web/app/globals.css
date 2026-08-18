@@ -289,6 +289,13 @@
   }
 }
 
+/* Markdown that is still arriving. Applied to the wrapper; each direct child
+   is a block the parser has just completed. See MarkdownContent for why this
+   lives in CSS rather than on the elements themselves. */
+.streaming-markdown > * {
+  animation: stream-in 420ms var(--ease-spring) both;
+}
+
 /* Modal / dialog scrim. Every overlay uses this one class so "focus the thing
    you clicked" is a single knob. The blur has to be large enough that body text
    behind the dialog is genuinely unreadable — at 1px it merely looked soft and
