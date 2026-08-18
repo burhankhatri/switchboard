@@ -27,6 +27,12 @@ export type ActivityAction =
   // Metadata records identifiers only — never a URL credential or secret.
   | "workspace_connection_added"
   | "workspace_connection_removed"
+  // Membership changes made BY an owner, as opposed to someone joining or
+  // leaving of their own accord. Worth auditing because adding a member grants
+  // them the workspace's credentials.
+  | "workspace_member_added"
+  | "workspace_member_removed"
+  | "workspace_member_role_changed"
 
 /**
  * Metadata types for different actions
