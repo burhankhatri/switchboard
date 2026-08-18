@@ -1,9 +1,10 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { ChevronLeft, Boxes, ArrowLeft } from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { WorkspaceLauncher } from "@/components/workspaces/WorkspaceLauncher"
 
 interface WelcomeViewProps {
   isMobile: boolean
@@ -63,26 +64,12 @@ export function WelcomeView({
             </p>
           </div>
         ) : (
-          /* ── No workspace: prompt to use the sidebar dropdown ── */
-          <div className="flex flex-col items-center gap-4 text-center select-none">
-            <div className="h-12 w-12 rounded-2xl bg-accent/60 flex items-center justify-center">
-              <Boxes className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-base font-medium text-foreground">Select a workspace</p>
-              <p className="mt-1 text-sm text-muted-foreground max-w-xs">
-                {isMobile
-                  ? "Open the menu and pick a workspace to get started."
-                  : "Use the dropdown at the top of the sidebar to pick or create a workspace."}
-              </p>
-            </div>
-            {!isMobile && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60 animate-pulse">
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>over there</span>
-              </div>
-            )}
-          </div>
+          /* ── No workspace: the workspaces themselves ──
+             This used to be a note pointing at the sidebar dropdown, which told
+             you a control existed instead of showing you your workspaces. The
+             launcher lists the ones you are in and the ones you can join, which
+             is what someone who has just been added needs to see. */
+          <WorkspaceLauncher onOpen={(w) => setActive(w)} />
         )}
       </div>
       {filePreviewModal}
