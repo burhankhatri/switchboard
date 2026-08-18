@@ -44,6 +44,10 @@ export function WorkspaceFileViewer() {
     () => (wsId && openFile ? readCachedFile(wsId, openFile) : null),
     [wsId, openFile]
   )
+  // Captured with the cache read, not on every render — a fresh Date.now() each
+  // render would keep pushing the staleness deadline out and the query would
+  // never revalidate.
+  const cachedAt = useMemo(() => (cached ? Date.now() : 0), [cached])
 
   const { data, isPending, isFetching, error } = useQuery({
     queryKey: ["workspace-file", wsId, openFile],
@@ -61,9 +65,13 @@ export function WorkspaceFileViewer() {
     enabled: !!wsId && !!openFile,
     retry: false,
     initialData: cached && openFile ? { path: openFile, ...cached } : undefined,
-    // Marks the seeded value as infinitely old: it paints immediately and a
-    // real fetch starts anyway, so a stale cache can never be what you edit.
-    initialDataUpdatedAt: 0,
+    // Seeded data counts as fetched-now, so a warm cache paints AND skips the
+    // refetch inside staleTime. This was 0 (= infinitely stale), which meant
+    // every open still waited on the network and the local cache bought
+    // nothing. Staleness is bounded by staleTime, and the server revalidates
+    // against GitHub with an ETag, so a genuinely changed file still lands.
+    initialDataUpdatedAt: cachedAt,
+    staleTime: 30 * 1000,
   })
 
   // Restore whatever was being typed when this file was last open. Keyed on the
