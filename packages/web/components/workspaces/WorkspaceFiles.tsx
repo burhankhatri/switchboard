@@ -124,6 +124,11 @@ export function WorkspaceFiles() {
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  // What is being created inline, if anything. null means the row is not shown.
+  const [creating, setCreating] = useState<"file" | "folder" | null>(null)
+  const [newName, setNewName] = useState("")
+  const [nameError, setNameError] = useState<string | null>(null)
+  const nameInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
 
@@ -156,6 +161,12 @@ export function WorkspaceFiles() {
   // A workspace persisted by an older build may lack `path`. Without it every
   // write would post "undefined/<file>" and be refused by the containment
   // check — which looked exactly like the upload doing nothing.
+  // Top-level names already taken, so a clash is caught before a commit that
+  // GitHub would reject anyway.
+  const existingNames = new Set(
+    (data?.workspace ?? []).map((f) => f.name.split("/")[0])
+  )
+
   const base = activeWorkspace.path
   if (!base) {
     return (
@@ -188,9 +199,44 @@ export function WorkspaceFiles() {
     setUploadError(failed.length ? failed.join("; ") : null)
   }
 
-  const prompt = (label: string, placeholder: string) => {
-    const v = window.prompt(label, placeholder)?.trim()
-    return v && !v.includes("..") && !v.startsWith("/") ? v : null
+  /**
+   * Names are validated here rather than by the browser, so the reason can be
+   * shown next to the field instead of silently refusing. Traversal and
+   * absolute paths are rejected for the same reason the API rejects them; this
+   * is the friendly half of that check, not a replacement for it.
+   */
+  function validateName(raw: string): string | null {
+    const v = raw.trim()
+    if (!v) return "Give it a name"
+    if (v.startsWith("/")) return "Leave off the leading slash"
+    if (v.includes("..")) return "No .. in names"
+    if (existingNames.has(v)) return "Something with that name already exists"
+    return null
+  }
+
+  function submitNew() {
+    const problem = validateName(newName)
+    if (problem) {
+      setNameError(problem)
+      return
+    }
+    const name = newName.trim()
+    write.mutate(
+      creating === "folder"
+        ? { path: `${base}/${name}/${GITKEEP}`, content: "" }
+        : { path: `${base}/${name}`, content: "" }
+    )
+    setCreating(null)
+    setNewName("")
+    setNameError(null)
+  }
+
+  function startCreating(kind: "file" | "folder") {
+    setCreating(kind)
+    setNewName("")
+    setNameError(null)
+    // The row mounts this render; focus on the next tick.
+    requestAnimationFrame(() => nameInput.current?.focus())
   }
 
   return (
@@ -207,20 +253,14 @@ export function WorkspaceFiles() {
       <div className="flex items-center gap-0.5 px-2 py-1">
         <p className="flex-1 text-[11px] uppercase tracking-wide text-muted-foreground">Files</p>
         <button
-          onClick={() => {
-            const name = prompt("New file (path inside the workspace)", "scripts/new.py")
-            if (name) write.mutate({ path: `${base}/${name}`, content: "" })
-          }}
+          onClick={() => startCreating("file")}
           title="New file"
           className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
         >
           <FilePlus className="h-3.5 w-3.5" />
         </button>
         <button
-          onClick={() => {
-            const name = prompt("New folder", "scripts")
-            if (name) write.mutate({ path: `${base}/${name}/${GITKEEP}`, content: "" })
-          }}
+          onClick={() => startCreating("folder")}
           title="New folder"
           className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
         >
@@ -228,7 +268,7 @@ export function WorkspaceFiles() {
         </button>
         <button
           onClick={() => fileInput.current?.click()}
-          title="Upload files"
+          title="Add files from your computer"
           className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
         >
           <Upload className="h-3.5 w-3.5" />
@@ -255,6 +295,50 @@ export function WorkspaceFiles() {
         </p>
       )}
 
+      {/* Inline creator. Replaces window.prompt(), which put a Chrome dialog in
+          front of the app and asked for a path when a name is what is wanted. */}
+      {creating && (
+        <div
+          className="flex items-center gap-1.5 px-2 py-1"
+          style={{ animation: "fade-up 200ms var(--ease-spring) both" }}
+        >
+          {creating === "folder" ? (
+            <Folder className="h-3 w-3 shrink-0 text-muted-foreground" />
+          ) : (
+            <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+          )}
+          <input
+            ref={nameInput}
+            value={newName}
+            onChange={(e) => {
+              setNewName(e.target.value)
+              setNameError(null)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                submitNew()
+              } else if (e.key === "Escape") {
+                e.preventDefault()
+                setCreating(null)
+                setNameError(null)
+              }
+            }}
+            onBlur={() => {
+              // Blur cancels rather than commits. Creating a file is a commit to
+              // a shared repo; clicking away should not be enough to do that.
+              if (!newName.trim()) setCreating(null)
+            }}
+            placeholder={creating === "folder" ? "folder name" : "name.py"}
+            aria-label={creating === "folder" ? "New folder name" : "New file name"}
+            className="min-w-0 flex-1 rounded-chip border border-line bg-field px-1.5 py-0.5 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
+          />
+        </div>
+      )}
+      {nameError && (
+        <p className="px-2 pb-1 pl-7 text-[11px] text-destructive">{nameError}</p>
+      )}
+
       {data && [...toTree(data.workspace).children.values()].map((c) => (
         <TreeNode key={c.name} node={c} depth={0} />
       ))}
@@ -266,7 +350,8 @@ export function WorkspaceFiles() {
       )}
 
       <p className="px-2 pt-2 text-[10px] text-muted-foreground/70 leading-snug">
-        Shared with everyone in this workspace. Changes commit and load on the next run.
+        Drag files here from your computer, or use the upload button. Shared with
+        everyone in this workspace; changes commit and load on the next run.
       </p>
     </div>
   )
