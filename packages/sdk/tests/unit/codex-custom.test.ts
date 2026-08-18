@@ -2,7 +2,7 @@
  * Unit tests for the custom OpenAI-compatible Codex endpoint ("Custom Codex").
  *
  * Two layers:
- *  - pure credential/model logic in @background-agents/common (env passthrough,
+ *  - pure credential/model logic in @switchboard/common (env passthrough,
  *    model resolution, the credential gate)
  *  - the SDK's config.toml generation (buildCodexConfigToml / parseHeaderLines)
  */
@@ -13,7 +13,7 @@ import {
   resolveCliModel,
   ENDPOINT_MODEL_PREFIX,
   type CustomEndpoint,
-} from "@background-agents/common"
+} from "@switchboard/common"
 import { buildCodexConfigToml } from "../../src/agents/codex/config"
 import { parseHeaderLines } from "../../src/utils/headers"
 

@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server"
  * 1. User clicks sign in, SignInModal sets callbackUrl to /api/auth/electron-callback
  * 2. User completes GitHub OAuth in browser
  * 3. NextAuth callback sets session cookies, redirects to this endpoint
- * 4. This route returns HTML that redirects to background-agents://auth-callback
+ * 4. This route returns HTML that redirects to switchboard://auth-callback
  * 5. Electron catches the deep link and reloads to pick up the session
  *
  * We use an HTML page with JavaScript redirect because NextResponse.redirect()
@@ -21,14 +21,14 @@ export async function GET(req: NextRequest) {
   const callbackUrl = searchParams.get("callbackUrl") || "/"
 
   // Redirect to Electron app via custom protocol
-  const electronUrl = `background-agents://auth-callback?success=true&callbackUrl=${encodeURIComponent(callbackUrl)}`
+  const electronUrl = `switchboard://auth-callback?success=true&callbackUrl=${encodeURIComponent(callbackUrl)}`
 
   // Return HTML page that redirects to the custom protocol
   const html = `
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Redirecting to Background Agents...</title>
+  <title>Redirecting to Switchboard...</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 <body>
   <div class="container">
     <h1>✓ Signed in successfully!</h1>
-    <p>Redirecting to Background Agents app...</p>
+    <p>Redirecting to Switchboard app...</p>
     <p><a href="${electronUrl}">Click here if you're not redirected automatically</a></p>
   </div>
   <script>

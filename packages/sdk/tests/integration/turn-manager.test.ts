@@ -1,6 +1,6 @@
 /**
  * Fast end-to-end test of the background turn-manager over the real
- * @background-agents/sandbox-jobs primitive — WITHOUT any real agent CLI.
+ * @switchboard/sandbox-jobs primitive — WITHOUT any real agent CLI.
  *
  * A synthetic AgentDefinition emits agent-style JSONL via `printf`/`sleep`, so
  * the whole path (createBackgroundSession → start → incremental poll → cumulative

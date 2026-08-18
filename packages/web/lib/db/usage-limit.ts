@@ -11,7 +11,7 @@
  * post-hoc: we block the NEXT turn once the period's usage has met the budget.
  */
 
-import type { Agent, ProviderName } from "@background-agents/common"
+import type { Agent, ProviderName } from "@switchboard/common"
 
 import { prisma } from "./prisma"
 import { sumSharedUsage, countSharedMessages } from "./token-usage"

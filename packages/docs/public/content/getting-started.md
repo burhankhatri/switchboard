@@ -1,6 +1,6 @@
-# Learn Background Agents
+# Learn Switchboard
 
-Background Agents runs AI coding agents — Claude, Codex, Copilot, Droid, Gemini, Goose, Kilo, Kimi, OpenCode, and Pi — inside isolated [Daytona](https://daytona.io) sandboxes. Every chat is tied to its own Git branch, so an agent can edit code, run it, and open a pull request without ever touching your machine.
+Switchboard runs AI coding agents — Claude, Codex, Copilot, Droid, Gemini, Goose, Kilo, Kimi, OpenCode, and Pi — inside isolated [Daytona](https://daytona.io) sandboxes. Every chat is tied to its own Git branch, so an agent can edit code, run it, and open a pull request without ever touching your machine.
 
 These docs pair a **feature** reference with worked **examples**. The feature pages cover each building block on its own; the examples put them together into things worth building — automations that turn issues into pull requests or summarize your inbox while you sleep, and small apps you can ship in a single session.
 
@@ -57,7 +57,7 @@ Creating a share link for a chat and opening the public, read-only view.
 - At least one model credential — a provider API key, a Claude subscription, or a [custom endpoint](#/custom-endpoints).
 
 > [!NOTE]
-> Running your own instance? Setup and configuration live in the [repository README](https://github.com/jamesmurdza/background-agents#readme).
+> Running your own instance? Setup and configuration live in the [repository README](https://github.com/burhankhatri/switchboard#readme).
 
 > [!TIP]
 > New here? Do [Issue → pull request](#/issue-to-pr) first. It touches sandboxes, GitHub, PRs, and the Jobs engine in one go, so everything else will feel familiar afterward.

@@ -1,7 +1,7 @@
 // Dead-simple static file server for local preview of the docs site.
 // The viewer fetches Markdown over HTTP, so it can't be opened as a file:// URL.
 //
-//   npm run dev -w @background-agents/docs   ->   http://localhost:4001
+//   npm run dev -w @switchboard/docs   ->   http://localhost:4001
 
 import { createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";

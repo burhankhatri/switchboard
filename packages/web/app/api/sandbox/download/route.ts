@@ -1,5 +1,5 @@
 import { Daytona } from "@daytonaio/sdk"
-import { PATHS } from "@background-agents/common"
+import { PATHS } from "@switchboard/common"
 import { ensureSandboxStarted } from "@/lib/sandbox"
 import { getSandboxOrExpired } from "@/lib/sandbox-lifecycle"
 import { internalError, badRequest, requireSandboxOwner } from "@/lib/db/api-helpers"

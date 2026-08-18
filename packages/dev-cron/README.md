@@ -1,4 +1,4 @@
-# @background-agents/dev-cron
+# @switchboard/dev-cron
 
 Local development simulator for Vercel cron jobs.
 

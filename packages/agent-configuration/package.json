@@ -1,5 +1,5 @@
 {
-  "name": "@background-agents/agent-configuration",
+  "name": "@switchboard/agent-configuration",
   "version": "0.1.0",
   "description": "Translation layer between coding agents' configuration formats",
   "type": "module",

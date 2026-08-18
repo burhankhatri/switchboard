@@ -4,7 +4,7 @@ import {
   renderClaudeHook,
   renderCodexRules,
   renderOpenCodePermissions,
-} from "@background-agents/agent-configuration/permissions"
+} from "@switchboard/agent-configuration/permissions"
 import { DEFAULT_GIT_POLICY } from "./git-policy"
 
 /**

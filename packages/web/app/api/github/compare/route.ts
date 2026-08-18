@@ -1,4 +1,4 @@
-import { compareBranches, isGitHubApiError } from "@background-agents/common"
+import { compareBranches, isGitHubApiError } from "@switchboard/common"
 import { requireGitHubAuth, isGitHubAuthError, internalError, badRequest } from "@/lib/db/api-helpers"
 
 export async function POST(req: Request) {

@@ -5,7 +5,7 @@
  * (built on the Vercel AI SDK), so when the user configures a custom
  * OpenAI-compatible endpoint we synthesize that file. The stored CUSTOM_OPENCODE_*
  * credentials are passed into the sandbox as env vars (see buildOpencodeCustomEnv
- * in @background-agents/common); opencodeSetup reads them back and writes this file.
+ * in @switchboard/common); opencodeSetup reads them back and writes this file.
  */
 
 import { parseHeaderLines } from "../../utils/headers"

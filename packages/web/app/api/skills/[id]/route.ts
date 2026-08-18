@@ -8,7 +8,7 @@ import {
   internalError,
 } from "@/lib/db/api-helpers"
 import { PATHS } from "@/lib/constants"
-import { uninstallSkill, getSkillNameFromHandle } from "@background-agents/sandbox-skills/sandbox"
+import { uninstallSkill, getSkillNameFromHandle } from "@switchboard/sandbox-skills/sandbox"
 
 // =============================================================================
 // DELETE - Uninstall a skill by ID (DB + sandbox filesystem)

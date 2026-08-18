@@ -1,6 +1,6 @@
 /**
  * Utilities for Simple Chat
- * Re-exports from @background-agents/common
+ * Re-exports from @switchboard/common
  */
 
-export { cn, generateBranchName } from "@background-agents/common"
+export { cn, generateBranchName } from "@switchboard/common"

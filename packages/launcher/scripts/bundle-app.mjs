@@ -1,4 +1,4 @@
-// Builds the Electron app (@background-agents/desktop) and copies its compiled
+// Builds the Electron app (@switchboard/desktop) and copies its compiled
 // output + assets into this package's `app/` directory, so the published
 // `background-agents` npm package is fully self-contained.
 //
@@ -25,8 +25,8 @@ const assetsDir = path.join(desktopDir, "assets");
 const mainJs = path.join(distDir, "main.js");
 const preloadCjs = path.join(distDir, "preload.cjs");
 
-log("Building @background-agents/desktop…");
-execSync("npm run build -w @background-agents/desktop", {
+log("Building @switchboard/desktop…");
+execSync("npm run build -w @switchboard/desktop", {
   cwd: repoRoot,
   stdio: "inherit",
 });

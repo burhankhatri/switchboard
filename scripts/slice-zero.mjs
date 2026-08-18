@@ -12,8 +12,8 @@
  */
 import { execFileSync } from "node:child_process"
 import { Daytona } from "@daytonaio/sdk"
-import { createSession } from "@background-agents/sdk"
-import { createSandboxGit } from "@background-agents/sandbox-git"
+import { createSession } from "@switchboard/sdk"
+import { createSandboxGit } from "@switchboard/sandbox-git"
 
 const REPO = process.env.WORKSPACE_REPO ?? "burhankhatri/agent-workspaces"
 const WORKSPACE_PATH = process.env.WORKSPACE_PATH ?? "workspaces/marketing-automation"

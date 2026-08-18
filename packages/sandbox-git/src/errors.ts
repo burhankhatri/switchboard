@@ -1,5 +1,5 @@
 /**
- * Git error types for @background-agents/sandbox-git
+ * Git error types for @switchboard/sandbox-git
  */
 
 /**

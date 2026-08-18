@@ -1,10 +1,10 @@
 {
-  "name": "background-agents",
+  "name": "switchboard",
   "version": "1.0.2",
-  "description": "Launch the Background Agents desktop app with one command — npx background-agents. Always runs the latest published version.",
+  "description": "Launch the Switchboard desktop app with one command \u2014 npx switchboard. Always runs the latest published version.",
   "type": "commonjs",
   "bin": {
-    "background-agents": "bin/background-agents.js"
+    "switchboard": "bin/switchboard.js"
   },
   "files": [
     "bin",
@@ -18,8 +18,8 @@
   "scripts": {
     "bundle": "node scripts/bundle-app.mjs",
     "prepack": "node scripts/bundle-app.mjs",
-    "start": "node bin/background-agents.js",
-    "typecheck": "node --check bin/background-agents.js && node --check lib/ui.js"
+    "start": "node bin/switchboard.js",
+    "typecheck": "node --check bin/switchboard.js && node --check lib/ui.js"
   },
   "dependencies": {
     "electron": "^33.2.1",
@@ -27,7 +27,7 @@
     "isomorphic-git": "^1.38.3"
   },
   "keywords": [
-    "background-agents",
+    "switchboard",
     "electron",
     "launcher",
     "npx",
@@ -35,10 +35,10 @@
   ],
   "license": "MIT",
   "author": "James Murdza",
-  "homepage": "https://backgrounder.dev",
+  "homepage": "https://switchboard.local",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jamesmurdza/background-agents.git",
+    "url": "https://github.com/burhankhatri/switchboard.git",
     "directory": "packages/launcher"
   }
 }

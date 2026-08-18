@@ -1,7 +1,7 @@
 schema: spec-driven
 
 context: |
-  Switchboard — shared agent workspaces, derived from background-agents.
+  Switchboard — shared agent workspaces, derived from switchboard.
   A workspace is a folder in one private git repo carrying the skills, scripts
   and connections for one kind of work. A run spawns a Daytona sandbox,
   sparse-clones that folder, and starts a headless agent with cwd inside it.

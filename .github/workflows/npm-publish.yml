@@ -4,15 +4,15 @@ name: Publish to npm
 # manual "Run workflow" button.
 #
 # Two independent jobs:
-#   1. publish-launcher  — the `background-agents` npx launcher (packages/launcher),
+#   1. publish-launcher  — the `switchboard` npx launcher (packages/launcher),
 #                          versioned from the pushed tag.
-#   2. publish-packages  — the reusable `@background-agents/*` libraries, each
+#   2. publish-packages  — the reusable `@switchboard/*` libraries, each
 #                          versioned from its OWN package.json and skipped if that
 #                          version is already on npm (so the job is idempotent and
 #                          safe to re-run).
 #
 # Requires an `NPM_TOKEN` repository secret (an npm automation/publish token with
-# rights to the `background-agents` package and the `@background-agents` scope).
+# rights to the `switchboard` package and the `@switchboard` scope).
 
 on:
   push:
@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Launcher version to publish (e.g. 1.0.0). Blank = use packages/launcher/package.json. Does not affect the @background-agents/* libraries."
+        description: "Launcher version to publish (e.g. 1.0.0). Blank = use packages/launcher/package.json. Does not affect the @switchboard/* libraries."
         required: false
         type: string
 
@@ -55,11 +55,11 @@ jobs:
           else
             VERSION="${GITHUB_REF_NAME#v}"   # tag push, e.g. v1.0.0 -> 1.0.0
           fi
-          echo "Publishing background-agents@${VERSION}"
-          npm version "${VERSION}" --no-git-tag-version --allow-same-version -w background-agents
+          echo "Publishing switchboard@${VERSION}"
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version -w switchboard
 
       - name: Publish to npm
-        run: npm publish -w background-agents --access public
+        run: npm publish -w switchboard --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -83,7 +83,7 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
 
-      - name: Publish @background-agents/* libraries
+      - name: Publish @switchboard/* libraries
         # For each listed package: read its name+version from package.json, and
         # publish only if that exact version is not already on npm. `npm publish`
         # re-runs the package's prepare/prepublishOnly so dist/ is fresh in the
@@ -99,7 +99,7 @@ jobs:
         # release tag doesn't publish a broken (src-pointing) tarball.
         run: |
           set -euo pipefail
-          # The reusable @background-agents/* libraries, in dependency order
+          # The reusable @switchboard/* libraries, in dependency order
           # (a package is listed before anything that depends on it).
           # `common` and `sandbox-image` are intentionally excluded — they are
           # internal-only (not published).

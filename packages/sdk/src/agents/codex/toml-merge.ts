@@ -2,7 +2,7 @@
  * TOML section helpers for ~/.codex/config.toml.
  *
  * The Codex config file has two independent owners that each do whole-file
- * writes: the MCP layer (@background-agents/agent-configuration) writes the
+ * writes: the MCP layer (@switchboard/agent-configuration) writes the
  * `[mcp_servers.*]` sections, while codexSetup writes the provider/routing
  * config (the top-level `model_provider`/`model` keys and `[model_providers.*]`
  * sections). setupMcpForAgent runs first, then codexSetup runs last — so

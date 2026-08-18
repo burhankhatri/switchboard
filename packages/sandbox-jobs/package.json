@@ -1,5 +1,5 @@
 {
-  "name": "@background-agents/sandbox-jobs",
+  "name": "@switchboard/sandbox-jobs",
   "version": "0.1.0",
   "description": "Run, observe, and reconnect to long-running shell processes in a Daytona sandbox via the filesystem. Byte-offset incremental reads, real exit codes, and cold-reconnect-by-id.",
   "type": "module",

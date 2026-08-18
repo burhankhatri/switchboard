@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 "use strict";
 
-// Background Agents desktop launcher.
+// Switchboard desktop launcher.
 //
-// `npx background-agents` resolves the latest published version of this package,
+// `npx switchboard` resolves the latest published version of this package,
 // then this script spawns the bundled Electron app (packages/launcher/app),
 // pointed at the production backend by default. The heavy Electron runtime is a
 // normal npm dependency, so npm/npx downloads it (with its own progress bar) on
@@ -17,10 +17,10 @@ const { spawn } = require("child_process");
 const { colors, symbols, Spinner, line, showCursor } = require("../lib/ui");
 const pkg = require("../package.json");
 
-const PROD_URL = "https://backgrounder.dev";
+const PROD_URL = "https://switchboard.local";
 const DEV_URL = "http://localhost:4000";
 const APP_ENTRY = path.join(__dirname, "..", "app", "dist", "main.js");
-const READY_MARKER = "background-agents:ready";
+const READY_MARKER = "switchboard:ready";
 
 function parseArgs(argv) {
   const opts = {
@@ -45,11 +45,11 @@ function parseArgs(argv) {
 function printBanner() {
   line();
   line(
-    `  ${colors.bold(colors.magenta("Background Agents"))} ${colors.dim(
+    `  ${colors.bold(colors.magenta("Switchboard"))} ${colors.dim(
       "desktop launcher v" + pkg.version
     )}`
   );
-  line(`  ${colors.dim("https://backgrounder.dev")}`);
+  line(`  ${colors.dim("https://switchboard.local")}`);
   line();
 }
 
@@ -94,7 +94,7 @@ function resolveElectron() {
     return {
       error:
         "The Electron binary is missing or its download was skipped.\n" +
-        "  Reinstall without ELECTRON_SKIP_BINARY_DOWNLOAD set, e.g.: npx background-agents@latest",
+        "  Reinstall without ELECTRON_SKIP_BINARY_DOWNLOAD set, e.g.: npx switchboard@latest",
     };
   }
   return { electronPath };
@@ -181,7 +181,7 @@ function main() {
   const latestPromise = checkLatestVersion();
 
   const spinner = new Spinner();
-  spinner.start(`Launching Background Agents ${colors.dim("→ " + backendUrl)}`);
+  spinner.start(`Launching Switchboard ${colors.dim("→ " + backendUrl)}`);
 
   const env = Object.assign({}, process.env, {
     BACKGROUND_AGENTS_URL: backendUrl,
@@ -203,7 +203,7 @@ function main() {
     ready = true;
     clearTimeout(readyFallback);
     spinner.succeed(
-      `Background Agents is running ${colors.dim("→ " + backendUrl)}`
+      `Switchboard is running ${colors.dim("→ " + backendUrl)}`
     );
     line(
       `  ${colors.dim("Close the app window (or press Ctrl+C here) to quit.")}`
@@ -260,7 +260,7 @@ function main() {
   child.on("error", (err) => {
     exited = true;
     clearTimeout(readyFallback);
-    if (!ready) spinner.fail("Failed to launch Background Agents");
+    if (!ready) spinner.fail("Failed to launch Switchboard");
     showCursor();
     line(`  ${symbols.error} ${colors.red(err.message)}`);
     process.exitCode = 1;
@@ -271,7 +271,7 @@ function main() {
     clearTimeout(readyFallback);
     showCursor();
     if (!ready) {
-      spinner.fail("Background Agents exited before it finished starting");
+      spinner.fail("Switchboard exited before it finished starting");
       if (code) {
         line(
           `  ${colors.dim(
@@ -282,7 +282,7 @@ function main() {
         );
       }
     } else {
-      line(`  ${symbols.arrow} ${colors.dim("Background Agents closed.")}`);
+      line(`  ${symbols.arrow} ${colors.dim("Switchboard closed.")}`);
     }
     process.exitCode = signal ? 0 : code == null ? 0 : code;
   });

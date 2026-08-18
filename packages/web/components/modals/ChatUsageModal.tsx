@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { ModalHeader, focusChatPrompt } from "@/components/ui/modal-header"
 import { useModals } from "@/lib/contexts"
 import { AgentIcon } from "@/components/icons/agent-icons"
-import { ALL_AGENTS, agentToProvider, type Agent } from "@background-agents/common"
+import { ALL_AGENTS, agentToProvider, type Agent } from "@switchboard/common"
 import type { ChatUsageResponse } from "@/app/api/chats/[chatId]/usage/route"
 import { fmtTokens } from "@/lib/format"
 

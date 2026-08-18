@@ -40,7 +40,7 @@ const PROCESS_NAME = "websocket-pty-server"
 
 /**
  * Where the PTY server's files live inside the sandbox. The
- * `background-agents` snapshot pre-creates this directory and pre-installs
+ * `switchboard` snapshot pre-creates this directory and pre-installs
  * `ws` + `node-pty` here at image build time, so `setupTerminal` skips the
  * install step on first terminal open. On other images the install runs
  * once into this directory and is cached for subsequent calls.
@@ -115,7 +115,7 @@ export async function stopTerminal(sandbox: Sandbox): Promise<TerminalSetupResul
  * @example
  * ```typescript
  * import { Daytona } from "@daytonaio/sdk"
- * import { setupTerminal, WebSocketTerminal } from "@background-agents/sandbox-terminal"
+ * import { setupTerminal, WebSocketTerminal } from "@switchboard/sandbox-terminal"
  *
  * const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY })
  * const sandbox = await daytona.create()
@@ -158,7 +158,7 @@ export async function setupTerminal(
   }
 
   // Ensure the install directory exists and is writable. On the
-  // `background-agents` snapshot this is a no-op (the image pre-creates
+  // `switchboard` snapshot this is a no-op (the image pre-creates
   // it owned by daytona); on other images it's the first-time setup.
   await sandbox.process.executeCommand(
     `mkdir -p ${INSTALL_DIR} 2>/dev/null || sudo mkdir -p ${INSTALL_DIR} && sudo chown -R $(id -u):$(id -g) ${INSTALL_DIR}`,

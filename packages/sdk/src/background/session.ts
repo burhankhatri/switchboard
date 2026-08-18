@@ -1,7 +1,7 @@
 /**
  * Background Session — the agent "turn manager".
  *
- * This is a thin consumer of @background-agents/sandbox-jobs. The process
+ * This is a thin consumer of @switchboard/sandbox-jobs. The process
  * primitive (detach, output, exit code, liveness, cancel, reattach) lives in
  * that package; this file owns only *conversation* concerns:
  *   - one job per turn,
@@ -21,7 +21,7 @@ import {
   CANCELLED_EXIT_CODE,
   type JobHandle,
   type SandboxJobs,
-} from "@background-agents/sandbox-jobs"
+} from "@switchboard/sandbox-jobs"
 import type { AgentDefinition, CommandSpec, ParseContext, RunOptions } from "../core/agent"
 import type { AgentCrashedEvent, Event } from "../types/events"
 import type { CodeAgentSandbox } from "../types/provider"

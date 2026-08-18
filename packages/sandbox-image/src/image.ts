@@ -7,8 +7,8 @@ import { Image } from "@daytonaio/sdk"
  * The app calls getActiveSnapshotName() to discover which one to use at
  * runtime — no env var or config needed.
  */
-export const SNAPSHOT_NAME = "background-agents"
-export const SNAPSHOT_NAME_TEMP = "background-agents-temp"
+export const SNAPSHOT_NAME = "switchboard"
+export const SNAPSHOT_NAME_TEMP = "switchboard-temp"
 
 /** Both possible snapshot names (for lookups). */
 export const ALL_SNAPSHOT_NAMES = [SNAPSHOT_NAME, SNAPSHOT_NAME_TEMP] as const
@@ -193,7 +193,7 @@ export function getAgentSandboxImage(): Image {
         "mkdir -p /home/daytona/.gemini /home/daytona/.config/goose /home/daytona/project && " +
           "chown -R daytona:daytona /home/daytona"
       )
-      // Pre-install ws + node-pty for @background-agents/sandbox-terminal so
+      // Pre-install ws + node-pty for @switchboard/sandbox-terminal so
       // setupTerminal() finds them already present at /opt/pty-server and
       // skips its runtime install step. Path and versions must match what
       // sandbox-terminal/src/sandbox/setup.ts and

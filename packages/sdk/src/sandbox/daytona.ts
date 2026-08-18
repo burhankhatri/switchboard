@@ -1,9 +1,9 @@
 /**
  * Daytona sandbox adapter: wraps a Sandbox from @daytonaio/sdk into CodeAgentSandbox.
- * Long-running processes are delegated to @background-agents/sandbox-jobs.
+ * Long-running processes are delegated to @switchboard/sandbox-jobs.
  */
 import type { Sandbox } from "@daytonaio/sdk"
-import { createSandboxJobs, type SandboxJobs, type StartJobOptions } from "@background-agents/sandbox-jobs"
+import { createSandboxJobs, type SandboxJobs, type StartJobOptions } from "@switchboard/sandbox-jobs"
 import type { CodeAgentSandbox, AdaptSandboxOptions, ProviderName } from "../types/index"
 import { getPackageName, getShellInstaller } from "../utils/install"
 import { escapeShell } from "../utils/shell"
@@ -32,7 +32,7 @@ export function adaptDaytonaSandbox(
     return { exitCode: result.exitCode ?? 0, output: result.result ?? "" }
   }
 
-  // Long-running-process runner, wired to @background-agents/sandbox-jobs.
+  // Long-running-process runner, wired to @switchboard/sandbox-jobs.
   // We wrap start() so the adapter's two-level env (session + run) is injected
   // into every job, exactly as the old executeBackground did — the package
   // itself stays env-agnostic.

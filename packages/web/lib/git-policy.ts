@@ -2,7 +2,7 @@
  * Git safety policy for background agents.
  *
  * This declares which git operations agents are not allowed to run, as a
- * `CommandPolicy`. The `@background-agents/agent-configuration` package renders
+ * `CommandPolicy`. The `@switchboard/agent-configuration` package renders
  * that policy into each agent's native config format (Claude hook, Codex rules,
  * OpenCode permissions). Keeping the rules here means one definition drives
  * every agent, edited in one place.
@@ -19,7 +19,7 @@
  * told to use `git restore`.
  */
 
-import type { CommandPolicy } from "@background-agents/agent-configuration/permissions"
+import type { CommandPolicy } from "@switchboard/agent-configuration/permissions"
 
 export const DEFAULT_GIT_POLICY: CommandPolicy = {
   deny: [

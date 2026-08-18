@@ -3,7 +3,7 @@
  *
  * Covers the mapping of a CustomEndpoint to the standard ANTHROPIC_* env vars,
  * header parsing / auth promotion, CLI model resolution, and that an endpoint
- * option is always usable — all pure logic in @background-agents/common.
+ * option is always usable — all pure logic in @switchboard/common.
  */
 import { describe, it, expect } from "vitest"
 import {
@@ -15,7 +15,7 @@ import {
   getAgentModels,
   ENDPOINT_MODEL_PREFIX,
   type CustomEndpoint,
-} from "@background-agents/common"
+} from "@switchboard/common"
 
 function ep(overrides: Partial<CustomEndpoint> = {}): CustomEndpoint {
   return {

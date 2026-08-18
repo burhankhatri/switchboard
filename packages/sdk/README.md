@@ -1,10 +1,10 @@
-# Background Agents SDK
+# Switchboard SDK
 
 A TypeScript SDK for running AI coding agents (Claude, Codex, Copilot, Droid, Gemini, Goose, Kilo, Kimi, OpenCode, Pi) in secure [Daytona](https://daytona.io) sandboxes. Designed for background execution with polling-based event streaming.
 
 ```typescript
 import { Daytona } from "@daytonaio/sdk"
-import { createSession } from "@background-agents/sdk"
+import { createSession } from "@switchboard/sdk"
 
 const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY })
 const sandbox = await daytona.create()
@@ -87,7 +87,7 @@ export DAYTONA_API_KEY=dtn_your_api_key
 ## Installation
 
 ```bash
-npm install @background-agents/sdk @daytonaio/sdk
+npm install @switchboard/sdk @daytonaio/sdk
 ```
 
 ---
@@ -96,7 +96,7 @@ npm install @background-agents/sdk @daytonaio/sdk
 
 ```typescript
 import { Daytona } from "@daytonaio/sdk"
-import { createSession } from "@background-agents/sdk"
+import { createSession } from "@switchboard/sdk"
 
 // 1. Create sandbox
 const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY })
@@ -136,7 +136,7 @@ The SDK is designed for long-running tasks that may outlive your server process.
 
 ```typescript
 import { Daytona } from "@daytonaio/sdk"
-import { createSession, getSession } from "@background-agents/sdk"
+import { createSession, getSession } from "@switchboard/sdk"
 
 const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY! })
 const sandbox = await daytona.create()
@@ -274,7 +274,7 @@ type Event =
 
 1. **Sandbox** — Create a Daytona sandbox for isolated execution
 2. **CLI install** — Provider CLI is installed in the sandbox automatically
-3. **Background execution** — Agent runs as a detached background job (via [`@background-agents/sandbox-jobs`](../sandbox-jobs), using `setsid` + a cgroup), outputs to a log file
+3. **Background execution** — Agent runs as a detached background job (via [`@switchboard/sandbox-jobs`](../sandbox-jobs), using `setsid` + a cgroup), outputs to a log file
 4. **Polling** — SDK polls the log file for new JSON events
 5. **Completion** — An `exit` file (holding the process exit code) signals when the agent finishes
 6. **Cleanup** — You call `sandbox.delete()` when done

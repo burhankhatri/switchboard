@@ -2,7 +2,7 @@
  * Server-only orchestration for refreshing the shared Claude credential pool.
  *
  * This is the ONLY module (besides the seed CLI) that imports the heavy
- * @background-agents/claude-credentials generator, which pulls in
+ * @switchboard/claude-credentials generator, which pulls in
  * @daytonaio/sdk -> @opentelemetry -> @grpc (Node-only). It's kept separate
  * from lib/claude-credentials.ts so the read helpers that sit on hot request
  * paths stay Prisma-weight. All DB access is delegated to that data-access
@@ -18,7 +18,7 @@ import {
   isClaudeOAuthCredentials,
   CLAUDE_COOKIES_KEY,
   type ClaudeOAuthCredentials,
-} from "@background-agents/claude-credentials"
+} from "@switchboard/claude-credentials"
 import {
   readCredentials,
   writeCredentials,

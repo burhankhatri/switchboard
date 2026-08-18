@@ -1,5 +1,5 @@
 {
-  "name": "@background-agents/sandbox-skills",
+  "name": "@switchboard/sandbox-skills",
   "version": "0.1.0",
   "description": "Skills registry client and sandbox operations for Daytona",
   "type": "module",

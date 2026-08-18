@@ -16,7 +16,7 @@
 
 import type { Sandbox as DaytonaSandbox } from "@daytonaio/sdk"
 
-import { agentToProvider, type Agent } from "@background-agents/common"
+import { agentToProvider, type Agent } from "@switchboard/common"
 
 import { prisma } from "@/lib/db/prisma"
 import {

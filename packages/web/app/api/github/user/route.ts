@@ -1,5 +1,5 @@
 import { requireGitHubAuth, isGitHubAuthError, internalError } from "@/lib/db/api-helpers"
-import { getUser } from "@background-agents/common"
+import { getUser } from "@switchboard/common"
 
 export async function GET() {
   const ghAuth = await requireGitHubAuth()

@@ -1,5 +1,5 @@
 import { requireGitHubAuth, isGitHubAuthError, internalError } from "@/lib/db/api-helpers"
-import { getUserRepos } from "@background-agents/common"
+import { getUserRepos } from "@switchboard/common"
 import { NextRequest } from "next/server"
 
 const PER_PAGE = 100

@@ -14,7 +14,7 @@
  * logged to the TokenUsage ledger. Omit a provider to leave it unlimited.
  */
 
-import type { ProviderName } from "@background-agents/common"
+import type { ProviderName } from "@switchboard/common"
 
 /** Subscription tier (mirrors Prisma's `Plan` enum). */
 export type Plan = "free" | "pro" | "unlimited"

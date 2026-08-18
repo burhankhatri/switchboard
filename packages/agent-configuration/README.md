@@ -1,4 +1,4 @@
-# @background-agents/agent-configuration
+# @switchboard/agent-configuration
 
 A translation layer between coding agents' configuration formats.
 
@@ -27,7 +27,7 @@ edit.
 ## Installation
 
 ```bash
-npm install @background-agents/agent-configuration
+npm install @switchboard/agent-configuration
 ```
 
 ## Command permissions
@@ -41,7 +41,7 @@ import {
   setupCodexPermissions,
   renderOpenCodePermissionEnv,
   type CommandPolicy,
-} from "@background-agents/agent-configuration/permissions"
+} from "@switchboard/agent-configuration/permissions"
 
 const policy: CommandPolicy = {
   deny: [
@@ -89,7 +89,7 @@ starts. Supported agents: `claude-code`, `codex`, `gemini`, `opencode`, `goose`,
 `copilot`, `kilo`, `kimi`, `droid`. It's a no-op for agents that don't support MCP.
 
 ```ts
-import { setupMcpForAgent } from "@background-agents/agent-configuration/mcp"
+import { setupMcpForAgent } from "@switchboard/agent-configuration/mcp"
 
 await setupMcpForAgent(sandbox, {
   agent: "claude-code",
@@ -111,7 +111,7 @@ previous run in a reused sandbox.
 ## Exports
 
 ```ts
-// "@background-agents/agent-configuration/permissions"
+// "@switchboard/agent-configuration/permissions"
 import {
   type CommandPolicy,
   type CommandRule,
@@ -131,14 +131,14 @@ import {
   renderOpenCodePermissions,
   renderOpenCodePermissionEnv,
   OPENCODE_BASELINE_PERMISSIONS,
-} from "@background-agents/agent-configuration/permissions"
+} from "@switchboard/agent-configuration/permissions"
 
-// "@background-agents/agent-configuration/mcp"
+// "@switchboard/agent-configuration/mcp"
 import {
   setupMcpForAgent,
   type AgentMcpServer,
   type SetupMcpOptions,
-} from "@background-agents/agent-configuration/mcp"
+} from "@switchboard/agent-configuration/mcp"
 ```
 
 The package root (`.`) re-exports both submodules.

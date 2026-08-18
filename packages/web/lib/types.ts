@@ -1,18 +1,18 @@
 /**
  * Types for Simple Chat
- * Re-exports shared types from @background-agents/common
+ * Re-exports shared types from @switchboard/common
  */
 
 // Re-export shared types
 export type {
   ContentBlock,
   ToolCall,
-} from "@background-agents/common"
+} from "@switchboard/common"
 
-import type { ContentBlock } from "@background-agents/common"
+import type { ContentBlock } from "@switchboard/common"
 
 // Re-export agent types
-export type { Agent, ModelOption, CustomEndpoint, CustomEndpointType } from "@background-agents/common"
+export type { Agent, ModelOption, CustomEndpoint, CustomEndpointType } from "@switchboard/common"
 export {
   ALL_AGENTS,
   agentModels,
@@ -29,7 +29,7 @@ export {
   agentHasFreeUsage,
   agentSharedPoolExhausted,
   agentIsReady,
-} from "@background-agents/common"
+} from "@switchboard/common"
 
 // =============================================================================
 // Environment Variables
@@ -275,7 +275,7 @@ export interface Settings {
 export type { CredentialId, Credentials, CredentialFlags } from "./credentials"
 
 // Re-export GitHub types from common
-export type { GitHubRepo, GitHubBranch, GitHubUser } from "@background-agents/common"
+export type { GitHubRepo, GitHubBranch, GitHubUser } from "@switchboard/common"
 
 // File upload types
 export interface PendingFile {

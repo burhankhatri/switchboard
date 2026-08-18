@@ -1,6 +1,6 @@
 "use client"
 
 /**
- * Agent icon components - re-exported from @background-agents/common
+ * Agent icon components - re-exported from @switchboard/common
  */
-export { AgentIcon } from "@background-agents/common"
+export { AgentIcon } from "@switchboard/common"

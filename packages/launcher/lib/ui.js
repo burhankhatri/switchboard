@@ -1,7 +1,7 @@
 "use strict";
 
 // Tiny dependency-free terminal UI: colors + a spinner. Keeping this free of
-// npm deps means `npx background-agents` installs fast (only Electron is heavy).
+// npm deps means `npx switchboard` installs fast (only Electron is heavy).
 
 const useColor =
   process.env.NO_COLOR == null &&

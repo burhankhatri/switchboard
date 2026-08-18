@@ -29,7 +29,7 @@ export function createTray(mainWindow: BrowserWindow) {
   }
 
   tray = new Tray(icon);
-  tray.setToolTip("Background Agents");
+  tray.setToolTip("Switchboard");
 
   // Build context menu
   const contextMenu = buildContextMenu(mainWindow, false);
@@ -57,7 +57,7 @@ export function createTray(mainWindow: BrowserWindow) {
 function buildContextMenu(mainWindow: BrowserWindow, isHidden: boolean): Menu {
   return Menu.buildFromTemplate([
     {
-      label: isHidden ? "Show Background Agents" : "Hide Background Agents",
+      label: isHidden ? "Show Switchboard" : "Hide Switchboard",
       click: () => {
         if (isHidden) {
           mainWindow.show();
@@ -97,7 +97,7 @@ function buildContextMenu(mainWindow: BrowserWindow, isHidden: boolean): Menu {
     },
     { type: "separator" },
     {
-      label: "Quit Background Agents",
+      label: "Quit Switchboard",
       accelerator: "CmdOrCtrl+Q",
       click: () => {
         app.quit();

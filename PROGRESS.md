@@ -5,7 +5,7 @@ git repo** carrying the skills, scripts and connections for one kind of work.
 Pick a workspace, an agent runs it in a disposable sandbox with everything
 already loaded — no per-person setup, no per-person subscription.
 
-Built on a fork of [jamesmurdza/background-agents](https://github.com/jamesmurdza/background-agents).
+Built on a fork of [burhankhatri/switchboard](https://github.com/burhankhatri/switchboard).
 
 ---
 
@@ -87,7 +87,7 @@ folder gets both the workspace's own skills and the shared ones for free — no
 3. **Filter the chat list by workspace.** `Chat.workspaceId` exists; it's a `where` clause.
 4. **Fail loud on bootstrap.** Claude Code's `system/init` event carries `plugin_errors` and `mcp_server_errors` — abort the run on either instead of proceeding without a skill or tool.
 5. **Image:** add `pip` (absent entirely) and `gh`; `python3` 3.11.2 is present. Geospatial libs (`libgeos`, `libproj`, `libspatialindex`) missing if the lead-gen pipeline is wired up.
-6. **Finish the rebrand.** Chat view, settings modals and command palette are still structurally backgrounder's.
+6. **Finish the rebrand.** Chat view, settings modals and command palette are still structurally switchboard's.
 7. **Scheduled runs against a workspace** — wired but untested.
 8. **Credential broker.** See below.
 
@@ -124,7 +124,7 @@ the shape of thing to keep watching for:
 
 ```bash
 npm install
-npx dotenv -e packages/web/.env.local -- npm run build:snapshot -w @background-agents/sandbox-image
+npx dotenv -e packages/web/.env.local -- npm run build:snapshot -w @switchboard/sandbox-image
 npm run dev            # http://localhost:4000
 ```
 

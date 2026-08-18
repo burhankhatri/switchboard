@@ -5,7 +5,7 @@
  * (not env vars), so when the user configures a custom OpenAI-compatible
  * endpoint we synthesize that file. The stored CUSTOM_CODEX_* credentials are
  * passed into the sandbox as env vars (see buildCodexCustomEnv in
- * @background-agents/common); codexSetup reads them back and writes the config.
+ * @switchboard/common); codexSetup reads them back and writes the config.
  */
 
 import { parseHeaderLines } from "../../utils/headers"

@@ -21,7 +21,7 @@ import {
 /**
  * Global OpenCode config path — NOT the project root. Writing under the repo
  * checkout would dirty the sandbox working tree (and could get committed by the
- * agent). The MCP setup (see @background-agents/agent-configuration) writes the
+ * agent). The MCP setup (see @switchboard/agent-configuration) writes the
  * `mcp` section into this same file, so both readers/writers here preserve keys
  * they don't own.
  */

@@ -82,7 +82,7 @@ interface ProviderConfig {
 
 // Optional overrides for capturing failure fixtures (e.g. gemini-error.jsonl):
 //   GEMINI_MODEL=gemini-2.5-pro JSONL_OUTPUT_NAME=gemini-error \
-//     npm run generate:jsonl-refs -w @background-agents/sdk -- gemini
+//     npm run generate:jsonl-refs -w @switchboard/sdk -- gemini
 // Run the Pro model with a FREE-tier GEMINI_API_KEY to capture the quota error.
 const GEMINI_MODEL = process.env.GEMINI_MODEL
 const JSONL_OUTPUT_NAME = process.env.JSONL_OUTPUT_NAME

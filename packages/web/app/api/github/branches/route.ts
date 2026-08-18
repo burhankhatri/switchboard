@@ -1,4 +1,4 @@
-import { getRepoBranches } from "@background-agents/common"
+import { getRepoBranches } from "@switchboard/common"
 import { requireGitHubAuth, isGitHubAuthError, internalError, badRequest } from "@/lib/db/api-helpers"
 
 export async function GET(req: Request) {

@@ -1,12 +1,12 @@
 /**
- * @background-agents/sandbox-git
+ * @switchboard/sandbox-git
  *
  * Git operations for Daytona sandboxes via sandbox.process.executeCommand().
  * Credentials are passed via -c flags and never stored in the sandbox.
  *
  * @example
  * ```typescript
- * import { createSandboxGit } from "@background-agents/sandbox-git"
+ * import { createSandboxGit } from "@switchboard/sandbox-git"
  *
  * const git = createSandboxGit(sandbox)
  *

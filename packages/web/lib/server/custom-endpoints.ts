@@ -4,14 +4,14 @@
  * Endpoints are stored on `User.customEndpoints` as a JSONB array. Every field is
  * plaintext except `headers`, which can carry auth and is encrypted at rest. These
  * helpers convert between the stored shape (headers encrypted) and the runtime
- * `CustomEndpoint` shape (headers decrypted) used by @background-agents/common.
+ * `CustomEndpoint` shape (headers decrypted) used by @switchboard/common.
  *
  * Must never be imported from client code.
  */
 
 import { prisma } from "@/lib/db/prisma"
 import { encrypt, decrypt } from "@/lib/db/encryption"
-import type { CustomEndpoint, CustomEndpointType } from "@background-agents/common"
+import type { CustomEndpoint, CustomEndpointType } from "@switchboard/common"
 
 const ENDPOINT_TYPES: readonly CustomEndpointType[] = ["anthropic", "codex", "opencode"]
 

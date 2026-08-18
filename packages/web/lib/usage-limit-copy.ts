@@ -1,4 +1,4 @@
-import type { ProviderName } from "@background-agents/common"
+import type { ProviderName } from "@switchboard/common"
 import type { BudgetUnit, Plan } from "@/lib/server/usage-budgets"
 
 export type LimitUpgradeTarget = "pro" | "unlimited"

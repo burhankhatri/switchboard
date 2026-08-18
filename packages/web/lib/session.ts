@@ -4,7 +4,7 @@
  *
  * This is server-side glue that adapts the SDK's agent event stream into the
  * shapes the web UI stores/renders. It lives in the web package (not in
- * @background-agents/common) because it depends on the SDK's event types and
+ * @switchboard/common) because it depends on the SDK's event types and
  * is only consumed by web server code — keeping it out of `common` ensures
  * that browser-shared package never transitively pulls in the SDK.
  */
@@ -14,7 +14,7 @@ import type {
   TokenEvent,
   ToolStartEvent,
   ToolEndEvent,
-} from "@background-agents/sdk"
+} from "@switchboard/sdk"
 import type { ContentBlock, ToolCall } from "./types"
 import { PATHS, SANDBOX_CONFIG } from "./constants"
 import { basename } from "./format"

@@ -1,4 +1,4 @@
-import { createSandboxGit, type SandboxLike } from "@background-agents/sandbox-git"
+import { createSandboxGit, type SandboxLike } from "@switchboard/sandbox-git"
 import { prisma } from "@/lib/db/prisma"
 import { getUserPushOptions } from "@/lib/git/push-options"
 import { isInConflictState } from "@/lib/git/sandbox-git-ops"

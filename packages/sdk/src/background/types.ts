@@ -34,7 +34,7 @@ export interface PollResult {
  *
  * This is the durable, cold-reconnect state for the *conversation* (turns,
  * agent session id, provider). Per-process state (output, exit code, pid) lives
- * in the job directory and is owned by @background-agents/sandbox-jobs — not
+ * in the job directory and is owned by @switchboard/sandbox-jobs — not
  * duplicated here.
  */
 export interface SessionMeta {

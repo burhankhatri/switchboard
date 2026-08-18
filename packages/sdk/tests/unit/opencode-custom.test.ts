@@ -3,7 +3,7 @@
  * target on the Custom model tab).
  *
  * Two layers:
- *  - pure credential/model logic in @background-agents/common (env passthrough,
+ *  - pure credential/model logic in @switchboard/common (env passthrough,
  *    model resolution to `custom/<model>`, the credential gate)
  *  - the SDK's opencode.json generation (buildOpencodeConfigJson)
  */
@@ -14,7 +14,7 @@ import {
   resolveCliModel,
   ENDPOINT_MODEL_PREFIX,
   type CustomEndpoint,
-} from "@background-agents/common"
+} from "@switchboard/common"
 import { buildOpencodeConfigJson } from "../../src/agents/opencode/config"
 
 function ep(overrides: Partial<CustomEndpoint> = {}): CustomEndpoint {

@@ -12,7 +12,7 @@ import {
   agentIsReady,
   hasCredentialsForModel,
   type CredentialFlags,
-} from "@background-agents/common"
+} from "@switchboard/common"
 
 const sharedPoolFresh: CredentialFlags = { CLAUDE_SHARED_POOL_AVAILABLE: true }
 const sharedPoolUsedUp: CredentialFlags = {

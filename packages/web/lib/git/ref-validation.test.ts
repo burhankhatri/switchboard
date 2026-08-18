@@ -63,7 +63,7 @@ describe("isSafeBranchName", () => {
 
 describe("isSafeRepoSegment", () => {
   it("accepts real GitHub owners and repo names", () => {
-    for (const ok of ["jamesmurdza", "background-agents", "next.js", "a_b-c.d"]) {
+    for (const ok of ["jamesmurdza", "switchboard", "next.js", "a_b-c.d"]) {
       expect(isSafeRepoSegment(ok)).toBe(true)
     }
   })

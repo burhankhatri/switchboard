@@ -1,6 +1,6 @@
-# Background Agents — Docs
+# Switchboard — Docs
 
-The docs site behind **docs.backgrounder.dev**. Plain Markdown content + a single-file viewer.
+The docs site behind **docs.switchboard.local**. Plain Markdown content + a single-file viewer.
 No framework, no dependencies — the only build step writes one small config file.
 
 ## View it locally
@@ -32,11 +32,11 @@ To add or reorder pages, edit the `NAV` array near the top of the `<script>` in 
 Deployed to Vercel as its own project, separate from `packages/web`:
 
 - **Root Directory**: `packages/docs`
-- **Domain**: `docs.backgrounder.dev`
+- **Domain**: `docs.switchboard.local`
 - **Env**: `DOCS_MEDIA_BASE` (see below)
 
 The web app links to it from the sidebar via `NEXT_PUBLIC_DOCS_URL`, which defaults to
-`https://docs.backgrounder.dev`. Point that at `http://localhost:4001` to test against a local
+`https://docs.switchboard.local`. Point that at `http://localhost:4001` to test against a local
 docs server.
 
 ### Where media is served from

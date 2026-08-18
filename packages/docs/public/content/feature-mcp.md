@@ -33,7 +33,7 @@ MCP isn't just for interactive chats. Attach a server to a [scheduled or trigger
 
 ## Setup
 
-To enable Smithery-hosted servers, the deployment needs a `SMITHERY_API_KEY` (and optionally a `SMITHERY_NAMESPACE`). See the [mcp package README](https://github.com/jamesmurdza/background-agents/tree/main/packages/mcp) for details.
+To enable Smithery-hosted servers, the deployment needs a `SMITHERY_API_KEY` (and optionally a `SMITHERY_NAMESPACE`). See the [mcp package README](https://github.com/burhankhatri/switchboard/tree/main/packages/mcp) for details.
 
 ## Next
 

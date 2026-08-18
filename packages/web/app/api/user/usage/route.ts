@@ -13,7 +13,7 @@ import {
   type BudgetUnit,
   type Plan,
 } from "@/lib/server/usage-budgets"
-import { agentLabels, type Agent } from "@background-agents/common"
+import { agentLabels, type Agent } from "@switchboard/common"
 
 /** Per-pool usage for one shared provider, for today (UTC). */
 export interface PoolUsage {

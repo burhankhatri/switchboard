@@ -17,7 +17,7 @@ import {
 } from "@/lib/server/usage-budgets"
 import { flagsFromCredentials, CREDENTIAL_KEYS, type CredentialFlags } from "@/lib/credentials"
 import { hasSharedOpencodeKey } from "@/lib/server/opencode-pool"
-import { sharedClaudePoolEligible } from "@background-agents/common"
+import { sharedClaudePoolEligible } from "@switchboard/common"
 
 export interface EffectiveFlags {
   flags: CredentialFlags

@@ -1,5 +1,5 @@
 /**
- * Type definitions for @background-agents/sandbox-git
+ * Type definitions for @switchboard/sandbox-git
  */
 
 // =============================================================================

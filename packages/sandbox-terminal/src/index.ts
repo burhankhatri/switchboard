@@ -1,5 +1,5 @@
 /**
- * @background-agents/sandbox-terminal
+ * @switchboard/sandbox-terminal
  *
  * WebSocket-based PTY terminal for Daytona sandboxes.
  *
@@ -11,7 +11,7 @@
  * Quick Start:
  * ```typescript
  * import { Daytona } from "@daytonaio/sdk"
- * import { setupTerminal, WebSocketTerminal } from "@background-agents/sandbox-terminal"
+ * import { setupTerminal, WebSocketTerminal } from "@switchboard/sandbox-terminal"
  *
  * const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY })
  * const sandbox = await daytona.create()

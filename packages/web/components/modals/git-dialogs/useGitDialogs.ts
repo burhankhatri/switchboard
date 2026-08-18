@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { PATHS } from "@/lib/constants"
-import { EMPTY_CONFLICT_STATE } from "@background-agents/common"
+import { EMPTY_CONFLICT_STATE } from "@switchboard/common"
 import type { Chat } from "@/lib/types"
 import type { UseGitDialogsOptions, UseGitDialogsResult, PRDescriptionType, RebaseConflictState } from "./types"
 import { callSandboxGit } from "./api"

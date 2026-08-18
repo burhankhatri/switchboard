@@ -1,5 +1,5 @@
 {
-  "name": "@background-agents/dev-cron",
+  "name": "@switchboard/dev-cron",
   "version": "0.1.0",
   "private": true,
   "description": "Local development simulator for Vercel cron jobs",

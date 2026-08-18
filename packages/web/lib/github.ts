@@ -9,7 +9,7 @@ import type {
   GitHubUser,
   GitHubRepo,
   GitHubBranch,
-} from "@background-agents/common"
+} from "@switchboard/common"
 
 // Re-export types for convenience
 export type { GitHubUser, GitHubRepo, GitHubBranch }

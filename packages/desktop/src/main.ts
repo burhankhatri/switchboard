@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 // Backend URL - defaults based on whether we're packaged (prod) or running
 // from source (dev). Override with BACKGROUND_AGENTS_URL at runtime.
 const DEFAULT_BACKEND_URL = app.isPackaged
-  ? "https://backgrounder.dev"
+  ? "https://switchboard.local"
   : "http://localhost:4000";
 const BACKEND_URL = process.env.BACKGROUND_AGENTS_URL || DEFAULT_BACKEND_URL;
 
@@ -31,7 +31,7 @@ let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
 
 // One-time state minted when we open the OAuth flow, used to correlate the
-// returning `background-agents://auth` deep link with a flow this app actually
+// returning `switchboard://auth` deep link with a flow this app actually
 // started. Prevents deep-link session fixation (an arbitrary page/email firing
 // the deep link to swap in an attacker-controlled JWT).
 let pendingAuthState: string | null = null;
@@ -52,7 +52,7 @@ function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    title: "Background Agents",
+    title: "Switchboard",
     icon: path.join(__dirname, "../assets/icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -75,7 +75,7 @@ function createWindow() {
     // Signal to the npx launcher (packages/launcher) that the window is up so it
     // can flip its terminal spinner from "Launching…" to "running". Harmless in
     // packaged builds where nothing is listening on stdout.
-    console.log("background-agents:ready");
+    console.log("switchboard:ready");
   });
 
   // Handle external links - open in system browser
@@ -132,7 +132,7 @@ if (!gotTheLock) {
 
     // Handle deep link from second instance (Windows)
     const deepLink = commandLine.find((arg) =>
-      arg.startsWith("background-agents://")
+      arg.startsWith("switchboard://")
     );
     if (deepLink) {
       handleDeepLink(deepLink);
@@ -212,7 +212,7 @@ async function handleDeepLink(url: string) {
 app.whenReady().then(async () => {
   // Set app user model ID for Windows notifications
   if (process.platform === "win32") {
-    app.setAppUserModelId("com.background-agents.desktop");
+    app.setAppUserModelId("com.switchboard.desktop");
   }
 
   // Create main window

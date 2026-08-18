@@ -1,4 +1,4 @@
-# @background-agents/sandbox-jobs
+# @switchboard/sandbox-jobs
 
 Run, observe, and reconnect to **long-running shell processes** in a Daytona
 sandbox — using the sandbox filesystem as the durable source of truth.
@@ -72,7 +72,7 @@ this package is for.
 ## Usage
 
 ```ts
-import { createSandboxJobs } from "@background-agents/sandbox-jobs"
+import { createSandboxJobs } from "@switchboard/sandbox-jobs"
 
 const jobs = createSandboxJobs(sandbox) // a @daytonaio/sdk Sandbox
 

@@ -1,5 +1,5 @@
 {
-  "name": "@background-agents/mcp",
+  "name": "@switchboard/mcp",
   "version": "0.1.0",
   "description": "MCP provider abstractions for GitHub and Smithery",
   "type": "module",

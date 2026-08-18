@@ -1,5 +1,5 @@
 /**
- * @background-agents/agent-configuration
+ * @switchboard/agent-configuration
  *
  * A translation layer between coding agents' configuration formats.
  *
@@ -19,7 +19,7 @@
  *   setupMcpForAgent,
  *   setupClaudePermissions,
  *   renderOpenCodePermissionEnv,
- * } from '@background-agents/agent-configuration'
+ * } from '@switchboard/agent-configuration'
  *
  * await setupMcpForAgent(sandbox, { agent, servers })
  * await setupClaudePermissions(sandbox, policy)

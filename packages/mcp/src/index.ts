@@ -1,5 +1,5 @@
 /**
- * @background-agents/mcp
+ * @switchboard/mcp
  *
  * MCP provider abstractions for GitHub and Smithery.
  *
@@ -17,7 +17,7 @@
  * import {
  *   createGitHubMcpProvider,
  *   createSmitheryProvider,
- * } from "@background-agents/mcp"
+ * } from "@switchboard/mcp"
  *
  * // GitHub provider - mint installation tokens
  * const github = createGitHubMcpProvider({

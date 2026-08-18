@@ -13,7 +13,7 @@ git repo** (`WORKSPACES_REPO`) carrying the skills, scripts and connections for
 one kind of work. A run spawns a Daytona sandbox, sparse-clones that folder, and
 starts a headless agent with its cwd inside it.
 
-Derived from background-agents (Apache-2.0, see NOTICE).
+Derived from switchboard (Apache-2.0, see NOTICE).
 
 ## Setup
 

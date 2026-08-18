@@ -4,7 +4,7 @@ import {
   isGitHubApiError,
   formatPRTitleFromBranch,
   formatPRBodyFromCommits,
-} from "@background-agents/common"
+} from "@switchboard/common"
 import { requireGitHubAuth, isGitHubAuthError } from "@/lib/db/api-helpers"
 import { createGitOperationMessage } from "@/lib/db/git-messages"
 import { generateWithOpenRouter } from "@/lib/llm/openrouter"

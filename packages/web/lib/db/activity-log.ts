@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client"
-import { classifyAgentError } from "@background-agents/sdk"
+import { classifyAgentError } from "@switchboard/sdk"
 import { prisma } from "./prisma"
 
 /**

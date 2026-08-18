@@ -1,7 +1,7 @@
 import { NEW_REPOSITORY } from "@/lib/types"
 import { autoPullBeforeRun } from "@/lib/server/auto-pull"
 import { createGitOperationMessage } from "@/lib/db/git-messages"
-import type { SandboxLike } from "@background-agents/sandbox-git"
+import type { SandboxLike } from "@switchboard/sandbox-git"
 import type { ChatRecord } from "./types"
 
 /**

@@ -1,8 +1,8 @@
 import { Daytona } from "@daytonaio/sdk"
 import { ensureSandboxStarted } from "@/lib/sandbox"
 import { getSandboxOrExpired, passiveReadGate } from "@/lib/sandbox-lifecycle"
-import { escapeShell } from "@background-agents/sdk"
-import { PATHS } from "@background-agents/common"
+import { escapeShell } from "@switchboard/sdk"
+import { PATHS } from "@switchboard/common"
 import { IMAGE_MIME_TYPES } from "@/lib/file-preview/types"
 import { internalError, badRequest, notFound, requireSandboxOwner } from "@/lib/db/api-helpers"
 

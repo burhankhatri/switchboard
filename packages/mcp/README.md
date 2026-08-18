@@ -1,4 +1,4 @@
-# @background-agents/mcp
+# @switchboard/mcp
 
 TypeScript library for connecting to MCP servers via GitHub and Smithery.
 
@@ -7,7 +7,7 @@ TypeScript library for connecting to MCP servers via GitHub and Smithery.
 Mints short-lived installation tokens for GitHub's hosted MCP server.
 
 ```typescript
-import { createGitHubMcpProvider, GITHUB_MCP_URL } from "@background-agents/mcp"
+import { createGitHubMcpProvider, GITHUB_MCP_URL } from "@switchboard/mcp"
 
 const github = createGitHubMcpProvider({
   appId: process.env.GITHUB_APP_ID!,
@@ -75,7 +75,7 @@ Manages connection lifecycles with per-server OAuth flows.
 import {
   createSmitheryProvider,
   getSmitheryConnectionId,
-} from "@background-agents/mcp"
+} from "@switchboard/mcp"
 
 const smithery = createSmitheryProvider({
   apiKey: process.env.SMITHERY_API_KEY!,
@@ -119,7 +119,7 @@ import type {
   IConnectionProvider,
   ConnectionResult,
   ConnectionStatus,
-} from "@background-agents/mcp"
+} from "@switchboard/mcp"
 ```
 
 ## Utilities
@@ -127,7 +127,7 @@ import type {
 Helper functions for working with MCP servers.
 
 ```typescript
-import { safeServerName, isSmitheryServer } from "@background-agents/mcp"
+import { safeServerName, isSmitheryServer } from "@switchboard/mcp"
 
 // Convert qualified server names (e.g. "github/github") to safe identifiers
 // for use in file names, IDs, etc.
@@ -147,5 +147,5 @@ import {
   GITHUB_MCP_URL,           // "https://api.githubcopilot.com/mcp/"
   GITHUB_MCP_QUALIFIED_NAME, // "github/github"
   SMITHERY_API_BASE,        // "https://api.smithery.ai"
-} from "@background-agents/mcp"
+} from "@switchboard/mcp"
 ```

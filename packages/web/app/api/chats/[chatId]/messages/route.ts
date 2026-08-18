@@ -16,7 +16,7 @@ import { buildUsageMeta } from "@/lib/server/shared-pool"
 import { logActivityAsync } from "@/lib/db/activity-log"
 import { createBackgroundAgentSession, type Agent } from "@/lib/agent-session"
 import { loadMcpConnections } from "@/lib/mcp/agent-servers"
-import { resolveCliModel } from "@background-agents/common"
+import { resolveCliModel } from "@switchboard/common"
 import { getUserEndpoints } from "@/lib/server/custom-endpoints"
 import {
   deleteSandboxQuietly,

@@ -17,7 +17,7 @@ import {
   isSmitheryServer,
   GITHUB_MCP_QUALIFIED_NAME,
   GITHUB_MCP_URL,
-} from "@background-agents/mcp"
+} from "@switchboard/mcp"
 import {
   type McpOwner,
   ownerCreateData,

@@ -8,7 +8,7 @@ import {
 } from "@/lib/db/api-helpers"
 import { sumChatUsageByProvider, countChatMessagesByProvider } from "@/lib/db/token-usage"
 import { getProviderBudget, type BudgetUnit } from "@/lib/server/usage-budgets"
-import { ALL_AGENTS, agentLabels, agentToProvider, type ProviderName } from "@background-agents/common"
+import { ALL_AGENTS, agentLabels, agentToProvider, type ProviderName } from "@switchboard/common"
 
 /** Reverse map: SDK provider id → human label (via its agent). */
 const PROVIDER_LABELS: Record<string, string> = Object.fromEntries(

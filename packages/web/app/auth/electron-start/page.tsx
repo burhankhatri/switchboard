@@ -13,7 +13,7 @@ import { signIn, useSession } from "next-auth/react"
  * Flow:
  * 1. If not authenticated: initiates GitHub OAuth
  * 2. If authenticated: fetches JWT from /api/auth/electron-token
- * 3. Redirects to background-agents://auth?token=<JWT>
+ * 3. Redirects to switchboard://auth?token=<JWT>
  */
 export default function ElectronStartPage() {
   const { data: session, status } = useSession()
@@ -64,7 +64,7 @@ export default function ElectronStartPage() {
       // flow it started (prevents deep-link session fixation).
       const state = new URLSearchParams(window.location.search).get("state")
       const stateParam = state ? `&state=${encodeURIComponent(state)}` : ""
-      window.location.href = `background-agents://auth?token=${encodeURIComponent(token)}${stateParam}`
+      window.location.href = `switchboard://auth?token=${encodeURIComponent(token)}${stateParam}`
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error")
       setRedirecting(false)

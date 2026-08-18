@@ -1,20 +1,20 @@
-# background-agents
+# switchboard
 
-Launch the **Background Agents** desktop app with a single command — no install, always the latest version:
+Launch the **Switchboard** desktop app with a single command — no install, always the latest version:
 
 ```bash
-npx background-agents@latest
+npx switchboard@latest
 ```
 
-That's it. The first run downloads the Electron runtime (~once, then cached); every run loads the production app at <https://backgrounder.dev>.
+That's it. The first run downloads the Electron runtime (~once, then cached); every run loads the production app at <https://switchboard.local>.
 
-> **Naming:** the TypeScript SDK previously published as `background-agents` now lives at [`@background-agents/sdk`](../sdk), which freed the `background-agents` name for this desktop launcher.
+> **Naming:** the TypeScript SDK previously published as `switchboard` now lives at [`@switchboard/sdk`](../sdk), which freed the `switchboard` name for this desktop launcher.
 
 ## How it works
 
-This is a thin launcher published to npm as [`background-agents`](https://www.npmjs.com/package/background-agents):
+This is a thin launcher published to npm as [`switchboard`](https://www.npmjs.com/package/switchboard):
 
-1. `npx background-agents@latest` resolves the **latest published version** of this package from the npm registry.
+1. `npx switchboard@latest` resolves the **latest published version** of this package from the npm registry.
 2. npm installs it and its dependencies — **Electron** (plus `electron-updater` and `isomorphic-git`) — downloading the Electron platform binary on first run (cached for later runs).
 3. The launcher spawns the bundled Electron app (`app/`) pointed at the production backend, showing a small terminal UI while it starts.
 
@@ -23,12 +23,12 @@ Because every launch pulls the latest npm version, **publishing a new version is
 ## Usage
 
 ```bash
-npx background-agents [options]
+npx switchboard [options]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--url <url>` | Backend URL to load (default: `https://backgrounder.dev`) |
+| `--url <url>` | Backend URL to load (default: `https://switchboard.local`) |
 | `--dev` | Use the local dev server (`http://localhost:4000`) |
 | `--verbose` | Stream the desktop app's logs to the terminal |
 | `-v`, `--version` | Print the launcher version |
@@ -36,22 +36,22 @@ npx background-agents [options]
 
 Environment variable `BACKGROUND_AGENTS_URL` does the same as `--url` (the flag wins).
 
-> Tip: plain `npx background-agents` may reuse an npx-cached copy. Use `npx background-agents@latest` to force the newest version.
+> Tip: plain `npx switchboard` may reuse an npx-cached copy. Use `npx switchboard@latest` to force the newest version.
 
 ## Caveats
 
 - **First run downloads Electron** (~100–150 MB) via npm; it's cached afterward and re-downloaded only when a new version ships a different Electron.
-- The app runs **unpackaged**, so it relies on programmatic `background-agents://` deep-link registration for the OAuth round-trip (same code path as running the app from source). For a fully signed/notarized native install, use the packaged builds from GitHub Releases instead.
+- The app runs **unpackaged**, so it relies on programmatic `switchboard://` deep-link registration for the OAuth round-trip (same code path as running the app from source). For a fully signed/notarized native install, use the packaged builds from GitHub Releases instead.
 - This package was **0.1.1 / 0.1.2 as the SDK**; the launcher is published from **1.0.0** onward, so `latest` cleanly points at the desktop app.
 
 ## Development
 
-This package lives in the monorepo at `packages/launcher`. Its `app/` directory is generated — it's a copy of the compiled `@background-agents/desktop` output.
+This package lives in the monorepo at `packages/launcher`. Its `app/` directory is generated — it's a copy of the compiled `@switchboard/desktop` output.
 
 ```bash
 # From the repo root:
-npm run bundle -w background-agents   # build the Electron app + copy it into app/
-npm start -w background-agents        # run the launcher locally (after bundling)
+npm run bundle -w switchboard   # build the Electron app + copy it into app/
+npm start -w switchboard        # run the launcher locally (after bundling)
 
 # Verify the published tarball contents:
 cd packages/launcher && npm pack --dry-run
@@ -65,7 +65,7 @@ Two ways:
 
 ### Automatic — on a version tag (GitHub Actions)
 
-Pushing a `v*` tag runs the publish workflow, which sets the launcher's version from the tag and publishes it to npm (requires the `NPM_TOKEN` repo secret). The same workflow has a second job that publishes the reusable `@background-agents/*` libraries — each versioned from its own `package.json` and skipped if that version is already on npm, so the job is idempotent.
+Pushing a `v*` tag runs the publish workflow, which sets the launcher's version from the tag and publishes it to npm (requires the `NPM_TOKEN` repo secret). The same workflow has a second job that publishes the reusable `@switchboard/*` libraries — each versioned from its own `package.json` and skipped if that version is already on npm, so the job is idempotent.
 
 ```bash
 git tag v1.0.1 && git push origin v1.0.1
@@ -77,7 +77,7 @@ git tag v1.0.1 && git push origin v1.0.1
 
 ```bash
 npm ci                                   # from the repo root
-npm publish -w background-agents --access public
+npm publish -w switchboard --access public
 ```
 
-You must be logged in (`npm login`) with publish rights to the `background-agents` package. The first launcher publish must be version **≥ 1.0.0** (0.1.1 / 0.1.2 already exist from the SDK era).
+You must be logged in (`npm login`) with publish rights to the `switchboard` package. The first launcher publish must be version **≥ 1.0.0** (0.1.1 / 0.1.2 already exist from the SDK era).

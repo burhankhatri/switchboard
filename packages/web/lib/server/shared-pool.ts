@@ -21,7 +21,7 @@ import {
   type Agent,
   type Credentials,
   type ProviderName,
-} from "@background-agents/common"
+} from "@switchboard/common"
 import type { UsagePool } from "@/lib/db/token-usage"
 
 /** Agents backed by a shared (server-provided) credential pool. */

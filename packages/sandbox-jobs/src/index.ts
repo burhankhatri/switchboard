@@ -1,5 +1,5 @@
 /**
- * @background-agents/sandbox-jobs
+ * @switchboard/sandbox-jobs
  *
  * Run, observe, and reconnect to long-running shell processes in a Daytona
  * sandbox — using the sandbox filesystem as the durable source of truth, so a

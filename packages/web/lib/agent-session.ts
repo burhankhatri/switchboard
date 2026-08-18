@@ -1,6 +1,6 @@
 /**
  * Agent Session utilities for Simple Chat
- * Uses shared code from @background-agents/common
+ * Uses shared code from @switchboard/common
  */
 
 import {
@@ -8,13 +8,13 @@ import {
   getSession,
   type Event,
   type EndEvent,
-} from "@background-agents/sdk"
+} from "@switchboard/sdk"
 import {
   agentToProvider,
   type Agent,
   type ContentBlock,
   type ToolCall,
-} from "@background-agents/common"
+} from "@switchboard/common"
 import {
   buildSystemPrompt,
   buildContentBlocks,
@@ -25,11 +25,11 @@ import {
   setupClaudePermissions,
   setupCodexPermissions,
   renderOpenCodePermissionEnv,
-} from "@background-agents/agent-configuration/permissions"
+} from "@switchboard/agent-configuration/permissions"
 import {
   setupMcpForAgent,
   type AgentMcpServer,
-} from "@background-agents/agent-configuration/mcp"
+} from "@switchboard/agent-configuration/mcp"
 import { DEFAULT_GIT_POLICY } from "./git-policy"
 import type { Sandbox as DaytonaSandbox } from "@daytonaio/sdk"
 

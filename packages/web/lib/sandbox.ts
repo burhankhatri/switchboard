@@ -8,9 +8,9 @@
 
 import type { Daytona, Sandbox } from "@daytonaio/sdk"
 import { randomUUID } from "crypto"
-import { createSandboxGit } from "@background-agents/sandbox-git"
-import { installSkills, discoverInstalledSkills } from "@background-agents/sandbox-skills/sandbox"
-import { TOKSCALE_VERSION, getActiveSnapshotName } from "@background-agents/sandbox-image"
+import { createSandboxGit } from "@switchboard/sandbox-git"
+import { installSkills, discoverInstalledSkills } from "@switchboard/sandbox-skills/sandbox"
+import { TOKSCALE_VERSION, getActiveSnapshotName } from "@switchboard/sandbox-image"
 import { PATHS, SANDBOX_CONFIG } from "@/lib/constants"
 import { NEW_REPOSITORY } from "@/lib/types"
 import { prisma } from "@/lib/db/prisma"
@@ -27,7 +27,7 @@ const tokscaleReady = new Set<string>()
  * sandbox, installing it on demand.
  *
  * The snapshot pre-installs tokscale (see TOKSCALE_VERSION in
- * @background-agents/sandbox-image), but sandboxes created BEFORE that snapshot
+ * @switchboard/sandbox-image), but sandboxes created BEFORE that snapshot
  * bump won't have it. We probe once per sandbox at bring-up and `npm install
  * -g` it if missing, so metering works on long-lived pre-existing sandboxes
  * too. Best-effort: never throws — a failure just means that turn isn't metered.
@@ -159,7 +159,7 @@ export interface CreatedSandbox {
 function generateSandboxName(userId?: string): string {
   const uuid = randomUUID().split("-")[0]
   const userIdPrefix = userId ? userId.slice(0, 8) : "anon"
-  return `backgrounder-${userIdPrefix}-${uuid}`
+  return `switchboard-${userIdPrefix}-${uuid}`
 }
 
 /**

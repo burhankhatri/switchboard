@@ -1,5 +1,5 @@
 import { Daytona } from "@daytonaio/sdk"
-import { rebuildSnapshot } from "@background-agents/sandbox-image"
+import { rebuildSnapshot } from "@switchboard/sandbox-image"
 
 // Manual, on-demand zero-downtime snapshot rebuild. Not on a cron schedule —
 // trigger it yourself when you need a fresh image. It runs two serial image

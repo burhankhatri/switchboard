@@ -23,7 +23,7 @@ export const PATHS = {
 
 export const SANDBOX_CONFIG = {
   /** Default snapshot for sandbox creation */
-  DEFAULT_SNAPSHOT: "background-agents",
+  DEFAULT_SNAPSHOT: "switchboard",
   /** Label key for identifying upstream-agents sandboxes */
   LABEL_KEY: "upstream-agents",
   /** Default preview port */

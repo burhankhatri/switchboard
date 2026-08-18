@@ -15,7 +15,7 @@
  * `app/api/agent/stream/route.ts`.
  */
 
-import { createSandboxGit, esc, type SandboxLike } from "@background-agents/sandbox-git"
+import { createSandboxGit, esc, type SandboxLike } from "@switchboard/sandbox-git"
 
 export type AutoPullResult =
   /** Nothing to do — branch already matches origin. */

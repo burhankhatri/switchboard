@@ -25,7 +25,7 @@ import {
   resolveModelForAgent,
   agentSupportsPlanMode,
 } from "@/lib/types"
-import { filterSlashCommandsWithConflict, filterSingleCommand, CREATE_REPO_COMMAND } from "@background-agents/common"
+import { filterSlashCommandsWithConflict, filterSingleCommand, CREATE_REPO_COMMAND } from "@switchboard/common"
 import type { SlashCommandType } from "@/components/SlashCommandMenu"
 import { useFileUpload } from "@/lib/hooks/useFileUpload"
 

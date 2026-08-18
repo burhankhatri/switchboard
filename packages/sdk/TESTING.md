@@ -9,7 +9,7 @@ This document describes how to run unit tests and integration tests for the Agen
 Raw JSONL output from each provider CLI is captured in `packages/sdk/tests/fixtures/jsonl-reference/`. To regenerate:
 
 ```bash
-npm run generate:jsonl-refs -w @background-agents/sdk
+npm run generate:jsonl-refs -w @switchboard/sdk
 ```
 
 These fixtures are used as samples to verify that the agents are working and to analyze their output formats.
@@ -25,7 +25,7 @@ Unit tests need no database and no env files.
 Run the command below from the repo root.
 
 ```bash
-npm run test -w @background-agents/sdk
+npm run test -w @switchboard/sdk
 ```
 
 ---
@@ -37,7 +37,7 @@ Integration tests run each provider (Claude, Codex, Gemini, Goose, OpenCode, Pi)
 Run the command below from the repo root.
 
 ```bash
-npm test -w @background-agents/sdk -- tests/integration
+npm test -w @switchboard/sdk -- tests/integration
 ```
 
 ### Using TEST_ prefixed API keys

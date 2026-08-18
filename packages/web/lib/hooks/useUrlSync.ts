@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef } from "react"
-import { type Agent, resolveAgentSlug } from "@background-agents/common"
+import { type Agent, resolveAgentSlug } from "@switchboard/common"
 import { ROUTES, matchRoute } from "@/lib/hooks/useUrlNavigation"
 
 // =============================================================================
@@ -71,7 +71,7 @@ export function useUrlSync({
 
         case "newChat":
           // Drafts (new chats) don't get their own URL — show the home page
-          // (backgrounder.dev) instead. Enter draft mode if we aren't already in
+          // (switchboard.local) instead. Enter draft mode if we aren't already in
           // one, then rewrite the URL to "/".
           setViewMode("chat")
           if (!currentChatId || !isDraftChatId(currentChatId)) {

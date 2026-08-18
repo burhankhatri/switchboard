@@ -1,6 +1,6 @@
-# @background-agents/common
+# @switchboard/common
 
-Shared utilities and types for the `@background-agents` packages. This package provides common functionality used across the monorepo, including agent configuration, GitHub API helpers, and utility functions.
+Shared utilities and types for the `@switchboard` packages. This package provides common functionality used across the monorepo, including agent configuration, GitHub API helpers, and utility functions.
 
 ## Installation
 
@@ -9,7 +9,7 @@ This is an internal workspace package. It's automatically available to other pac
 ```json
 {
   "dependencies": {
-    "@background-agents/common": "*"
+    "@switchboard/common": "*"
   }
 }
 ```
@@ -68,7 +68,7 @@ import {
   resolveModelForAgent,
   resolveAgent,
   resolveAgentAndModel,
-} from "@background-agents/common"
+} from "@switchboard/common"
 ```
 
 ### GitHub API Helpers
@@ -97,7 +97,7 @@ import {
   createPullRequest,
   createFileCommit,
   forkRepo,
-} from "@background-agents/common"
+} from "@switchboard/common"
 ```
 
 ### Content Block Types
@@ -110,7 +110,7 @@ import type {
   ToolCall,
   AgentStatus,
   AgentStatusResponse,
-} from "@background-agents/common"
+} from "@switchboard/common"
 ```
 
 ### Branch Utilities
@@ -118,7 +118,7 @@ import type {
 Generate Git branch names.
 
 ```typescript
-import { generateBranchName } from "@background-agents/common"
+import { generateBranchName } from "@switchboard/common"
 ```
 
 ### Git Operations
@@ -134,7 +134,7 @@ import {
   formatPRBodyFromCommits,
   // Constants
   EMPTY_CONFLICT_STATE,
-} from "@background-agents/common"
+} from "@switchboard/common"
 ```
 
 ### Slash Commands
@@ -149,19 +149,19 @@ import {
   CREATE_REPO_COMMAND,
   filterSlashCommandsWithConflict,
   filterSingleCommand,
-} from "@background-agents/common"
+} from "@switchboard/common"
 ```
 
 ### Common Utilities
 
 ```typescript
-import { cn } from "@background-agents/common"
+import { cn } from "@switchboard/common"
 ```
 
 ### Constants
 
 ```typescript
-import { PATHS, SANDBOX_CONFIG } from "@background-agents/common"
+import { PATHS, SANDBOX_CONFIG } from "@switchboard/common"
 ```
 
 ### Agent Icons
@@ -182,7 +182,7 @@ import {
   ElizaIcon,
   PiIcon,
   AgentIcon,
-} from "@background-agents/common"
+} from "@switchboard/common"
 ```
 
 ### Search Palette
@@ -194,7 +194,7 @@ import {
   type RecentItem,
   getRecentItems,
   addRecentItem,
-} from "@background-agents/common"
+} from "@switchboard/common"
 ```
 
 ## Development

@@ -26,7 +26,7 @@ import {
   generateClaudeCredentials,
   CLAUDE_CREDS_KEY,
   CLAUDE_COOKIES_KEY,
-} from "@background-agents/claude-credentials"
+} from "@switchboard/claude-credentials"
 
 const USAGE =
   "usage: tsx scripts/run-ccauth.ts (--cookies-path <path> | --refresh-token <token>) [--seed]"

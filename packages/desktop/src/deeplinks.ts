@@ -1,7 +1,7 @@
 import { app } from "electron";
 import path from "node:path";
 
-const PROTOCOL = "background-agents";
+const PROTOCOL = "switchboard";
 
 export function setupDeepLinks(handler: (url: string) => void) {
   // Register protocol handler

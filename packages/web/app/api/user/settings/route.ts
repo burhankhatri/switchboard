@@ -14,7 +14,7 @@ import {
   type CredentialFlags,
   type Credentials,
 } from "@/lib/credentials"
-import type { CustomEndpoint } from "@background-agents/common"
+import type { CustomEndpoint } from "@switchboard/common"
 import {
   decryptUserEndpoints,
   encryptEndpointsForStorage,

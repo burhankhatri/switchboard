@@ -1,11 +1,11 @@
-# Background Agents — Electron desktop app
+# Switchboard — Electron desktop app
 
 A thin Electron wrapper that loads the [`web`](../web) app in a desktop window. Adds OS-native features the browser can't provide:
 
 - System tray + global shortcuts
 - Native notifications
 - macOS dock badge
-- Deep links (`background-agents://...`) for OAuth redirect
+- Deep links (`switchboard://...`) for OAuth redirect
 - Auto-update via `electron-updater`
 - Git-sync helpers and license-detection IPC
 
@@ -15,7 +15,7 @@ The actual chat UI, sandbox management, and agent integration all live in the [`
 
 `main.ts` derives the backend URL at startup:
 
-- **Packaged build** (`app.isPackaged === true`) → `https://backgrounder.dev`
+- **Packaged build** (`app.isPackaged === true`) → `https://switchboard.local`
 - **Dev** (running from source) → `http://localhost:4000`
 
 Either is overridden if `BACKGROUND_AGENTS_URL` is set.
@@ -33,7 +33,7 @@ npm run dev:electron
 ### Standalone against production
 
 From the repo root, this launches the desktop app pointing at the production
-backend (`https://backgrounder.dev`):
+backend (`https://switchboard.local`):
 
 ```bash
 npm run start:electron

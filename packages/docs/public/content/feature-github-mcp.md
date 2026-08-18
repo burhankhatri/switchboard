@@ -43,7 +43,7 @@ GITHUB_APP_SLUG="..."
 GITHUB_APP_PRIVATE_KEY="..."
 ```
 
-The one-time App creation (permissions, making it public, generating the private key) is documented in the [mcp package README](https://github.com/jamesmurdza/background-agents/tree/main/packages/mcp#github-app-setup).
+The one-time App creation (permissions, making it public, generating the private key) is documented in the [mcp package README](https://github.com/burhankhatri/switchboard/tree/main/packages/mcp#github-app-setup).
 
 > [!TIP]
 > GitHub MCP (read/write issues & PRs via the API) is complementary to working directly in a [connected repository](#/github). The agent commits to the branch to *ship* the change; GitHub MCP gives it the *context* — issues and prior PRs — while it works.

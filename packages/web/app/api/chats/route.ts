@@ -19,7 +19,7 @@ import {
   resolveModelForAgent,
   hasCredentialsForModel,
   type Agent,
-} from "@background-agents/common"
+} from "@switchboard/common"
 import { getEffectiveCredentialFlags } from "@/lib/server/credential-flags"
 
 // =============================================================================

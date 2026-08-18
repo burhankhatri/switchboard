@@ -1,5 +1,5 @@
 import { Daytona } from "@daytonaio/sdk"
-import { createSandboxGit } from "@background-agents/sandbox-git"
+import { createSandboxGit } from "@switchboard/sandbox-git"
 import { ensureSandboxStarted } from "@/lib/sandbox"
 import { isSafeRepoPath, isSafeBranchName, isSafeRepoSegment } from "@/lib/git/ref-validation"
 import { clearPushFailureMessages, createGitOperationMessage } from "@/lib/db/git-messages"

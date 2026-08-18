@@ -1,4 +1,4 @@
-# @background-agents/sandbox-image
+# @switchboard/sandbox-image
 
 Custom [Daytona](https://daytona.io) sandbox image with pre-installed AI coding agent CLIs.
 
@@ -30,7 +30,7 @@ This is an internal workspace package. It's automatically available to other pac
 ```json
 {
   "dependencies": {
-    "@background-agents/sandbox-image": "*"
+    "@switchboard/sandbox-image": "*"
   }
 }
 ```
@@ -43,7 +43,7 @@ import {
   getAgentSandboxImage,
   SNAPSHOT_NAME,
   SNAPSHOT_RESOURCES,
-} from "@background-agents/sandbox-image"
+} from "@switchboard/sandbox-image"
 
 const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY })
 
@@ -61,17 +61,17 @@ import {
   getAgentSandboxImage, // Builds the Daytona Image spec
   AGENT_PACKAGES,       // Map of agent name -> npm package
   TOKSCALE_VERSION,     // Pinned tokscale (token/cost metering) CLI version
-  SNAPSHOT_NAME,        // Canonical snapshot name ("background-agents")
+  SNAPSHOT_NAME,        // Canonical snapshot name ("switchboard")
   SNAPSHOT_NAME_TEMP,   // Transient scratch name used only during a rebuild
   ALL_SNAPSHOT_NAMES,   // All known snapshot names
   getActiveSnapshotName,// Resolves the ready ("active") snapshot to serve
   SNAPSHOT_RESOURCES,   // { cpu, memory, disk } defaults
   rebuildSnapshot,      // Rebuilds the snapshot from the current Image spec
-} from "@background-agents/sandbox-image"
+} from "@switchboard/sandbox-image"
 
 import type {
   RebuildSnapshotOptions, // Options for rebuildSnapshot
-} from "@background-agents/sandbox-image"
+} from "@switchboard/sandbox-image"
 ```
 
 ### Default resources

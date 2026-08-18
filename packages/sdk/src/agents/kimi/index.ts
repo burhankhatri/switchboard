@@ -35,7 +35,7 @@ const KIMI_DEFAULT_BASE_URL = "https://api.moonshot.ai/v1"
 /**
  * Moonshot models exposed to Kimi Code. Each must be declared in config.toml
  * with a max_context_size or the CLI refuses to use it. ids match the Moonshot
- * /v1/models catalog and the values in agentModels.kimi (@background-agents/common).
+ * /v1/models catalog and the values in agentModels.kimi (@switchboard/common).
  */
 const KIMI_MODELS: { id: string; context: number }[] = [
   { id: "kimi-k3", context: 1048576 },

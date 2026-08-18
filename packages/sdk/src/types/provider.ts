@@ -2,7 +2,7 @@
  * Sandbox and Provider Types
  */
 
-import type { SandboxJobs } from "@background-agents/sandbox-jobs"
+import type { SandboxJobs } from "@switchboard/sandbox-jobs"
 
 /**
  * Supported agent names.
@@ -41,7 +41,7 @@ export interface CodeAgentSandbox {
   /**
    * Long-running-process runner. Background sessions launch one job per turn
    * and observe it via the sandbox filesystem. The Daytona adapter wires this
-   * to @background-agents/sandbox-jobs (with session env injected); custom
+   * to @switchboard/sandbox-jobs (with session env injected); custom
    * sandboxes may provide their own implementation.
    */
   jobs?: SandboxJobs

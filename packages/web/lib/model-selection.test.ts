@@ -14,7 +14,7 @@ import {
   resolveAgentSlug,
   getDefaultAgent,
   type CustomEndpoint,
-} from "@background-agents/common"
+} from "@switchboard/common"
 
 describe("resolveModelForAgent", () => {
   it("honors a saved preference that belongs to the agent and is usable", () => {

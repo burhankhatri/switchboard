@@ -1,5 +1,5 @@
 /**
- * @background-agents/common
+ * @switchboard/common
  * Shared utilities and types for upstream-agents packages
  */
 

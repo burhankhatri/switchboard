@@ -1,5 +1,5 @@
 {
-  "name": "@background-agents/sandbox-git",
+  "name": "@switchboard/sandbox-git",
   "version": "0.1.0",
   "description": "Git operations for Daytona sandboxes without the toolbox dependency",
   "type": "module",

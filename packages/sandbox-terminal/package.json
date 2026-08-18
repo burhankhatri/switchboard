@@ -1,5 +1,5 @@
 {
-  "name": "@background-agents/sandbox-terminal",
+  "name": "@switchboard/sandbox-terminal",
   "version": "0.2.0",
   "description": "WebSocket-based PTY terminal for Daytona sandboxes",
   "type": "module",

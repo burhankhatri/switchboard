@@ -1,5 +1,5 @@
 /**
- * End-to-end test for @background-agents/sandbox-terminal.
+ * End-to-end test for @switchboard/sandbox-terminal.
  *
  * Boots a real Daytona sandbox, installs the PTY server with `setupTerminal`,
  * connects to the returned `wss://` URL with a Node `ws` client (the same
@@ -10,7 +10,7 @@
  * The test is skipped when DAYTONA_API_KEY is not exported, so it's safe to
  * include in `npm test`. To run explicitly:
  *
- *   DAYTONA_API_KEY=... npm test -w @background-agents/sandbox-terminal -- tests/integration/terminal.test.ts
+ *   DAYTONA_API_KEY=... npm test -w @switchboard/sandbox-terminal -- tests/integration/terminal.test.ts
  *
  * The TEST_DAYTONA_API_KEY env var takes precedence over DAYTONA_API_KEY,
  * mirroring the convention used by packages/sdk.
@@ -31,7 +31,7 @@ const DAYTONA_API_KEY =
   process.env.TEST_DAYTONA_API_KEY || process.env.DAYTONA_API_KEY
 
 // Optional: run the suite against a specific registered snapshot (e.g. the
-// production `background-agents` snapshot) instead of Daytona's default
+// production `switchboard` snapshot) instead of Daytona's default
 // image. Useful for catching image-specific failures.
 const TEST_SANDBOX_SNAPSHOT = process.env.TEST_SANDBOX_SNAPSHOT
 

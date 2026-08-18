@@ -13,7 +13,7 @@
  *   setupCodexPermissions,
  *   renderOpenCodePermissionEnv,
  *   type CommandPolicy,
- * } from '@background-agents/agent-configuration/permissions'
+ * } from '@switchboard/agent-configuration/permissions'
  *
  * await setupClaudePermissions(sandbox, policy)   // Claude Code
  * await setupCodexPermissions(sandbox, policy)    // Codex

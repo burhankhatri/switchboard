@@ -1,4 +1,4 @@
-# @background-agents/claude-credentials
+# @switchboard/claude-credentials
 
 Claude Code OAuth credential generation via [ccauth](https://github.com/synacktraa/ccauth) and Daytona.
 
@@ -9,13 +9,13 @@ This package provides automated generation of Claude Code OAuth credentials — 
 ## Installation
 
 ```bash
-npm install @background-agents/claude-credentials
+npm install @switchboard/claude-credentials
 ```
 
 ## Usage
 
 ```typescript
-import { generateClaudeCredentials } from "@background-agents/claude-credentials"
+import { generateClaudeCredentials } from "@switchboard/claude-credentials"
 
 // From claude.ai cookies — full browser OAuth flow (heavy image + Turnstile).
 const cookies = "..." // claude.ai session cookies JSON (Cookie-Editor export)
@@ -56,7 +56,7 @@ token is rejected, so callers can fall back to the `{ cookies }` form.
 ### Types
 
 ```typescript
-import type { ClaudeOAuthCredentials } from "@background-agents/claude-credentials"
+import type { ClaudeOAuthCredentials } from "@switchboard/claude-credentials"
 
 // ClaudeOAuthCredentials shape:
 // {
@@ -77,7 +77,7 @@ import type { ClaudeOAuthCredentials } from "@background-agents/claude-credentia
 import {
   CLAUDE_CREDS_KEY,   // Database row key for cached credentials
   CLAUDE_COOKIES_KEY, // Database row key for raw cookies
-} from "@background-agents/claude-credentials"
+} from "@switchboard/claude-credentials"
 ```
 
 ### Functions
@@ -91,7 +91,7 @@ import {
   isClaudeOAuthCredentials,         // Type guard
   RefreshTokenExpiredError,         // Thrown when the refresh token is expired/revoked
   type GenerateCredentialsOptions,  // Options for generateClaudeCredentials
-} from "@background-agents/claude-credentials"
+} from "@switchboard/claude-credentials"
 ```
 
 ## Requirements

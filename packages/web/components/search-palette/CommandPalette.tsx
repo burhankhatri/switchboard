@@ -12,7 +12,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command"
 import { VariableIcon } from "@/components/icons/variable-icon"
-import { SLASH_COMMANDS } from "@background-agents/common"
+import { SLASH_COMMANDS } from "@switchboard/common"
 import type { SectionKey } from "@/components/modals/SettingsModal"
 import type { Theme } from "@/lib/types"
 import type { PaletteCommandCallbacks } from "./types"

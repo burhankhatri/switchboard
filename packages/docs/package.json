@@ -1,8 +1,8 @@
 {
-  "name": "@background-agents/docs",
+  "name": "@switchboard/docs",
   "version": "0.1.0",
   "private": true,
-  "description": "Standalone docs site for Background Agents (docs.backgrounder.dev)",
+  "description": "Standalone docs site for Switchboard (docs.switchboard.local)",
   "type": "module",
   "scripts": {
     "predev": "node scripts/gen-media-config.mjs",
