@@ -3,12 +3,13 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { WorkspaceConnections } from "@/components/workspaces/WorkspaceConnections"
 import { WorkspaceFiles } from "@/components/workspaces/WorkspaceFiles"
+import { WorkspaceDropdown } from "@/components/workspaces/WorkspaceDropdown"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { BRAND } from "@/lib/brand"
 import { useRouter } from "next/navigation"
 import { useSession, signOut } from "next-auth/react"
 import { signInWithGitHub } from "@/lib/auth-utils"
-import { Plus, PanelLeft, X, Loader2, Search, BarChart3, Settings, HelpCircle, LogOut, Boxes } from "lucide-react"
+import { Plus, PanelLeft, X, Loader2, Search, BarChart3, Settings, HelpCircle, LogOut } from "lucide-react"
 import { usePalette } from "@/components/search-palette/PaletteProvider"
 import { cn } from "@/lib/utils"
 import { useClickOutside } from "@/lib/hooks/useClickOutside"
@@ -375,22 +376,10 @@ export function Sidebar({
             </button>
           </div>
 
-          {activeWorkspace ? (
-            <button
-              onClick={() => setActiveWorkspace(null)}
-              className="mx-3 mt-2 mb-1 flex items-center gap-2 w-[calc(100%-1.5rem)] px-3 py-2 rounded-lg hover:bg-accent/50 text-left"
-            >
-              <Boxes className="h-4 w-4 shrink-0 text-primary" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm truncate">{activeWorkspace.name}</span>
-                <span className="block text-xs text-muted-foreground">Tap to switch workspace</span>
-              </span>
-            </button>
-          ) : (
-            <p className="mx-3 mt-2 mb-1 px-3 py-2 text-sm text-muted-foreground">
-              Pick a workspace to start.
-            </p>
-          )}
+          {/* Workspace dropdown — always visible at top of mobile drawer */}
+          <div className="px-3 pt-2 pb-1">
+            <WorkspaceDropdown />
+          </div>
 
           {activeWorkspace && (
             <p className="px-6 pt-1 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -618,24 +607,10 @@ export function Sidebar({
         </button>
       </div>
 
-      {!collapsed &&
-        (activeWorkspace ? (
-          <button
-            onClick={() => setActiveWorkspace(null)}
-            className="mx-2 mb-2 flex items-center gap-2 w-[calc(100%-1rem)] px-2 py-1.5 rounded-md hover:bg-accent/50 text-left cursor-pointer"
-            title="Switch workspace"
-          >
-            <Boxes className="h-4 w-4 shrink-0 text-primary" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm truncate">{activeWorkspace.name}</span>
-              <span className="block text-xs text-muted-foreground">Switch workspace</span>
-            </span>
-          </button>
-        ) : (
-          <p className="mx-2 mb-2 px-2 py-1.5 text-sm text-muted-foreground">
-            Pick a workspace to start.
-          </p>
-        ))}
+      {/* Workspace dropdown — always visible, collapses to icon */}
+      <div className={cn(collapsed ? "flex justify-center px-0 mb-1" : "px-2 mb-2")}>
+        <WorkspaceDropdown collapsed={collapsed} className={collapsed ? "" : "w-full"} />
+      </div>
 
       {activeWorkspace && !collapsed && (
         <p className="px-4 pt-1 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">

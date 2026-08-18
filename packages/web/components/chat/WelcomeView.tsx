@@ -1,9 +1,8 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { HelpCircle, Command, ChevronLeft } from "lucide-react"
+import { HelpCircle, Command, ChevronLeft, Boxes, ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { WorkspaceLauncher } from "@/components/workspaces/WorkspaceLauncher"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { WorkspaceFileViewer } from "@/components/workspaces/WorkspaceFileViewer"
 
@@ -20,9 +19,9 @@ interface WelcomeViewProps {
 /**
  * Home screen.
  *
- * Workspaces come first and the composer second, because the workspace decides
- * which skills, scripts and connections the run will have — asking "what would
- * you like to build?" before that is asking the question in the wrong order.
+ * When no workspace is selected the user is prompted to pick one from the
+ * sidebar dropdown — the launcher list is no longer in the centre pane.
+ * When a workspace is active the composer is centred as before.
  */
 export function WelcomeView({
   isMobile,
@@ -31,7 +30,6 @@ export function WelcomeView({
   chatInput,
   filePreviewModal,
 }: WelcomeViewProps) {
-  // Shared with the sidebar: the same choice drives both panes.
   const { activeWorkspace: active, setActiveWorkspace: setActive, ready, openFile } = useWorkspace()
 
   return (
@@ -39,10 +37,11 @@ export function WelcomeView({
       <div
         className={cn(
           "flex-1 flex flex-col bg-transparent backdrop-blur-xl relative overflow-y-auto",
-          active ? "items-center justify-center" : "",
+          "items-center justify-center",
           isMobile ? "p-4 pb-safe" : "p-4"
         )}
       >
+        {/* Top-right icon bar */}
         <div className="absolute top-3 right-3 z-10 flex items-center gap-1">
           {onOpenCommandPalette && (
             <button
@@ -67,6 +66,7 @@ export function WelcomeView({
         {!ready ? null : openFile ? (
           <WorkspaceFileViewer />
         ) : active ? (
+          /* ── Workspace active: centred composer ── */
           <div className="w-full max-w-3xl mx-auto">
             <button
               onClick={() => setActive(null)}
@@ -88,10 +88,30 @@ export function WelcomeView({
             </p>
           </div>
         ) : (
-          <WorkspaceLauncher onOpen={setActive} />
+          /* ── No workspace: prompt to use the sidebar dropdown ── */
+          <div className="flex flex-col items-center gap-4 text-center select-none">
+            <div className="h-12 w-12 rounded-2xl bg-accent/60 flex items-center justify-center">
+              <Boxes className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-base font-medium text-foreground">Select a workspace</p>
+              <p className="mt-1 text-sm text-muted-foreground max-w-xs">
+                {isMobile
+                  ? "Open the menu and pick a workspace to get started."
+                  : "Use the dropdown at the top of the sidebar to pick or create a workspace."}
+              </p>
+            </div>
+            {!isMobile && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60 animate-pulse">
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>over there</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
       {filePreviewModal}
     </>
   )
 }
+
