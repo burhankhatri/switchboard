@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest"
 import { parseMention } from "./MentionMenu"
+import {
+  selectConnections,
+  workspaceConnectionsKey,
+} from "@/lib/query/hooks/useWorkspaceConnections"
 
 describe("parseMention", () => {
   it("opens on a bare @ at the start", () => {
@@ -35,6 +39,7 @@ describe("parseMention", () => {
     expect(parseMention("@lead-gen")?.query).toBe("lead-gen")
     expect(parseMention("@run_zip")?.query).toBe("run_zip")
     expect(parseMention("@master.csv")?.query).toBe("master.csv")
+    expect(parseMention("@scripts/seed")?.query).toBe("scripts/seed")
   })
 
   it("returns null for text with no @ at all", () => {
@@ -63,5 +68,39 @@ describe("workspace-files cache shape", () => {
     expect(() => {
       for (const _ of Array.isArray(wrong) ? wrong : []) void _
     }).not.toThrow()
+  })
+})
+
+/**
+ * The bug this guards against, which the files test above did not catch because
+ * it exercised a local lambda instead of the real code: WorkspaceConnections and
+ * useMentionItems both read ["workspace-connections", id], but wrote different
+ * shapes into it — the panel an object, the composer a bare array. A key is one
+ * cache slot. On load the panel's fetch filled it and the panel worked; saving a
+ * connection invalidated the slot, the composer's fetch refilled it with an
+ * array, and `data?.connections` went undefined. The panel then reported
+ * "None yet." while the server was returning every connection.
+ *
+ * Both now go through one fetcher, so there is only ever one shape to read.
+ */
+describe("workspace-connections cache shape", () => {
+  it("gives both consumers the same cache slot", () => {
+    expect(workspaceConnectionsKey("ws1")).toEqual(workspaceConnectionsKey("ws1"))
+    expect(workspaceConnectionsKey("ws1")).not.toEqual(workspaceConnectionsKey("ws2"))
+  })
+
+  it("narrows the cached response to the list", () => {
+    const cached = { connections: [{ slug: "google-ads" }, { slug: "meta-ads" }] }
+    expect(selectConnections(cached as never)).toHaveLength(2)
+  })
+
+  it("survives a slot an older build filled with a bare array", () => {
+    // Deployed tabs keep their cache across a release; the shape that broke
+    // production must degrade, not blank the panel.
+    expect(selectConnections([{ slug: "google-ads" }] as never)).toHaveLength(1)
+  })
+
+  it("treats an empty response as empty rather than throwing", () => {
+    expect(selectConnections(undefined as never)).toEqual([])
   })
 })

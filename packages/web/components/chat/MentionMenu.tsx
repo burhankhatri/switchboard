@@ -4,17 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Cloud, Database, EmptyPage, Globe, Page } from "iconoir-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { useWorkspaceConnections } from "@/lib/query/hooks/useWorkspaceConnections"
 import { cn } from "@/lib/utils"
-
-interface Connection {
-  id: string
-  kind: string
-  name: string
-  slug: string
-  description: string | null
-  baseUrl: string | null
-  mcpUrl: string | null
-}
 
 interface RepoFile {
   path: string
@@ -35,7 +26,7 @@ interface WorkspaceFilesResponse {
  * `@` itself so a selection can replace exactly the token that was typed.
  */
 export function parseMention(input: string): { query: string; start: number } | null {
-  const match = /(^|\s)@([\w.-]*)$/.exec(input)
+  const match = /(^|\s)@([\w./-]*)$/.exec(input)
   if (!match) return null
   return { query: match[2], start: match.index + match[1].length }
 }
@@ -65,17 +56,10 @@ export function useMentionItems(query: string): MentionItem[] {
   const { activeWorkspace } = useWorkspace()
   const wsId = activeWorkspace?.id
 
-  const { data: connections } = useQuery({
-    queryKey: ["workspace-connections", wsId],
-    queryFn: async () => {
-      const r = await fetch(`/api/workspaces/${wsId}/connections`)
-      if (!r.ok) throw new Error(String(r.status))
-      return ((await r.json()) as { connections: Connection[] }).connections
-    },
-    enabled: !!wsId,
-    staleTime: 60_000,
-    retry: false,
-  })
+  // Shared with the sidebar panel through one fetcher, so the slot only ever
+  // holds one shape. See useWorkspaceConnections for what went wrong when it
+  // did not.
+  const { data: connections } = useWorkspaceConnections(wsId)
 
   // Shares the ["workspace-files", id] key with WorkspaceFiles, so the tree is
   // fetched once for both. That means the shape stored under the key has to be

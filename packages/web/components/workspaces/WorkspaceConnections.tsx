@@ -5,6 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Loader2, Plug, Plus, Trash2 } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { useWorkspaceOverview } from "@/lib/query/hooks/useWorkspaceOverview"
+import {
+  useWorkspaceConnections,
+  workspaceConnectionsKey,
+} from "@/lib/query/hooks/useWorkspaceConnections"
 import { WorkspaceConnectionDialog } from "./WorkspaceConnectionDialog"
 import { WorkspaceConnectionDetail } from "./WorkspaceConnectionDetail"
 
@@ -43,15 +47,9 @@ export function WorkspaceConnections() {
   const envKeys = overview?.envKeys ?? []
   const [error, setError] = useState<string | null>(null)
   const qc = useQueryClient()
-  const key = ["workspace-connections", activeWorkspace?.id]
+  const key = workspaceConnectionsKey(activeWorkspace?.id)
 
-  const { data, isLoading } = useQuery({
-    queryKey: key,
-    queryFn: () =>
-      fetch(`/api/workspaces/${activeWorkspace!.id}/connections`).then(json<{ connections: Connection[] }>),
-    enabled: !!activeWorkspace,
-    retry: false,
-  })
+  const { data: connectionList, isLoading, isError } = useWorkspaceConnections(activeWorkspace?.id)
 
   const remove = useMutation({
     mutationFn: (slug: string) =>
@@ -66,7 +64,7 @@ export function WorkspaceConnections() {
   })
 
   if (!activeWorkspace) return null
-  const connections = data?.connections ?? []
+  const connections = connectionList ?? []
 
   return (
     <div className="px-2 pb-2">
@@ -116,7 +114,15 @@ export function WorkspaceConnections() {
         </div>
       ))}
 
-      {!isLoading && connections.length === 0 && (
+      {/* A failed load used to render as "None yet.", which is how a workspace
+          with two connections could look like one with none. */}
+      {!isLoading && isError && (
+        <p className="px-2 py-1.5 text-xs text-destructive">
+          Could not load connections.
+        </p>
+      )}
+
+      {!isLoading && !isError && connections.length === 0 && (
         <p className="px-2 py-1.5 text-xs text-muted-foreground">None yet.</p>
       )}
 

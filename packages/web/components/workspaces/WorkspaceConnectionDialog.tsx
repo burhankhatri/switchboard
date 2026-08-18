@@ -7,6 +7,7 @@ import { BaseDialog } from "@/components/modals/BaseDialog"
 import { DialogLabel, dialogIconClass } from "@/components/ui/dialog-parts"
 import { Input } from "@/components/ui/input"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { workspaceConnectionsKey } from "@/lib/query/hooks/useWorkspaceConnections"
 import { useMobile } from "@/lib/hooks/useMobile"
 import { cn } from "@/lib/utils"
 
@@ -70,7 +71,7 @@ export function WorkspaceConnectionDialog({ open, onClose }: WorkspaceConnection
         body: JSON.stringify({ kind, ...form }),
       }).then(json),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["workspace-connections", activeWorkspace?.id] })
+      qc.invalidateQueries({ queryKey: workspaceConnectionsKey(activeWorkspace?.id) })
       onClose()
     },
     onError: (e: Error) => setError(e.message),
