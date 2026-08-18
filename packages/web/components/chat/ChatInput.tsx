@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useEffect, useCallback, useState } from "react"
-import { AlertTriangle, ArrowUp, Square, ChevronDown, Github, X, Paperclip, Pencil, ListChecks, Mic, GitBranch } from "lucide-react"
+import { AlertTriangle, ArrowUp, Square, ChevronDown, X, Paperclip, Pencil, ListChecks, Mic, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { GlassContainer } from "../glass-ui/GlassContainer"
 import { TextInputArea } from "../glass-ui/TextInputArea"
@@ -12,9 +12,7 @@ import type { Chat, Agent, CredentialFlags, PendingFile } from "@/lib/types"
 import { NEW_REPOSITORY } from "@/lib/types"
 import { PendingFilesDisplay } from "./PendingFilesDisplay"
 import { AgentModelSelector } from "./AgentModelSelector"
-import { RepoCombobox } from "./RepoCombobox"
 import { BranchCombobox } from "./BranchCombobox"
-import { McpServersCombobox } from "./McpServersCombobox"
 import { SlashCommandMenu, type SlashCommandType } from "../SlashCommandMenu"
 import { MobileSelect } from "../ui/MobileBottomSheet"
 
@@ -459,72 +457,11 @@ export function ChatInput({
               icon={<Paperclip className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />}
             />
 
-            {/* Repo display/selector */}
-            {showRepoButton ? (
-              <div className="flex items-center gap-1">
-                <RepoCombobox
-                  value={isNewRepo ? null : chat.repo}
-                  onChange={(repo, branch) => {
-                    onUpdateChat?.({ repo, baseBranch: branch })
-                  }}
-                  onRequestCreate={() => modals.setRepoCreateOpen(true)}
-                  createOnly={!canSelectExistingRepo && isNewRepo}
-                  isMobile={isMobile}
-                />
-                {!isNewRepo && isNewChat && (
-                  <BranchCombobox
-                    repo={chat.repo}
-                    value={chat.branch || chat.baseBranch}
-                    onChange={(branch) => {
-                      onUpdateChat?.({ baseBranch: branch })
-                    }}
-                    defaultBranch={defaultBranch}
-                    isMobile={isMobile}
-                  />
-                )}
-                {!isNewRepo && onUpdateChat && canSelectExistingRepo && (
-                  <button
-                    onClick={() => onUpdateChat({ repo: NEW_REPOSITORY, baseBranch: "main" })}
-                    className={cn(
-                      "text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
-                      isMobile ? "p-1.5" : "p-0.5"
-                    )}
-                    title="Remove repository"
-                  >
-                    <X className={cn(isMobile ? "h-4 w-4" : "h-3 w-3")} />
-                  </button>
-                )}
-              </div>
-            ) : !isNewRepo && (
-              <a
-                href={`https://github.com/${chat.repo}/tree/${chat.branch}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  "flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors",
-                  isMobile ? "text-sm" : "text-sm"
-                )}
-                title={chat.repo}
-              >
-                <Github className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />
-                <span className={cn(isMobile ? "hidden @[16rem]/row1:inline" : "hidden @[32rem]:inline")}>
-                  {chat.repo?.split("/").pop()}
-                </span>
-              </a>
-            )}
+            {/* Repo picker and MCP picker removed: the workspace supplies the
+                repo, and its MCP connections are configured on the workspace
+                rather than per chat. Offering them here let the composer
+                contradict the workspace it runs in. */}
 
-            {/* MCP servers picker */}
-            {showMcpButton && (
-              <McpServersCombobox
-                entityId={chat.id}
-                apiBase="/api/chats"
-                isDraft={isDraftChat}
-                onMaterializeDraft={onMaterializeDraftForMcp}
-                open={modals.mcpServersModalOpen}
-                onOpenChange={modals.setMcpServersModalOpen}
-                isMobile={isMobile}
-              />
-            )}
 
             {/* Mode selector dropdown (Edit/Plan) - only show if agent supports plan mode */}
             {planModeSupported && (

@@ -14,7 +14,10 @@ export type Agent = "claude-code" | "opencode" | "codex" | "copilot" | "droid" |
  * (claude-code, opencode, gemini) lead, with Kilo (free models, no shared
  * pool) placed ahead of Gemini, then the remaining providers.
  */
-export const ALL_AGENTS: Agent[] = ["claude-code", "opencode", "kilo", "gemini", "droid", "pi", "codex", "copilot", "goose", "kimi", "eliza"]
+// Only the two harnesses this product supports. The Agent union and the
+// per-agent tables below still carry the others so existing rows and the SDK's
+// registry keep resolving, but nothing offers them in the UI.
+export const ALL_AGENTS: Agent[] = ["claude-code", "opencode"]
 
 /** SDK provider names (must match ProviderName from SDK) */
 export type ProviderName = "claude" | "codex" | "copilot" | "droid" | "eliza" | "opencode" | "gemini" | "goose" | "kilo" | "kimi" | "pi"
