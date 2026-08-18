@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import styles from './glass-ui.module.css';
 
 interface TextInputAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -13,9 +13,8 @@ export const TextInputArea: React.FC<TextInputAreaProps> = ({
   disabled = false,
   ...props
 }) => {
-  const [isFocused, setIsFocused] = useState(false);
   const internalRef = useRef<HTMLTextAreaElement>(null);
-  
+
   // Use the provided ref or our internal one
   const resolvedRef = (textareaRef as React.RefObject<HTMLTextAreaElement>) || internalRef;
 
@@ -24,8 +23,6 @@ export const TextInputArea: React.FC<TextInputAreaProps> = ({
       resolvedRef.current.focus();
     }
   };
-
-  const showCustomPlaceholder = value === '';
 
   // Auto-resize textarea
   useEffect(() => {
@@ -40,27 +37,17 @@ export const TextInputArea: React.FC<TextInputAreaProps> = ({
       className={`${styles.textInputArea} ${className}`} 
       onClick={handleContainerClick}
     >
-      {showCustomPlaceholder && !isFocused && (
-        <div className={styles.customPlaceholderContainer}>
-          <span className={styles.placeholder}>{placeholder}</span>
-        </div>
-      )}
-      
+      {/* One placeholder, the browser's own. There used to be two — an
+          absolutely-positioned span while blurred and the native one while
+          focused — which sit in different places, so the hint visibly jumped
+          the moment you clicked into the box. */}
       <textarea
         ref={resolvedRef}
         value={value}
         disabled={disabled}
         className={styles.realTextarea}
-        placeholder={isFocused && showCustomPlaceholder ? placeholder : ''}
+        placeholder={placeholder}
         rows={1}
-        onFocus={(e) => {
-          setIsFocused(true);
-          props.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setIsFocused(false);
-          props.onBlur?.(e);
-        }}
         {...props}
       />
     </div>

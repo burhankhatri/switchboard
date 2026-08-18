@@ -510,12 +510,10 @@ export function ChatInput({
             onPaste={onPaste}
             placeholder={
               isCreating
-                ? "Creating sandbox..."
+                ? "Creating sandbox…"
                 : isRunning
-                ? "Agent is working..."
-                : isNewChat
-                ? "Ask"
-                : "Enter prompt or /merge..."
+                ? "Agent is working…"
+                : "Ask anything — / for commands, @ for connections"
             }
           />
         </div>
