@@ -1,6 +1,7 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, useLayoutEffect } from "react"
+import { createPortal } from "react-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Boxes,
@@ -54,6 +55,9 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
   const [systemPrompt, setSystemPrompt] = useState("")
   const [error, setError] = useState<string | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  // Anchors the portalled panel; it cannot position itself relative to a
+  // parent it deliberately escapes.
+  const triggerRef = useRef<HTMLElement | null>(null)
   const qc = useQueryClient()
 
   useClickOutside(wrapperRef, () => setOpen(false), open)
@@ -105,6 +109,7 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
     return (
       <div ref={wrapperRef} className={cn("relative flex justify-center", className)}>
         <button
+          ref={triggerRef as React.RefObject<HTMLButtonElement>}
           onClick={() => setOpen((v) => !v)}
           className={cn(
             "p-1.5 rounded-md transition-colors cursor-pointer",
@@ -130,6 +135,7 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
           create={create} join={join}
           selectWorkspace={selectWorkspace}
           side="left"
+          anchorRef={triggerRef}
         />}
       </div>
     )
@@ -139,6 +145,7 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
   return (
     <div ref={wrapperRef} className={cn("relative", className)}>
       <button
+        ref={triggerRef as React.RefObject<HTMLButtonElement>}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -176,6 +183,7 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
         create={create} join={join}
         selectWorkspace={selectWorkspace}
         side="bottom"
+        anchorRef={triggerRef}
       />}
     </div>
   )
@@ -201,20 +209,54 @@ interface PanelProps {
   join: ReturnType<typeof useMutation<unknown, Error, string>>
   selectWorkspace: (w: WorkspaceSummary) => void
   side: "bottom" | "left"
+  anchorRef: React.RefObject<HTMLElement | null>
 }
 
 function DropdownPanel({
   mode, setMode, name, setName, systemPrompt, setSystemPrompt,
   error, setError, isLoading, loadError, mine, others,
-  activeWorkspace, create, join, selectWorkspace, side,
+  activeWorkspace, create, join, selectWorkspace, side, anchorRef,
 }: PanelProps) {
-  return (
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  // The panel is portalled to <body> and positioned from the trigger's rect
+  // rather than being absolutely positioned inside the sidebar.
+  //
+  // The sidebar carries backdrop-filter for the glass effect, and an element
+  // with a backdrop-filter clips its descendants to its own bounds — so a 288px
+  // panel inside a ~190px sidebar was being cut off mid-word. Escaping the
+  // sidebar is the only fix that keeps both the glass and the full panel.
+  useLayoutEffect(() => {
+    const el = anchorRef.current
+    if (!el) return
+    const update = () => {
+      const r = el.getBoundingClientRect()
+      const width = 288
+      const top = side === "bottom" ? r.bottom + 4 : r.top
+      const left = side === "bottom" ? r.left : r.right + 4
+      setPos({
+        top: Math.min(top, window.innerHeight - 120),
+        // Keep it on screen if the trigger sits near the right edge.
+        left: Math.max(8, Math.min(left, window.innerWidth - width - 8)),
+      })
+    }
+    update()
+    window.addEventListener("resize", update)
+    window.addEventListener("scroll", update, true)
+    return () => {
+      window.removeEventListener("resize", update)
+      window.removeEventListener("scroll", update, true)
+    }
+  }, [anchorRef, side])
+
+  if (!pos) return null
+
+  return createPortal(
     <div
+      style={{ top: pos.top, left: pos.left }}
       className={cn(
-        "absolute z-50 w-72 rounded-lg border border-border bg-popover shadow-xl py-1 max-h-[min(420px,calc(100vh-8rem))] overflow-y-auto",
-        side === "bottom"
-          ? "top-[calc(100%+4px)] left-0"
-          : "left-[calc(100%+4px)] top-0"
+        "fixed z-[100] w-72 rounded-lg border border-border bg-popover shadow-xl py-1",
+        "max-h-[min(420px,calc(100vh-8rem))] overflow-y-auto"
       )}
     >
       {mode === "list" ? (
@@ -367,6 +409,7 @@ function DropdownPanel({
           </p>
         </form>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
