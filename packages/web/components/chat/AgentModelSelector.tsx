@@ -8,6 +8,7 @@ import type { Agent, ModelOption, CredentialFlags, Chat } from "@/lib/types"
 import { getAgentModels, agentLabels, getModelLabel, hasCredentialsForModel, agentHasFreeUsage, agentIsReady, agentSharedPoolExhausted, resolveModelForAgent, ALL_AGENTS } from "@/lib/types"
 import { useSettingsQuery } from "@/lib/query/hooks/useSettingsQuery"
 import { AgentIcon } from "../icons/agent-icons"
+import { PillButton } from "../glass-ui/Buttons"
 import { MobileSelect } from "../ui/MobileBottomSheet"
 import type { HighlightKey } from "../modals/SettingsModal"
 import {
@@ -289,30 +290,21 @@ export function AgentModelSelector({
     return (
       <>
         {/* Agent selector - Mobile */}
-        <button
+        <PillButton
           onClick={() => setShowAgentSheet(true)}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           title={agentLabels[currentAgent]}
-        >
-          <AgentIcon agent={currentAgent} className="h-4 w-4" />
-          <span className="hidden @[18rem]/row2:inline">{agentLabels[currentAgent]}</span>
-          <ChevronDown className="h-4 w-4 hidden @[18rem]/row2:block" />
-        </button>
+          icon={<AgentIcon agent={currentAgent} className="h-4 w-4" />}
+          label={<span className="hidden @[18rem]/row2:inline">{agentLabels[currentAgent]}</span>}
+        />
 
         {/* Model selector - Mobile */}
-        <button
+        <PillButton
           onClick={() => setShowModelSheet(true)}
-          className={cn(
-            "flex items-center gap-1 text-sm transition-colors cursor-pointer",
-            !hasRequiredCredentials ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground"
-          )}
+          className={!hasRequiredCredentials ? "text-red-500" : ""}
           title={getModelLabel(currentAgent, currentModel, endpoints)}
-        >
-          {!hasRequiredCredentials && <Lock className="h-4 w-4" />}
-          <Cpu className="h-4 w-4 @[18rem]/row2:hidden" />
-          <span className="hidden @[18rem]/row2:inline">{getModelLabel(currentAgent, currentModel, endpoints)}</span>
-          <ChevronDown className="h-4 w-4 hidden @[18rem]/row2:block" />
-        </button>
+          icon={!hasRequiredCredentials ? <Lock className="h-4 w-4" /> : <Cpu className="h-4 w-4 @[18rem]/row2:hidden" />}
+          label={<span className="hidden @[18rem]/row2:inline">{getModelLabel(currentAgent, currentModel, endpoints)}</span>}
+        />
 
         {/* Mobile Bottom Sheets */}
         <MobileSelect
@@ -340,21 +332,20 @@ export function AgentModelSelector({
     <>
       {/* Agent selector - Desktop */}
       <div className="relative" data-dropdown>
-        <button
-          onClick={(e) => {
+        <PillButton
+          onClick={(e: React.MouseEvent) => {
             e.stopPropagation()
             const opening = !showAgentDropdown
             setShowAgentDropdown(opening)
             setShowModelDropdown(false)
             if (opening) onDropdownOpen?.()
           }}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors cursor-pointer"
           title={agentLabels[currentAgent]}
+          icon={<AgentIcon agent={currentAgent} className="h-3.5 w-3.5" />}
+          label={<span className="hidden @[32rem]:inline">{agentLabels[currentAgent]}</span>}
         >
-          <AgentIcon agent={currentAgent} className="h-3.5 w-3.5" />
-          <span className="hidden @[32rem]:inline">{agentLabels[currentAgent]}</span>
           <ChevronDown className="h-3.5 w-3.5" />
-        </button>
+        </PillButton>
         {showAgentDropdown && (
           <div className="absolute bottom-full right-0 mb-1 bg-popover border border-border rounded-md shadow-lg py-1 z-50 w-48">
             {agents.map((agent) => {
@@ -400,18 +391,14 @@ export function AgentModelSelector({
         }
       }}>
         <PopoverTrigger asChild>
-          <button
-            className={cn(
-              "flex items-center gap-1 text-sm transition-colors cursor-pointer",
-              !hasRequiredCredentials ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground"
-            )}
+          <PillButton
+            className={!hasRequiredCredentials ? "text-red-500" : ""}
             title={getModelLabel(currentAgent, currentModel, endpoints)}
+            icon={!hasRequiredCredentials ? <Lock className="h-3.5 w-3.5" /> : <Cpu className="h-3.5 w-3.5 @[32rem]:hidden" />}
+            label={<span className="hidden @[32rem]:inline">{getModelLabel(currentAgent, currentModel, endpoints)}</span>}
           >
-            {!hasRequiredCredentials && <Lock className="h-3.5 w-3.5" />}
-            <Cpu className="h-3.5 w-3.5 @[32rem]:hidden" />
-            <span className="hidden @[32rem]:inline">{getModelLabel(currentAgent, currentModel, endpoints)}</span>
             <ChevronDown className="h-3.5 w-3.5" />
-          </button>
+          </PillButton>
         </PopoverTrigger>
         <PopoverContent
           className="w-64 p-0"

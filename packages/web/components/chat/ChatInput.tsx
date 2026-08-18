@@ -3,6 +3,9 @@
 import { useRef, useEffect, useCallback, useState } from "react"
 import { AlertTriangle, ArrowUp, Square, ChevronDown, Github, X, Paperclip, Pencil, ListChecks, Mic, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { GlassContainer } from "../glass-ui/GlassContainer"
+import { TextInputArea } from "../glass-ui/TextInputArea"
+import { PillButton, IconButton, PrimaryAction } from "../glass-ui/Buttons"
 import { useModals } from "@/lib/contexts"
 import { useSpeechRecognition } from "@/lib/hooks/useSpeechRecognition"
 import type { Chat, Agent, CredentialFlags, PendingFile } from "@/lib/types"
@@ -340,17 +343,18 @@ export function ChatInput({
       "w-full mx-auto",
       isMobile ? "max-w-full" : "max-w-[52rem]"
     )}>
-      <div
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
+      <GlassContainer
         className={cn(
-          "relative flex flex-col glass-panel shadow-sm",
-          isMobile ? "rounded-xl" : "rounded-2xl",
-          "focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20",
+          "flex flex-col relative",
           isDraggingOver && "border-primary ring-2 ring-primary/30"
         )}
       >
+        <div
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          className="absolute inset-0 z-0 rounded-2xl"
+        />
         {/* Drop zone overlay */}
         {isDraggingOver && (
           <div className="absolute inset-0 bg-primary/5 rounded-2xl flex items-center justify-center z-10 pointer-events-none">
@@ -385,100 +389,39 @@ export function ChatInput({
         />
 
         {/* Text input area */}
-        <div className={cn(
-          "flex items-end gap-2",
-          isMobile ? "px-3 py-2" : "px-4 py-3"
-        )}>
-          {/* Textarea wrapper with slash command menu */}
-          <div className="relative flex-1">
-            {/* Slash Command Menu */}
-            {hasSlashCommands && (
-              <SlashCommandMenu
-                input={input}
-                open={slashMenuOpen}
-                onSelect={onSlashSelect}
-                onClose={onSlashClose}
-                selectedIndex={slashSelectedIndex}
-                onSelectedIndexChange={onSlashSelectedIndexChange}
-                hasLinkedRepo={hasLinkedRepo}
-                inConflict={inConflict}
-                isMobile={isMobile}
-              />
-            )}
-
-            <textarea
-              ref={textareaRef}
-              data-chat-prompt
-              data-testid="chat-input"
-              value={input}
-              onChange={(e) => onInputChange(e.target.value)}
-              onKeyDown={onKeyDown}
-              onPaste={onPaste}
-              placeholder={
-                isCreating
-                  ? "Creating sandbox..."
-                  : isRunning
-                  ? "Agent is working..."
-                  : isNewChat
-                  ? "Message..."
-                  : "Enter prompt or /merge..."
-              }
-              rows={1}
-              className={cn(
-                "w-full resize-none bg-transparent text-foreground placeholder:text-muted-foreground/50 focus:outline-none",
-                isMobile ? "text-base" : "text-[15px]"
-              )}
+        <div className="relative z-10 w-full mb-4">
+          {/* Slash Command Menu */}
+          {hasSlashCommands && (
+            <SlashCommandMenu
+              input={input}
+              open={slashMenuOpen}
+              onSelect={onSlashSelect}
+              onClose={onSlashClose}
+              selectedIndex={slashSelectedIndex}
+              onSelectedIndexChange={onSlashSelectedIndexChange}
+              hasLinkedRepo={hasLinkedRepo}
+              inConflict={inConflict}
+              isMobile={isMobile}
             />
-          </div>
-
-          {/* Voice dictation (speech-to-text) — stays on the left of the fixed
-              action slot so run-state changes cannot move it under a pending
-              click. Bottom-aligned as the textarea grows. Only shown when
-              supported. */}
-          {speech.isSupported && (
-            <button
-              type="button"
-              onClick={toggleListening}
-              disabled={speech.permissionDenied}
-              aria-pressed={speech.isListening}
-              className={cn(
-                "shrink-0 flex items-center justify-center rounded-md transition-colors",
-                isMobile ? "h-9 w-9" : "h-7 w-7",
-                speech.permissionDenied
-                  ? "text-muted-foreground/40 cursor-not-allowed"
-                  : speech.isListening
-                  ? "text-red-500 bg-red-500/10 animate-pulse cursor-pointer"
-                  : "text-muted-foreground hover:text-foreground cursor-pointer"
-              )}
-              title={
-                speech.permissionDenied
-                  ? "Microphone access denied"
-                  : speech.isListening
-                  ? "Stop dictation"
-                  : "Dictate prompt"
-              }
-              aria-label={
-                speech.permissionDenied
-                  ? "Microphone access denied"
-                  : speech.isListening
-                  ? "Stop voice dictation"
-                  : "Start voice dictation"
-              }
-            >
-              <Mic className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />
-            </button>
           )}
 
-          {/* Send / stop / queue button — the slot remains mounted while idle
-              so the adjacent microphone never replaces its hit target. */}
-          <ChatActionSlot
-            isRunning={isRunning}
-            canQueue={canQueue}
-            canSend={canSend}
-            isMobile={isMobile}
-            showBranchAffordance={showBranchAffordance}
-            onSend={handleSendWithSpeechStop}
-            onStop={onStop}
+          <TextInputArea
+            textareaRef={textareaRef}
+            data-chat-prompt
+            data-testid="chat-input"
+            value={input}
+            onChange={(e) => onInputChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+            placeholder={
+              isCreating
+                ? "Creating sandbox..."
+                : isRunning
+                ? "Agent is working..."
+                : isNewChat
+                ? "Ask"
+                : "Enter prompt or /merge..."
+            }
           />
         </div>
 
@@ -502,24 +445,19 @@ export function ChatInput({
 
         {/* Bottom row with selectors */}
         <div className={cn(
-          "@container",
-          isMobile ? "flex flex-col gap-1 px-3 py-2" : "flex items-center gap-3 px-4 py-2"
+          "flex justify-between items-center mt-2 w-full",
+          isMobile ? "px-3 py-2" : "px-4 py-2"
         )}>
-          {/* Left side items */}
-          <div className={cn("flex items-center gap-2", isMobile ? "w-full @container/row1" : "flex-1")}>
+          {/* Left group */}
+          <div className="flex items-center" style={{ gap: '10px' }}>
             {/* Attachment button */}
-            <button
+            <IconButton
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className={cn(
-                "shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
-                isMobile ? "h-7 w-7" : "h-6 w-6"
-              )}
               title="Attach files"
               aria-label="Attach files"
-            >
-              <Paperclip className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />
-            </button>
+              icon={<Paperclip className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />}
+            />
 
             {/* Repo display/selector */}
             {showRepoButton ? (
@@ -588,31 +526,16 @@ export function ChatInput({
               />
             )}
 
-            {/* Spacer - only on desktop */}
-            {!isMobile && <div className="flex-1" />}
-          </div>
-
-          {/* Right side items */}
-          <div className={cn("flex items-center gap-2", isMobile && "w-full @container/row2")}>
             {/* Mode selector dropdown (Edit/Plan) - only show if agent supports plan mode */}
             {planModeSupported && (
               isMobile ? (
                 <>
-                  <button
+                  <PillButton
                     onClick={() => setShowModeSheet(true)}
-                    className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                     title={planModeEnabled ? "Plan mode — agent will plan before acting" : "Edit mode — agent will edit code directly"}
-                  >
-                    {planModeEnabled ? (
-                      <ListChecks className="h-4 w-4" />
-                    ) : (
-                      <Pencil className="h-4 w-4" />
-                    )}
-                    <span className="hidden @[18rem]/row2:inline">
-                      {planModeEnabled ? "Plan" : "Edit"}
-                    </span>
-                    <ChevronDown className="h-4 w-4 hidden @[18rem]/row2:block" />
-                  </button>
+                    icon={planModeEnabled ? <ListChecks className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                    label={<span className="hidden sm:inline">{planModeEnabled ? "Plan" : "Edit"}</span>}
+                  />
                   <MobileSelect
                     open={showModeSheet}
                     onClose={() => setShowModeSheet(false)}
@@ -624,24 +547,15 @@ export function ChatInput({
                 </>
               ) : (
                 <div className="relative" data-dropdown>
-                  <button
-                    onClick={(e) => {
+                  <PillButton
+                    onClick={(e: React.MouseEvent) => {
                       e.stopPropagation()
                       setShowModeDropdown(!showModeDropdown)
                     }}
-                    className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors cursor-pointer"
                     title={planModeEnabled ? "Plan mode — agent will plan before acting" : "Edit mode — agent will edit code directly"}
-                  >
-                    {planModeEnabled ? (
-                      <ListChecks className="h-3.5 w-3.5" />
-                    ) : (
-                      <Pencil className="h-3.5 w-3.5" />
-                    )}
-                    <span className="hidden @[32rem]:inline">
-                      {planModeEnabled ? "Plan" : "Edit"}
-                    </span>
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </button>
+                    icon={planModeEnabled ? <ListChecks className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                    label={<span className="hidden sm:inline">{planModeEnabled ? "Plan" : "Edit"}</span>}
+                  />
                   {showModeDropdown && (
                     <div className="absolute bottom-full right-0 mb-1 bg-popover/85 backdrop-blur-md border border-border/40 rounded-md shadow-lg py-1 z-50 w-32">
                       <button
@@ -689,8 +603,51 @@ export function ChatInput({
               closeDropdowns={showModeDropdown}
             />
           </div>
+
+          {/* Right group */}
+          <div className="flex items-center" style={{ gap: '10px' }}>
+            {/* Voice dictation */}
+            {speech.isSupported && (
+              <IconButton
+                type="button"
+                onClick={toggleListening}
+                disabled={speech.permissionDenied}
+                aria-pressed={speech.isListening}
+                className={cn(
+                  speech.permissionDenied ? "opacity-50 cursor-not-allowed" : "",
+                  speech.isListening ? "bg-red-500 hover:bg-red-600 active:bg-red-700 animate-pulse text-white" : ""
+                )}
+                title={
+                  speech.permissionDenied
+                    ? "Microphone access denied"
+                    : speech.isListening
+                    ? "Stop dictation"
+                    : "Dictate prompt"
+                }
+                aria-label={
+                  speech.permissionDenied
+                    ? "Microphone access denied"
+                    : speech.isListening
+                    ? "Stop voice dictation"
+                    : "Start voice dictation"
+                }
+                icon={<Mic className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />}
+              />
+            )}
+
+            {/* Send / stop / queue button */}
+            <ChatActionSlot
+              isRunning={isRunning}
+              canQueue={canQueue}
+              canSend={canSend}
+              isMobile={isMobile}
+              showBranchAffordance={showBranchAffordance}
+              onSend={handleSendWithSpeechStop}
+              onStop={onStop}
+            />
+          </div>
         </div>
-      </div>
+      </GlassContainer>
     </div>
   )
 }
