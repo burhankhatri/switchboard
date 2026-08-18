@@ -164,12 +164,10 @@ export function MentionMenu({
   }, [query])
 
   return (
-    <div
-      onMouseLeave={() => setEngaged(false)}
-      className="absolute inset-x-0 bottom-full z-30 mb-2 max-h-72 overflow-y-auto rounded-[10px] bg-surface p-1 shadow-raised"
-      style={{ animation: "pop-in 180ms var(--ease-spring) both", transformOrigin: "bottom center" }}
-      role="listbox"
-    >
+    // Positioning belongs to the AnchoredMenu that portals this out of the
+    // composer; an absolute box here was clipped by the composer's
+    // backdrop-filter.
+    <div onMouseLeave={() => setEngaged(false)} className="relative" role="listbox">
       <span
         aria-hidden
         className="pointer-events-none absolute inset-x-1 rounded-[6px] bg-hover"

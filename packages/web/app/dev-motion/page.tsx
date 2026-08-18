@@ -20,17 +20,28 @@ import { useRef, useState } from "react"
  */
 function MenuDemo() {
   const anchor = useRef<HTMLDivElement>(null)
+  const inputAnchor = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
+  const [wide, setWide] = useState(false)
   return (
     <GlassContainer className="flex flex-col relative">
-      <div className="relative z-10 w-full">
+      <div className="relative z-10 w-full" ref={inputAnchor}>
         <TextInputArea value="" onChange={() => {}} placeholder="Menu must escape this panel" />
+        <AnchoredMenu anchorRef={inputAnchor} open={wide} onClose={() => setWide(false)} matchWidth>
+          <div data-testid="wide-menu" className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-ink-3">Git Commands</div>
+          {["/merge", "/rebase", "/squash"].map((c) => (
+            <button key={c} className="w-full rounded-[6px] px-3 py-1.5 text-left text-sm hover:bg-accent cursor-pointer">{c}</button>
+          ))}
+        </AnchoredMenu>
       </div>
       <div className="relative z-10 flex items-center gap-1 px-1 pb-0.5">
         <div ref={anchor} className="relative">
           <PillButton onClick={() => setOpen((v) => !v)} label="Claude Code" data-testid="menu-trigger">
             <ChevronDown className="h-3.5 w-3.5" />
           </PillButton>
+        </div>
+        <div>
+          <PillButton onClick={() => setWide((v) => !v)} label="/ commands" data-testid="wide-trigger" />
         </div>
         <AnchoredMenu anchorRef={anchor} open={open} onClose={() => setOpen(false)} width={192}>
           <div data-testid="menu-body">

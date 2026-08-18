@@ -14,6 +14,9 @@ interface AnchoredMenuProps {
   align?: "left" | "right"
   /** Menu width in px. Needed up front so right-alignment can be computed. */
   width?: number
+  /** Take the anchor's width instead of a fixed one — for menus that belong to
+   *  an input and should line up with it. */
+  matchWidth?: boolean
   className?: string
 }
 
@@ -37,10 +40,11 @@ export function AnchoredMenu({
   children,
   align = "left",
   width = 192,
+  matchWidth = false,
   className,
 }: AnchoredMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => setMounted(true), [])
@@ -53,17 +57,18 @@ export function AnchoredMenu({
       if (!anchor) return
       const rect = anchor.getBoundingClientRect()
       const height = menuRef.current?.offsetHeight ?? 0
+      const w = matchWidth ? rect.width : width
 
       // Above the trigger by default — these hang off a composer pinned to the
       // bottom of the window, so below would run off-screen.
       let top = rect.top - height - 6
       if (top < 8) top = rect.bottom + 6
 
-      let left = align === "right" ? rect.right - width : rect.left
+      let left = align === "right" ? rect.right - w : rect.left
       // Keep it on screen horizontally whichever edge it was aligned to.
-      left = Math.max(8, Math.min(left, window.innerWidth - width - 8))
+      left = Math.max(8, Math.min(left, window.innerWidth - w - 8))
 
-      setPos({ top, left })
+      setPos({ top, left, width: w })
     }
 
     place()
@@ -73,7 +78,7 @@ export function AnchoredMenu({
       window.removeEventListener("scroll", place, true)
       window.removeEventListener("resize", place)
     }
-  }, [open, align, width, anchorRef])
+  }, [open, align, width, matchWidth, anchorRef])
 
   useEffect(() => {
     if (!open) return
@@ -104,7 +109,9 @@ export function AnchoredMenu({
         position: "fixed",
         top: pos?.top ?? -9999,
         left: pos?.left ?? -9999,
-        width,
+        width: pos?.width ?? width,
+        maxHeight: "min(60vh, 420px)",
+        overflowY: "auto",
         // Hidden until placed, so it never flashes at the wrong position.
         visibility: pos ? "visible" : "hidden",
         animation: "pop-in 160ms var(--ease-spring) both",

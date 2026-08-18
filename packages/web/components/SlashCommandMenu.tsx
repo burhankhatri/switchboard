@@ -76,14 +76,11 @@ export function SlashCommandMenu({
     return null
   }
 
+  // Deliberately NOT positioned here. This renders inside an AnchoredMenu,
+  // which portals it out of the composer — an absolute box in place was clipped
+  // by the composer's backdrop-filter, which cuts descendants to its own bounds.
   return (
-    <div
-      ref={menuRef}
-      className={cn(
-        "absolute bottom-full left-0 mb-1 rounded-lg border border-border/40 bg-popover/85 backdrop-blur-md p-1 shadow-lg z-50",
-        isMobile ? "right-0" : "w-64"
-      )}
-    >
+    <div ref={menuRef}>
       <div className={cn(
         "px-2 py-1.5 font-medium text-muted-foreground uppercase tracking-wider",
         isMobile ? "text-xs" : "text-[10px]"

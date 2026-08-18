@@ -350,6 +350,8 @@ export function ChatInput({
   // Menus are portalled out of the composer, so they need an element to
   // measure from.
   const modeAnchor = useRef<HTMLDivElement>(null)
+  // The slash and @ menus line up with the input rather than a small trigger.
+  const composerAnchor = useRef<HTMLDivElement>(null)
 
   // Changing model updates a label and nothing else, so it is easy to be
   // unsure it took. The sweep is the acknowledgement.
@@ -457,25 +459,38 @@ export function ChatInput({
           isMobile={isMobile}
         />
 
-        {/* Text input area. The grid below decides whether this sits inline
-            with the controls or takes its own full-width row. */}
-        <div className="relative z-10 w-full">
-          {/* Slash Command Menu */}
+        {/* Text input area. Both menus below are portalled out of this panel —
+            the composer sets a backdrop-filter, which clips descendants to its
+            own bounds regardless of overflow, so an in-place menu lost its top
+            and its edges. */}
+        <div className="relative z-10 w-full" ref={composerAnchor}>
           {hasSlashCommands && (
-            <SlashCommandMenu
-              input={input}
+            <AnchoredMenu
+              anchorRef={composerAnchor}
               open={slashMenuOpen}
-              onSelect={onSlashSelect}
               onClose={onSlashClose}
-              selectedIndex={slashSelectedIndex}
-              onSelectedIndexChange={onSlashSelectedIndexChange}
-              hasLinkedRepo={hasLinkedRepo}
-              inConflict={inConflict}
-              isMobile={isMobile}
-            />
+              matchWidth
+            >
+              <SlashCommandMenu
+                input={input}
+                open={slashMenuOpen}
+                onSelect={onSlashSelect}
+                onClose={onSlashClose}
+                selectedIndex={slashSelectedIndex}
+                onSelectedIndexChange={onSlashSelectedIndexChange}
+                hasLinkedRepo={hasLinkedRepo}
+                inConflict={inConflict}
+                isMobile={isMobile}
+              />
+            </AnchoredMenu>
           )}
 
-          {mentionOpen && (
+          <AnchoredMenu
+            anchorRef={composerAnchor}
+            open={mentionOpen}
+            onClose={() => onInputChange(input.replace(/@[\w.-]*$/, ""))}
+            matchWidth
+          >
             <MentionMenu
               items={mentionItems}
               activeIndex={mentionIndex}
@@ -483,7 +498,7 @@ export function ChatInput({
               onSelect={applyMention}
               query={mentionQuery}
             />
-          )}
+          </AnchoredMenu>
 
           <TextInputArea
             textareaRef={textareaRef}
