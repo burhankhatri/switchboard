@@ -6,6 +6,7 @@ import {
   ChevronRight, FilePlus, FileText, FolderPlus, Folder, Loader2, Sparkles, Upload,
 } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { writeCachedFile } from "@/lib/workspace-file-cache"
 import { cn } from "@/lib/utils"
 
 interface RepoFile { path: string; name: string; size: number }
@@ -36,9 +37,33 @@ const MAX_UPLOAD_BYTES = 256 * 1024
 const GITKEEP = ".gitkeep"
 
 function TreeNode({ node, depth }: { node: Node; depth: number }) {
-  const { openFile, setOpenFile } = useWorkspace()
+  const { activeWorkspace, openFile, setOpenFile } = useWorkspace()
   const [open, setOpen] = useState(depth < 2)
+  const qc = useQueryClient()
   const pad = { paddingLeft: `${depth * 12 + 8}px` }
+
+  // Fetch on the way to the click. Reading a file is a GitHub round trip, and
+  // the ~300ms between pointing at a row and pressing it is enough to hide
+  // most of it — by the time the editor mounts the content is usually cached.
+  const prefetch = (path: string) => {
+    const wsId = activeWorkspace?.id
+    if (!wsId) return
+    void qc.prefetchQuery({
+      queryKey: ["workspace-file", wsId, path],
+      queryFn: async () => {
+        const r = await fetch(`/api/workspaces/${wsId}/files?path=${encodeURIComponent(path)}`)
+        if (!r.ok) throw new Error(String(r.status))
+        const file = await r.json()
+        writeCachedFile(wsId, path, {
+          content: file.content,
+          sha: file.sha,
+          truncated: file.truncated,
+        })
+        return file
+      },
+      staleTime: 30 * 1000,
+    })
+  }
 
   if (node.path) {
     if (node.name === GITKEEP) return null // placeholder, not content
@@ -46,6 +71,8 @@ function TreeNode({ node, depth }: { node: Node; depth: number }) {
     return (
       <button
         onClick={() => setOpenFile(node.path!)}
+        onMouseEnter={() => prefetch(node.path!)}
+        onFocus={() => prefetch(node.path!)}
         style={pad}
         className={cn(
           "flex items-center gap-1.5 w-full py-1 pr-2 rounded text-left text-xs cursor-pointer",

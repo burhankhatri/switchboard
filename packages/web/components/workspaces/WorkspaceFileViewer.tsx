@@ -1,9 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { X, Loader2, FileText, Check } from "lucide-react"
+import { X, FileText, Check, RefreshCw } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import {
+  clearDraft,
+  readCachedFile,
+  readDraft,
+  writeCachedFile,
+  writeDraft,
+} from "@/lib/workspace-file-cache"
 import { cn } from "@/lib/utils"
 
 interface FilePayload { path: string; content: string; truncated: boolean; sha: string }
@@ -16,69 +23,136 @@ interface FilePayload { path: string; content: string; truncated: boolean; sha: 
  * editor opened is sent back with the save: if someone else changed the file
  * meanwhile, GitHub rejects it and we surface a conflict instead of silently
  * overwriting them.
+ *
+ * The editor is local-first. Opening a file paints from localStorage and
+ * revalidates behind that, and Save returns immediately while the commit
+ * happens in the background — a commit is a network round trip to GitHub, and
+ * there is no reason to make someone watch a spinner for it. The cost of that
+ * choice is that a rejected save surfaces a moment after it looked fine, which
+ * is why a failure restores the unsaved state rather than just logging.
  */
 export function WorkspaceFileViewer() {
   const { activeWorkspace, openFile, setOpenFile } = useWorkspace()
   const [draft, setDraft] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const qc = useQueryClient()
+  const wsId = activeWorkspace?.id ?? ""
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["workspace-file", activeWorkspace?.id, openFile],
-    queryFn: () =>
-      fetch(`/api/workspaces/${activeWorkspace!.id}/files?path=${encodeURIComponent(openFile!)}`).then(
-        (r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<FilePayload> }
-      ),
-    enabled: !!activeWorkspace && !!openFile,
+  // Seeded synchronously so the first paint already has content for any file
+  // opened before. Recomputed per file, not per render.
+  const cached = useMemo(
+    () => (wsId && openFile ? readCachedFile(wsId, openFile) : null),
+    [wsId, openFile]
+  )
+
+  const { data, isPending, isFetching, error } = useQuery({
+    queryKey: ["workspace-file", wsId, openFile],
+    queryFn: async () => {
+      const r = await fetch(`/api/workspaces/${wsId}/files?path=${encodeURIComponent(openFile!)}`)
+      if (!r.ok) throw new Error(String(r.status))
+      const file = (await r.json()) as FilePayload
+      writeCachedFile(wsId, openFile!, {
+        content: file.content,
+        sha: file.sha,
+        truncated: file.truncated,
+      })
+      return file
+    },
+    enabled: !!wsId && !!openFile,
     retry: false,
+    initialData: cached && openFile ? { path: openFile, ...cached } : undefined,
+    // Marks the seeded value as infinitely old: it paints immediately and a
+    // real fetch starts anyway, so a stale cache can never be what you edit.
+    initialDataUpdatedAt: 0,
   })
 
-  // Reset the draft whenever a different file is opened, or a reload brings
-  // newer content — otherwise you would edit one file's text over another's.
-  useEffect(() => { setDraft(null); setSaved(false) }, [openFile, data?.sha])
+  // Restore whatever was being typed when this file was last open. Keyed on the
+  // file alone — reacting to the sha as well would discard an in-flight edit the
+  // moment a background revalidation landed.
+  useEffect(() => {
+    if (!wsId || !openFile) {
+      setDraft(null)
+      return
+    }
+    const stored = readDraft(wsId, openFile)
+    setDraft(stored?.content ?? null)
+    setSaved(false)
+  }, [wsId, openFile])
 
   const save = useMutation({
     mutationFn: async (content: string) => {
-      const res = await fetch(`/api/workspaces/${activeWorkspace!.id}/files`, {
+      const res = await fetch(`/api/workspaces/${wsId}/files`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: openFile, content, sha: data?.sha }),
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Save failed")
-      return res.json()
+      return res.json() as Promise<{ path: string; sha: string }>
     },
-    onSuccess: () => {
+    // Confirm to the user now. The commit is a background detail.
+    onMutate: (content: string) => {
       setSaved(true)
-      qc.invalidateQueries({ queryKey: ["workspace-file", activeWorkspace?.id, openFile] })
-      qc.invalidateQueries({ queryKey: ["workspace-files", activeWorkspace?.id] })
+      if (wsId && openFile) {
+        writeCachedFile(wsId, openFile, {
+          content,
+          sha: data?.sha ?? "",
+          truncated: false,
+        })
+      }
     },
+    onSuccess: (res, content) => {
+      if (!wsId || !openFile) return
+      // Committed: the draft IS the server's content now, so it stops being
+      // unsaved work and the local copy is dropped.
+      clearDraft(wsId, openFile)
+      setDraft(null)
+      qc.setQueryData<FilePayload>(["workspace-file", wsId, openFile], (prev) =>
+        prev ? { ...prev, content, sha: res.sha } : prev
+      )
+      writeCachedFile(wsId, openFile, { content, sha: res.sha, truncated: false })
+      qc.invalidateQueries({ queryKey: ["workspace-files", wsId] })
+    },
+    // The draft stays on disk, so a rejected save never costs the edit.
+    onError: () => setSaved(false),
   })
 
   if (!openFile) return null
   const value = draft ?? data?.content ?? ""
   const dirty = draft !== null && draft !== data?.content
 
+  const onEdit = (next: string) => {
+    setDraft(next)
+    setSaved(false)
+    // Every keystroke, not debounced: this is the only copy of unsaved work,
+    // and a debounce is exactly the window in which a crash loses it.
+    if (wsId && openFile) writeDraft(wsId, openFile, { content: next, baseSha: data?.sha ?? "" })
+  }
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       <div className="flex items-center gap-2 mb-3">
         <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="font-mono text-xs text-muted-foreground truncate flex-1">{openFile}</span>
-        {dirty && !save.isPending && <span className="text-xs text-muted-foreground">unsaved</span>}
+        {/* Revalidation is ambient, not a wait — it must never look like one. */}
+        {isFetching && !isPending && (
+          <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground/60" aria-label="Syncing" />
+        )}
+        {dirty && <span className="text-xs text-muted-foreground">unsaved</span>}
         {saved && !dirty && (
           <span className="flex items-center gap-1 text-xs text-primary">
-            <Check className="h-3 w-3" /> committed
+            <Check className="h-3 w-3" /> {save.isPending ? "saved locally" : "committed"}
           </span>
         )}
         <button
           onClick={() => save.mutate(value)}
-          disabled={!dirty || save.isPending || data?.truncated}
+          disabled={!dirty || data?.truncated}
           title={data?.truncated ? "This file is too large to edit here" : undefined}
           className={cn(
             "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer",
             "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-default"
           )}
         >
-          {save.isPending && <Loader2 className="h-3 w-3 animate-spin" />} Save
+          Save
         </button>
         <button
           onClick={() => setOpenFile(null)}
@@ -89,19 +163,18 @@ export function WorkspaceFileViewer() {
         </button>
       </div>
 
-      {isLoading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-        </div>
+      {/* Only a file never opened before can show a loading state. */}
+      {isPending && (
+        <div className="animate-pulse rounded-xl border border-border bg-card h-64" aria-label="Loading" />
       )}
-      {error && <p className="text-sm text-muted-foreground py-6">Could not open this file.</p>}
+      {error && !data && <p className="text-sm text-muted-foreground py-6">Could not open this file.</p>}
       {save.error && <p className="text-sm text-destructive mb-2">{(save.error as Error).message}</p>}
 
       {data && (
         <>
           <textarea
             value={value}
-            onChange={(e) => { setDraft(e.target.value); setSaved(false) }}
+            onChange={(e) => onEdit(e.target.value)}
             spellCheck={false}
             readOnly={data.truncated}
             rows={22}
@@ -110,7 +183,7 @@ export function WorkspaceFileViewer() {
           <p className="mt-2 text-xs text-muted-foreground">
             {data.truncated
               ? "Truncated — too large to edit here."
-              : "Saving commits to the workspaces repo. The next run picks it up."}
+              : "Edits are kept in this browser as you type. Saving commits to the workspaces repo, and the next run picks it up."}
           </p>
         </>
       )}

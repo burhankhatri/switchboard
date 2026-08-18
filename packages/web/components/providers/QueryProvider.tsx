@@ -9,7 +9,11 @@ function makeQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 30 * 1000, // 30 seconds
-        gcTime: 5 * 60 * 1000, // 5 minutes
+        // Kept for the session rather than 5 minutes. Eviction here is what
+        // turns "go back to a view you had open" into a spinner instead of an
+        // instant paint; the data is revalidated on use either way, so holding
+        // it costs memory and buys every revisit.
+        gcTime: 24 * 60 * 60 * 1000,
         retry: 2,
         refetchOnWindowFocus: false,
       },
