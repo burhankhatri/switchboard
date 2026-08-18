@@ -96,6 +96,10 @@ export function AgentModelSelector({
     [elizaEnabled]
   )
 
+  // Must sit above the mobile early return: a hook declared after a
+  // conditional return is called on some renders and not others, which is the
+  // "rendered more hooks than during the previous render" crash.
+  const agentAnchor = useRef<HTMLDivElement>(null)
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [showAgentSheet, setShowAgentSheet] = useState(false)
@@ -327,10 +331,6 @@ export function AgentModelSelector({
       </>
     )
   }
-
-  // Portalled menus need an element to measure, since they no longer live
-  // inside the trigger's layout.
-  const agentAnchor = useRef<HTMLDivElement>(null)
 
   // Desktop dropdowns
   return (
