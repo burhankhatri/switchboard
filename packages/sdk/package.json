@@ -1,0 +1,83 @@
+{
+  "name": "@background-agents/sdk",
+  "version": "0.1.2",
+  "description": "A TypeScript SDK for interacting with various AI coding agents (Claude, Codex, Copilot, Droid, Gemini, Goose, Kilo, Kimi, OpenCode, Pi)",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./next.config": "./next.config.codeagentsdk.cjs",
+    "./package.json": "./package.json",
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:eliza && tsc && tsc-alias --resolve-full-paths",
+    "build:eliza": "npm run build:eliza-bundle && npm run build:eliza-embed",
+    "build:eliza-bundle": "esbuild src/agents/eliza/cli.ts --bundle --platform=node --format=esm --outfile=dist/agents/eliza/cli.bundle.js",
+    "build:eliza-embed": "npx tsx scripts/embed-eliza-bundle.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build",
+    "generate:jsonl-refs": "npx tsx scripts/generate-jsonl-references.ts"
+  },
+  "keywords": [
+    "ai",
+    "coding-agent",
+    "claude",
+    "codex",
+    "copilot",
+    "droid",
+    "gemini",
+    "goose",
+    "kilo",
+    "kimi",
+    "opencode",
+    "pi",
+    "sdk"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jamesmurdza/background-agents.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/jamesmurdza/background-agents/tree/main/packages/sdk",
+  "bugs": {
+    "url": "https://github.com/jamesmurdza/background-agents/issues"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "esbuild": "^0.20.0",
+    "tsc-alias": "^1.8.10",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "next.config.codeagentsdk.cjs"
+  ],
+  "dependencies": {
+    "@background-agents/sandbox-jobs": "^0.1.0",
+    "@daytonaio/sdk": "^0.170.0",
+    "dotenv": "^17.3.1"
+  }
+}

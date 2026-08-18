@@ -1,0 +1,69 @@
+# @background-agents/dev-cron
+
+Local development simulator for Vercel cron jobs.
+
+Reads cron configuration from `vercel.json` and runs the endpoints locally on the configured schedule.
+
+## Usage
+
+From the repo root:
+
+```bash
+npm run dev:cron
+```
+
+(Or `npm run dev` from within `packages/dev-cron/`.)
+
+All environment variables (below) are optional — sensible defaults are used.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BASE_URL` | `http://localhost:4000` | Base URL for the dev server |
+| `CRON_SECRET` | (none) | Bearer token for cron endpoint auth |
+| `VERCEL_JSON` | (auto-detected) | Path to `vercel.json`. If unset, the simulator searches `./vercel.json`, then the repo root, then `packages/web/vercel.json` (where the config actually lives). |
+
+## Example Output
+
+```
+╔═══════════════════════════════════════╗
+║       Dev Cron Simulator              ║
+╚═══════════════════════════════════════╝
+
+Base URL: http://localhost:4000
+Cron Secret: (none)
+
+Loading config from: /path/to/vercel.json
+
+Found 2 cron job(s):
+
+  /api/cron/refresh-claude-creds
+    Schedule: 0 * * * *
+    Interval: 1h
+  /api/cron/agent-lifecycle
+    Schedule: * * * * *
+    Interval: 1m
+
+─────────────────────────────────────────
+Press Ctrl+C to stop
+
+[2026-01-15T12:00:00.000Z] ✓ /api/cron/refresh-claude-creds (200, 45ms)
+  {"refreshed":0}
+[2026-01-15T12:00:00.000Z] ✓ /api/cron/agent-lifecycle (200, 32ms)
+  {"processed":1,"results":[{"chatId":"abc","action":"refreshed"}]}
+```
+
+## Supported Cron Expressions
+
+This is a simplified parser for development purposes:
+
+| Expression | Interval |
+|------------|----------|
+| `* * * * *` | Every minute |
+| `*/2 * * * *` | Every 2 minutes |
+| `*/5 * * * *` | Every 5 minutes |
+| `0 * * * *` | Every hour |
+| `0 */2 * * *` | Every 2 hours |
+
+Complex expressions (specific times, day-of-week, etc.) default to 1 minute for dev.

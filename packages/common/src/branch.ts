@@ -1,0 +1,98 @@
+/**
+ * Branch name generation and validation utilities
+ */
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+/**
+ * Word list for generating random branch names
+ * Used to create memorable, human-readable branch names like "swift-lunar-amber"
+ */
+const BRANCH_NAME_WORDS = [
+  "swift",
+  "lunar",
+  "amber",
+  "coral",
+  "ember",
+  "frost",
+  "bloom",
+  "spark",
+  "drift",
+  "pulse",
+  "cedar",
+  "maple",
+  "river",
+  "stone",
+  "cloud",
+  "flame",
+  "steel",
+  "light",
+  "storm",
+  "wave",
+  "tiger",
+  "eagle",
+  "brave",
+  "vivid",
+  "noble",
+  "rapid",
+  "quiet",
+  "sharp",
+  "fresh",
+  "grand",
+] as const
+
+type BranchNameWord = (typeof BRANCH_NAME_WORDS)[number]
+
+// =============================================================================
+// Branch Name Generation
+// =============================================================================
+
+/**
+ * Pick a random word from the branch name word list
+ */
+function pickRandomWord(): BranchNameWord {
+  return BRANCH_NAME_WORDS[Math.floor(Math.random() * BRANCH_NAME_WORDS.length)]
+}
+
+/**
+ * Generate a random alphanumeric suffix
+ */
+function generateSuffix(length: number = 4): string {
+  return Math.random()
+    .toString(36)
+    .substring(2, 2 + length)
+}
+
+export interface BranchNameOptions {
+  /** Number of words to use (default: 2) */
+  wordCount?: number
+  /** Whether to include an alphanumeric suffix (default: true) */
+  includeSuffix?: boolean
+  /** Length of the suffix if included (default: 4) */
+  suffixLength?: number
+}
+
+/**
+ * Generate a random branch name from the word list
+ *
+ * @example
+ * generateBranchName() // "swift-lunar-a1b2"
+ * generateBranchName({ wordCount: 3, includeSuffix: false }) // "swift-lunar-amber"
+ * generateBranchName({ wordCount: 2, suffixLength: 6 }) // "swift-lunar-a1b2c3"
+ */
+export function generateBranchName(options: BranchNameOptions = {}): string {
+  const { wordCount = 2, includeSuffix = true, suffixLength = 4 } = options
+
+  const words: string[] = []
+  for (let i = 0; i < wordCount; i++) {
+    words.push(pickRandomWord())
+  }
+
+  if (includeSuffix) {
+    words.push(generateSuffix(suffixLength))
+  }
+
+  return words.join("-")
+}

@@ -1,0 +1,537 @@
+import { Daytona } from "@daytonaio/sdk"
+import { createSandboxGit } from "@background-agents/sandbox-git"
+import { ensureSandboxStarted } from "@/lib/sandbox"
+import { isSafeRepoPath, isSafeBranchName, isSafeRepoSegment } from "@/lib/git/ref-validation"
+import { clearPushFailureMessages, createGitOperationMessage } from "@/lib/db/git-messages"
+import { requireGitHubAuth, isGitHubAuthError, verifySandboxOwnership, forbidden } from "@/lib/db/api-helpers"
+import {
+  getConflictedFiles,
+  pushViaTemporaryBranch,
+  type TempBranchPushResult,
+} from "@/lib/git/sandbox-git-ops"
+
+// Booting a stopped sandbox (ensureSandboxStarted) can take up to ~120s, so
+// give working-tree actions headroom on top of the git work itself.
+export const maxDuration = 120
+
+/**
+ * Actions that operate on the sandbox working tree and therefore require it to
+ * be running. For these we boot a stopped sandbox (an explicit user action,
+ * mirroring the other /api/sandbox/* routes). The remaining actions are handled
+ * without booting: `merge` and `delete-remote-branch` run through GitHub's API,
+ * and `check-rebase-status` is a passive poll that returns defaults when stopped.
+ */
+const WORKING_TREE_ACTIONS = new Set([
+  "list-branches",
+  "rebase",
+  "abort-rebase",
+  "abort-merge",
+  "force-push",
+])
+
+/**
+ * Map a failed {@link pushViaTemporaryBranch} to the user-facing git-operation
+ * message and the API response error string. Kept route-side so the wording for
+ * rebase vs force-push lives next to the handlers that produce it.
+ */
+function tempBranchPushError(
+  result: Extract<TempBranchPushResult, { ok: false }>,
+  label: string,
+  pushNoun: string
+): { gitMessage: string; responseError: string } {
+  switch (result.stage) {
+    case "head":
+      return {
+        gitMessage: `${label}: could not read HEAD.`,
+        responseError: `Failed to get HEAD: ${result.detail}`,
+      }
+    case "create-branch":
+      return {
+        gitMessage: `${label}: could not create temp branch (${result.detail.trim()}).`,
+        responseError: `Failed to create temp branch: ${result.detail}`,
+      }
+    case "push":
+      return {
+        gitMessage: `${label}: could not push ${pushNoun} (${result.detail}).`,
+        responseError: `Failed to push ${pushNoun}: ${result.detail}`,
+      }
+    case "patch-ref":
+      return {
+        gitMessage: `${label}: ${result.detail}.`,
+        responseError: `${label}: ${result.detail}`,
+      }
+  }
+}
+
+export async function POST(req: Request) {
+  const ghAuth = await requireGitHubAuth()
+  if (isGitHubAuthError(ghAuth)) return ghAuth
+  const githubToken = ghAuth.token
+  const userId = ghAuth.userId
+
+  const body = await req.json()
+  const { sandboxId, repoPath, action, targetBranch, currentBranch, repoOwner, repoApiName, squash, targetSandboxId, chatId, sourceName, targetName } = body
+
+  if (!sandboxId || !repoPath || !action) {
+    return Response.json({ error: "Missing required fields: sandboxId, repoPath, action" }, { status: 400 })
+  }
+
+  // requireGitHubAuth only proves the caller is signed in; it does not tie them
+  // to this sandbox. Verify ownership so a logged-in user can't run git actions
+  // against another user's sandbox/repo.
+  if (!(await verifySandboxOwnership(userId, sandboxId))) {
+    return forbidden()
+  }
+
+  // Reject any interpolated value carrying shell/URL metacharacters before it
+  // reaches a command or GitHub URL below (see the injection-guard helpers).
+  if (!isSafeRepoPath(repoPath)) {
+    return Response.json({ error: "Invalid repoPath" }, { status: 400 })
+  }
+  for (const [name, value] of [
+    ["currentBranch", currentBranch],
+    ["targetBranch", targetBranch],
+  ] as const) {
+    if (value !== undefined && !isSafeBranchName(value)) {
+      return Response.json({ error: `Invalid ${name}` }, { status: 400 })
+    }
+  }
+  for (const [name, value] of [
+    ["repoOwner", repoOwner],
+    ["repoApiName", repoApiName],
+  ] as const) {
+    if (value !== undefined && !isSafeRepoSegment(value)) {
+      return Response.json({ error: `Invalid ${name}` }, { status: 400 })
+    }
+  }
+
+  const daytonaApiKey = process.env.DAYTONA_API_KEY
+  if (!daytonaApiKey) {
+    return Response.json({ error: "Daytona API key not configured" }, { status: 500 })
+  }
+
+  try {
+    const daytona = new Daytona({ apiKey: daytonaApiKey })
+    const sandbox = await daytona.get(sandboxId)
+    const git = createSandboxGit(sandbox)
+
+    // Working-tree actions need the sandbox running; boot it if stopped.
+    if (WORKING_TREE_ACTIONS.has(action)) {
+      await ensureSandboxStarted(sandbox)
+    }
+
+    switch (action) {
+      case "list-branches": {
+        // Fetch all remote branches
+        await git.fetch(repoPath, githubToken, "--prune")
+        const brResult = await sandbox.process.executeCommand(
+          `cd ${repoPath} && git branch -r --format='%(refname:short)' 2>&1`
+        )
+        if (brResult.exitCode) {
+          return Response.json({ branches: [] })
+        }
+        const branches = brResult.result
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .map((b: string) => b.replace("origin/", ""))
+          .filter((b: string) => b !== "HEAD")
+        return Response.json({ branches })
+      }
+
+      case "merge": {
+        if (!targetBranch || !currentBranch) {
+          return Response.json({ error: "Missing branch names for merge" }, { status: 400 })
+        }
+        if (!repoOwner || !repoApiName) {
+          return Response.json({ error: "Missing repository owner or name for merge" }, { status: 400 })
+        }
+
+        // A clean merge runs entirely through GitHub's merge API and needs no
+        // sandbox. We only touch the working tree when the sandbox is actually
+        // running — to detect whether we're merging into the checked-out branch
+        // (which gates conflict replication and the post-merge pull). A stopped
+        // sandbox has no active checkout, so treat it as "not the active branch"
+        // and let auto-pull-before-run sync it when it next wakes. This keeps
+        // merge working while the sandbox is stopped instead of failing on the
+        // up-front `git.status` ("failed to resolve container IP").
+        const sandboxStarted = sandbox.state === "started"
+        let isMergingIntoActiveBranch = false
+        if (sandboxStarted) {
+          const currentStatus = await git.status(repoPath)
+          isMergingIntoActiveBranch = currentStatus.currentBranch === targetBranch
+        }
+
+        // Use GitHub's merge API
+        const commitMessage = squash
+          ? `Squash merge ${currentBranch} into ${targetBranch}`
+          : `Merge ${currentBranch} into ${targetBranch}`
+
+        const mergeRes = await fetch(
+          `https://api.github.com/repos/${repoOwner}/${repoApiName}/merges`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${githubToken}`,
+              Accept: "application/vnd.github.v3+json",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              base: targetBranch,
+              head: currentBranch,
+              commit_message: commitMessage,
+            }),
+          }
+        )
+
+        if (!mergeRes.ok) {
+          const mergeData = await mergeRes.json().catch(() => ({}))
+          const errorMessage = (mergeData as { message?: string }).message || `Status ${mergeRes.status}`
+          if (mergeRes.status === 409) {
+            // Conflict
+            if (!isMergingIntoActiveBranch) {
+              if (chatId) {
+                await createGitOperationMessage(
+                  chatId,
+                  `Merge conflict. Switch to "${targetBranch}" and merge from there.`,
+                  true
+                )
+              }
+              return Response.json(
+                { error: `Merge conflict. Switch to "${targetBranch}" and merge from there.` },
+                { status: 409 }
+              )
+            }
+
+            if (squash) {
+              if (chatId) {
+                await createGitOperationMessage(chatId, `Merge conflict: ${errorMessage}.`, true)
+              }
+              return Response.json({ error: "Merge conflict: " + errorMessage }, { status: 409 })
+            }
+
+            // Replicate merge in sandbox for conflict resolution
+            await git.fetch(repoPath, githubToken)
+
+            try {
+              await git.pull(repoPath, githubToken)
+            } catch {
+              // best-effort
+            }
+
+            const mergeLocal = await sandbox.process.executeCommand(
+              `cd ${repoPath} && git merge origin/${currentBranch} 2>&1`
+            )
+
+            const mergeHeadCheck = await sandbox.process.executeCommand(
+              `test -f ${repoPath}/.git/MERGE_HEAD && echo "yes" || echo "no"`
+            )
+            const hasMergeHead = mergeHeadCheck.result.trim() === "yes"
+
+            if (hasMergeHead) {
+              const conflictedFiles = await getConflictedFiles(sandbox, repoPath)
+
+              if (chatId) {
+                const fileList = conflictedFiles.join(", ")
+                await createGitOperationMessage(
+                  chatId,
+                  `Merge conflict: ${currentBranch} into ${targetBranch}. Conflicted files: ${fileList}`,
+                  true
+                )
+              }
+
+              return Response.json(
+                {
+                  conflict: true,
+                  inMerge: true,
+                  conflictedFiles,
+                  targetBranch,
+                  currentBranch,
+                  message: mergeLocal.result,
+                },
+                { status: 409 }
+              )
+            }
+
+            if (chatId) {
+              await createGitOperationMessage(chatId, `Merge conflict: ${errorMessage}.`, true)
+            }
+            return Response.json({ error: "Merge conflict: " + errorMessage }, { status: 409 })
+          }
+          if (chatId) {
+            await createGitOperationMessage(chatId, `Merge failed: ${errorMessage}.`, true)
+          }
+          return Response.json({ error: "Merge failed: " + errorMessage }, { status: 500 })
+        }
+
+        // Merge succeeded on GitHub - create success message
+        const verb = squash ? "Squash merged" : "Merged"
+        const source = sourceName || currentBranch
+        const target = targetName || targetBranch
+        if (chatId) {
+          await createGitOperationMessage(
+            chatId,
+            `${verb} ${source} into ${target}.`,
+            false,
+            undefined,
+            targetBranch
+          )
+        }
+
+        if (isMergingIntoActiveBranch) {
+          try {
+            await git.pull(repoPath, githubToken)
+          } catch {
+            // Pull may fail but GitHub merge succeeded
+          }
+          return Response.json({ success: true })
+        } else if (targetSandboxId) {
+          // Pull the merged changes into the target branch's sandbox if it's running
+          try {
+            const targetSandbox = await daytona.get(targetSandboxId)
+            console.log(`[merge] Target sandbox ${targetSandboxId} state: ${targetSandbox.state}`)
+            if (targetSandbox.state === "started") {
+              console.log(`[merge] Pulling from origin/${targetBranch} into target sandbox at ${repoPath}`)
+              const targetGit = createSandboxGit(targetSandbox)
+              try {
+                await targetGit.pull(repoPath, githubToken)
+                console.log(`[merge] Pull succeeded`)
+                return Response.json({ success: true })
+              } catch (pullErr) {
+                console.error(`[merge] Pull failed:`, pullErr)
+                return Response.json({ success: true, needsSync: true })
+              }
+            } else {
+              // Sandbox not running, tell frontend to mark for sync
+              console.log(`[merge] Target sandbox not started, marking needsSync`)
+              return Response.json({ success: true, needsSync: true })
+            }
+          } catch (pullError) {
+            // Pull failed or couldn't get sandbox, tell frontend to mark for sync
+            console.error(`[merge] Pull failed:`, pullError)
+            return Response.json({ success: true, needsSync: true })
+          }
+        }
+
+        return Response.json({ success: true })
+      }
+
+      case "rebase": {
+        if (!targetBranch || !currentBranch || !repoOwner || !repoApiName) {
+          return Response.json({ error: "Missing required fields for rebase" }, { status: 400 })
+        }
+
+        // Fetch target branch from remote first to ensure we have the latest.
+        // Use fetchBranch to ensure the remote tracking ref (origin/<branch>) is created,
+        // which is required for single-branch clones.
+        await git.fetchBranch(repoPath, targetBranch, githubToken)
+
+        // Rebase onto the freshly fetched remote branch
+        // We use origin/${targetBranch} directly instead of checking out the local
+        // branch and pulling, as the fetch already updated origin/${targetBranch}
+        const rebaseResult = await sandbox.process.executeCommand(
+          `cd ${repoPath} && git rebase origin/${targetBranch} 2>&1`
+        )
+        if (rebaseResult.exitCode) {
+          const isConflict = rebaseResult.result.includes("CONFLICT") ||
+                             rebaseResult.result.includes("could not apply")
+
+          if (isConflict) {
+            const conflictedFiles = await getConflictedFiles(sandbox, repoPath)
+
+            if (chatId) {
+              const fileList = conflictedFiles.join(", ")
+              await createGitOperationMessage(
+                chatId,
+                `Rebase conflict: ${currentBranch} onto ${targetBranch}. Conflicted files: ${fileList}`,
+                true
+              )
+            }
+
+            return Response.json({
+              conflict: true,
+              targetBranch,
+              conflictedFiles,
+              message: rebaseResult.result,
+            }, { status: 409 })
+          }
+
+          // Non-conflict error - abort and return error
+          await sandbox.process.executeCommand(`cd ${repoPath} && git rebase --abort 2>&1`)
+          if (chatId) {
+            await createGitOperationMessage(chatId, `Rebase failed: ${rebaseResult.result.trim()}.`, true)
+          }
+          return Response.json({ error: "Rebase failed: " + rebaseResult.result }, { status: 500 })
+        }
+
+        // Update the remote branch to the rebased HEAD (rewrites history).
+        const rebasePush = await pushViaTemporaryBranch({
+          sandbox,
+          repoPath,
+          githubToken,
+          currentBranch,
+          repoOwner,
+          repoApiName,
+          userId,
+          tempBranchPrefix: "rebase",
+        })
+        if (!rebasePush.ok) {
+          const { gitMessage, responseError } = tempBranchPushError(
+            rebasePush,
+            "Rebase failed",
+            "rebased commits"
+          )
+          if (chatId) {
+            await createGitOperationMessage(chatId, gitMessage, true)
+          }
+          return Response.json({ error: responseError }, { status: 500 })
+        }
+
+        // Success
+        if (chatId) {
+          await createGitOperationMessage(
+            chatId,
+            `Rebased ${currentBranch} onto ${targetBranch}.`,
+            false,
+            undefined,
+            currentBranch
+          )
+        }
+
+        return Response.json({ success: true })
+      }
+
+      case "abort-rebase": {
+        const abortResult = await sandbox.process.executeCommand(
+          `cd ${repoPath} && git rebase --abort 2>&1`
+        )
+        if (abortResult.exitCode) {
+          if (chatId) {
+            await createGitOperationMessage(chatId, `Rebase abort failed: ${abortResult.result.trim()}.`, true)
+          }
+          return Response.json({ error: "Abort failed: " + abortResult.result }, { status: 500 })
+        }
+        if (chatId) {
+          await createGitOperationMessage(chatId, `Rebase aborted.`)
+        }
+        return Response.json({ success: true })
+      }
+
+      case "abort-merge": {
+        const abortMergeResult = await sandbox.process.executeCommand(
+          `cd ${repoPath} && git merge --abort 2>&1`
+        )
+        if (abortMergeResult.exitCode) {
+          if (chatId) {
+            await createGitOperationMessage(chatId, `Merge abort failed: ${abortMergeResult.result.trim()}.`, true)
+          }
+          return Response.json({ error: "Abort failed: " + abortMergeResult.result }, { status: 500 })
+        }
+        if (chatId) {
+          await createGitOperationMessage(chatId, `Merge aborted.`)
+        }
+        return Response.json({ success: true })
+      }
+
+      case "check-rebase-status": {
+        // Passive poll (runs on mount). Never boot a stopped sandbox just to
+        // check status — report "nothing in progress" instead.
+        if (sandbox.state !== "started") {
+          return Response.json({ inRebase: false, inMerge: false, conflictedFiles: [] })
+        }
+        const rebaseCheck = await sandbox.process.executeCommand(
+          `test -d ${repoPath}/.git/rebase-merge -o -d ${repoPath}/.git/rebase-apply && echo "yes" || echo "no"`
+        )
+        const inRebase = rebaseCheck.result.trim() === "yes"
+
+        const mergeHeadCheck = await sandbox.process.executeCommand(
+          `test -f ${repoPath}/.git/MERGE_HEAD && echo "yes" || echo "no"`
+        )
+        const inMerge = mergeHeadCheck.result.trim() === "yes"
+
+        let conflictedFiles: string[] = []
+        if (inRebase || inMerge) {
+          conflictedFiles = await getConflictedFiles(sandbox, repoPath)
+        }
+
+        return Response.json({ inRebase, inMerge, conflictedFiles })
+      }
+
+      case "force-push": {
+        // Force-push to sync diverged history while preserving PRs.
+        // GitHub's update-ref API requires the SHA to already exist on GitHub,
+        // so we push to a temp branch first to ship the objects, then PATCH the
+        // real branch ref to that SHA, then delete the temp remote branch.
+        if (!currentBranch || !repoOwner || !repoApiName) {
+          return Response.json({ error: "Missing required fields for force-push" }, { status: 400 })
+        }
+
+        const forcePush = await pushViaTemporaryBranch({
+          sandbox,
+          repoPath,
+          githubToken,
+          currentBranch,
+          repoOwner,
+          repoApiName,
+          userId,
+          tempBranchPrefix: "force-push",
+        })
+        if (!forcePush.ok) {
+          const { gitMessage, responseError } = tempBranchPushError(
+            forcePush,
+            "Force push failed",
+            "temp branch"
+          )
+          if (chatId) {
+            await createGitOperationMessage(chatId, gitMessage, true)
+          }
+          return Response.json({ error: responseError }, { status: 500 })
+        }
+
+        // Success — replace the "Push failed" message (and its now-dead force
+        // push link) that prompted this action with the success line.
+        if (chatId) {
+          await clearPushFailureMessages(chatId)
+          await createGitOperationMessage(
+            chatId,
+            `Force pushed ${currentBranch}.`,
+            false,
+            undefined,
+            currentBranch
+          )
+        }
+
+        return Response.json({ success: true })
+      }
+
+      case "delete-remote-branch": {
+        if (!currentBranch || !repoOwner || !repoApiName) {
+          return Response.json({ error: "Missing required fields for delete-remote-branch" }, { status: 400 })
+        }
+        // Delete remote branch via GitHub API
+        const deleteRes = await fetch(
+          `https://api.github.com/repos/${repoOwner}/${repoApiName}/git/refs/heads/${currentBranch}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${githubToken}`,
+              Accept: "application/vnd.github.v3+json",
+            },
+          }
+        )
+        if (!deleteRes.ok && deleteRes.status !== 404) {
+          const deleteData = await deleteRes.json().catch(() => ({}))
+          return Response.json({ error: "Delete failed: " + ((deleteData as { message?: string }).message || deleteRes.status) }, { status: 500 })
+        }
+        return Response.json({ success: true })
+      }
+
+      default:
+        return Response.json({ error: `Unknown action: ${action}` }, { status: 400 })
+    }
+  } catch (error: unknown) {
+    console.error("[sandbox/git] Error:", error)
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return Response.json({ error: message }, { status: 500 })
+  }
+}

@@ -1,0 +1,156 @@
+/**
+ * Streaming E2E Tests
+ *
+ * Tests run serially and reuse the same sandbox for speed.
+ * First test creates the sandbox (~30-60s), the second reuses it.
+ */
+
+import { test, expect, Page, BrowserContext } from "@playwright/test"
+
+/**
+ * Sets up test authentication by calling the test auth endpoint
+ * and setting the session cookie
+ */
+async function setupTestAuth(page: Page, context: BrowserContext) {
+  // Call test auth endpoint to get session token
+  const response = await page.request.post("/api/test/auth")
+
+  if (!response.ok()) {
+    const body = await response.text()
+    throw new Error(`Failed to get test auth: ${response.status()} - ${body}`)
+  }
+
+  const { token } = await response.json()
+
+  // Set the session cookie with proper options
+  await context.addCookies([
+    {
+      name: "next-auth.session-token",
+      value: token,
+      domain: "localhost",
+      path: "/",
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax",
+    },
+  ])
+}
+
+// Use describe.serial so tests run in order and share state (same sandbox)
+test.describe.serial("Chat Streaming", () => {
+  test.beforeEach(async ({ page, context }) => {
+    await setupTestAuth(page, context)
+  })
+
+  // Test 1: Creates sandbox (slow), sends message, verifies streaming infrastructure.
+  // Whatever the default agent resolves to via credential flags is fine — we
+  // just need the streaming pipeline to work end-to-end.
+  test("sends message and receives streamed response", async ({ page }) => {
+    await page.goto("/")
+
+    // Wait for the app to load
+    await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 10000 })
+
+    // Wait for the session to hydrate. If we press Enter before NextAuth has
+    // populated `session`, handleSendMessage opens the sign-in modal and the
+    // message is stashed — the chat is never created.
+    await expect(page.getByText("test@playwright.local")).toBeVisible({ timeout: 10000 })
+
+    // Type and send a message
+    const input = page.getByTestId("chat-input")
+    await input.click() // Focus the input
+    await input.fill("Hello, how are you feeling today?")
+    await input.press("Enter") // Use input.press instead of keyboard.press
+
+    // User message should appear immediately
+    await expect(page.getByTestId("user-message")).toContainText(
+      "Hello, how are you feeling today?"
+    )
+
+    // Chat status should change to "creating" or "running" (sandbox creation starts)
+    await expect(page.getByTestId("chat-container")).toHaveAttribute(
+      "data-chat-status",
+      /^(creating|running|ready|error)$/,
+      { timeout: 30000 }
+    )
+
+    // Wait for assistant message placeholder to appear (proves sandbox created and agent started)
+    const assistantMessage = page.getByTestId("assistant-message").last()
+    await expect(assistantMessage).toBeVisible({ timeout: 90000 })
+
+    // Wait for streaming to complete (status changes from "running" to "ready" or "error")
+    await expect(page.getByTestId("chat-container")).toHaveAttribute(
+      "data-chat-status",
+      /^(ready|error)$/,
+      { timeout: 120000 }
+    )
+
+    // Get final status
+    const status = await page.getByTestId("chat-container").getAttribute("data-chat-status")
+
+    // If successful, verify content exists
+    if (status === "ready") {
+      const content = await assistantMessage.textContent()
+      expect(content).toBeTruthy()
+      expect(content!.length).toBeGreaterThan(0)
+
+      // KEY TEST: Verify content doesn't disappear after streaming ends
+      // This catches the bug where stopStream() was deleting accumulated content
+      // before it was saved to the chat state
+      // Check multiple times over 5 seconds to catch any delayed state overwrites
+      for (let i = 1; i <= 5; i++) {
+        await page.waitForTimeout(1000)
+        const contentAfterDelay = await assistantMessage.textContent()
+        expect(contentAfterDelay).toBe(content) // Content should be stable
+        expect(contentAfterDelay!.length).toBeGreaterThan(0) // Still has content
+      }
+    }
+
+    // Key assertion: The streaming infrastructure worked - messages were persisted to DB
+    // (We verify this by checking the message IDs are stable across the page)
+    const messageId = await assistantMessage.getAttribute("data-message-id")
+    expect(messageId).toBeTruthy()
+  })
+
+  // Test 2: Reuses sandbox from test 1, sends another message (fast)
+  test("second message reuses existing sandbox", async ({ page }) => {
+    await page.goto("/")
+
+    // Wait for the app to load and verify we're authenticated
+    await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText("test@playwright.local")).toBeVisible({ timeout: 10000 })
+
+    // Wait for chats to load from server (they should be fetched on load)
+    // The sidebar shows existing chats from the database
+    const chatItem = page.locator('[data-testid="chat-item"]').first()
+    await expect(chatItem).toBeVisible({ timeout: 30000 })
+
+    // Click on the existing chat
+    await chatItem.click()
+
+    // Wait for chat to actually load (status should change)
+    await page.waitForFunction(() => {
+      const container = document.querySelector('[data-testid="chat-container"]')
+      return container && container.getAttribute("data-chat-id")
+    }, { timeout: 10000 })
+
+    // Now should see messages from previous test
+    await expect(page.getByTestId("user-message")).toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId("assistant-message")).toBeVisible({ timeout: 10000 })
+
+    // Send another message (no sandbox creation needed - fast!)
+    await page.getByTestId("chat-input").fill("Tell me more about that")
+    await page.keyboard.press("Enter")
+
+    // Wait for response (allow error state too)
+    await expect(page.getByTestId("chat-container")).toHaveAttribute(
+      "data-chat-status",
+      /^(ready|error)$/,
+      { timeout: 60000 }
+    )
+
+    // Should now have 2 user messages and 2 assistant messages
+    await expect(page.getByTestId("user-message")).toHaveCount(2)
+    await expect(page.getByTestId("assistant-message")).toHaveCount(2)
+  })
+})

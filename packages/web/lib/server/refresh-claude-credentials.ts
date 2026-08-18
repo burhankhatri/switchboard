@@ -1,0 +1,183 @@
+/**
+ * Server-only orchestration for refreshing the shared Claude credential pool.
+ *
+ * This is the ONLY module (besides the seed CLI) that imports the heavy
+ * @background-agents/claude-credentials generator, which pulls in
+ * @daytonaio/sdk -> @opentelemetry -> @grpc (Node-only). It's kept separate
+ * from lib/claude-credentials.ts so the read helpers that sit on hot request
+ * paths stay Prisma-weight. All DB access is delegated to that data-access
+ * layer; this module only composes it with the generator.
+ */
+
+// Enforces the server-only contract and, more importantly, quarantines the
+// gRPC-heavy generator import to this file.
+import "server-only"
+import {
+  generateClaudeCredentials,
+  RefreshTokenExpiredError,
+  isClaudeOAuthCredentials,
+  CLAUDE_COOKIES_KEY,
+  type ClaudeOAuthCredentials,
+} from "@background-agents/claude-credentials"
+import {
+  readCredentials,
+  writeCredentials,
+  getCookies,
+  recordCcAuthRun,
+} from "@/lib/claude-credentials"
+
+// Skip refresh while the live credential still has at least this much life.
+// Anthropic OAuth access tokens are 8h-lived, so 2h leaves us 6 hours of cron
+// retries before stale-token risk.
+const SKIP_THRESHOLD_MS = 2 * 60 * 60 * 1000
+
+export type RefreshResult =
+  | { status: "skipped"; expiresAt: number }
+  | { status: "refreshed"; expiresAt: number }
+  | {
+      status: "error"
+      code: "COOKIES_UNAVAILABLE" | "CCAUTH_FAILED" | "REFRESH_FAILED"
+      message: string
+    }
+
+/**
+ * Regenerates the shared OAuth credentials from the stored cookies and upserts
+ * them into the `claude-credentials` row.
+ *
+ * Unless `force` is set, this no-ops (`{ status: "skipped" }`) while the current
+ * token still has more than SKIP_THRESHOLD_MS of life, so the cron can run
+ * frequently without hammering Daytona/ccauth.
+ *
+ * Returns an `error` variant (rather than throwing) for the two expected
+ * operational failures so callers can map them to HTTP responses:
+ *   - COOKIES_UNAVAILABLE — the cookies row hasn't been seeded.
+ *   - CCAUTH_FAILED       — ccauth couldn't mint a token (often expired cookies).
+ */
+export async function refreshCredentials(
+  opts: {
+    force?: boolean
+    /** Who triggered this run, recorded in the audit log. Defaults to "cron". */
+    trigger?: "cron" | "admin"
+    /** Whether the caller rotated the stored cookies just before this run. */
+    cookiesUpdated?: boolean
+  } = {},
+): Promise<RefreshResult> {
+  const startedAt = Date.now()
+  const result = await runRefresh(opts.force ?? false)
+  const durationMs = Date.now() - startedAt
+
+  // Append to the audit log powering the admin "Credentials" tab. Never let a
+  // logging failure mask the actual refresh outcome.
+  try {
+    await recordCcAuthRun({
+      status: result.status,
+      code: result.status === "error" ? result.code : null,
+      message: result.status === "error" ? result.message : null,
+      trigger: opts.trigger ?? "cron",
+      forced: opts.force ?? false,
+      cookiesUpdated: opts.cookiesUpdated ?? false,
+      durationMs,
+      expiresAt: result.status === "error" ? null : result.expiresAt,
+    })
+  } catch (err) {
+    console.error("[refresh-claude-credentials] Failed to record run:", err)
+  }
+
+  return result
+}
+
+async function runRefresh(force: boolean): Promise<RefreshResult> {
+  const existing = await readCredentials()
+
+  let current: ClaudeOAuthCredentials | null = null
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing)
+      if (isClaudeOAuthCredentials(parsed)) {
+        current = parsed
+        if (!force && current.claudeAiOauth.expiresAt - Date.now() > SKIP_THRESHOLD_MS) {
+          return { status: "skipped", expiresAt: current.claudeAiOauth.expiresAt }
+        }
+      }
+    } catch (err) {
+      // Malformed row — fall through and overwrite.
+      console.warn(
+        "[refresh-claude-credentials] Existing creds row unparseable:",
+        err,
+      )
+    }
+  }
+
+  // Preferred path: renew from the refresh token — a plain grant_type=refresh_token
+  // call in a lightweight sandbox, no browser/Cloudflare. Only when the refresh
+  // token itself is expired do we fall through to the full cookie-based flow.
+  const refreshToken = current?.claudeAiOauth.refreshToken
+  if (refreshToken) {
+    try {
+      const creds = await generateClaudeCredentials({ refreshToken })
+      await writeCredentials(JSON.stringify(creds))
+      return { status: "refreshed", expiresAt: creds.claudeAiOauth.expiresAt }
+    } catch (err) {
+      if (err instanceof RefreshTokenExpiredError) {
+        console.warn(
+          "[refresh-claude-credentials] refresh token expired; falling back to ccauth:",
+          err.message,
+        )
+        // fall through to the cookie flow below
+      } else {
+        // Transient refresh failure — don't spin up the heavy ccauth browser
+        // flow; let the next run retry the cheap refresh.
+        console.error("[refresh-claude-credentials] token refresh failed:", err)
+        return {
+          status: "error",
+          code: "REFRESH_FAILED",
+          message: err instanceof Error ? err.message : String(err),
+        }
+      }
+    }
+  }
+
+  // Fallback: full cookie-based OAuth flow (first run, or refresh token expired).
+  const cookies = await getCookies()
+  if (!cookies) {
+    return {
+      status: "error",
+      code: "COOKIES_UNAVAILABLE",
+      message: `CcAuthInfo row '${CLAUDE_COOKIES_KEY}' not found — seed it first with npm run seed:ccauth.`,
+    }
+  }
+
+  let creds
+  try {
+    creds = await generateClaudeCredentials({ cookies })
+  } catch (err) {
+    console.error("[refresh-claude-credentials] ccauth failed:", err)
+    return {
+      status: "error",
+      code: "CCAUTH_FAILED",
+      message: err instanceof Error ? err.message : String(err),
+    }
+  }
+
+  await writeCredentials(JSON.stringify(creds))
+  return { status: "refreshed", expiresAt: creds.claudeAiOauth.expiresAt }
+}
+
+/**
+ * Maps a {@link RefreshResult} to the JSON HTTP response shared by every route
+ * that triggers a refresh (the hourly cron and the admin panel action), so the
+ * response shape stays in one place.
+ */
+export function refreshResultToResponse(result: RefreshResult): Response {
+  switch (result.status) {
+    case "skipped":
+      return Response.json({ skipped: true, expiresAt: result.expiresAt })
+    case "refreshed":
+      return Response.json({ refreshed: true, expiresAt: result.expiresAt })
+    case "error":
+      return Response.json(
+        { error: result.code, message: result.message },
+        { status: 500 },
+      )
+  }
+}

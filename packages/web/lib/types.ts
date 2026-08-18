@@ -1,0 +1,331 @@
+/**
+ * Types for Simple Chat
+ * Re-exports shared types from @background-agents/common
+ */
+
+// Re-export shared types
+export type {
+  ContentBlock,
+  ToolCall,
+} from "@background-agents/common"
+
+import type { ContentBlock } from "@background-agents/common"
+
+// Re-export agent types
+export type { Agent, ModelOption, CustomEndpoint, CustomEndpointType } from "@background-agents/common"
+export {
+  ALL_AGENTS,
+  agentModels,
+  agentLabels,
+  agentSupportsPlanMode,
+  getDefaultModelForAgent,
+  resolveModelForAgent,
+  resolveAgent,
+  resolveAgentAndModel,
+  getAgentModels,
+  getModelLabel,
+  hasCredentialsForModel,
+  sharedClaudePoolEligible,
+  agentHasFreeUsage,
+  agentSharedPoolExhausted,
+  agentIsReady,
+} from "@background-agents/common"
+
+// =============================================================================
+// Environment Variables
+// =============================================================================
+
+/** A single environment variable entry (for UI display) */
+export interface EnvVar {
+  id: string
+  key: string
+  value: string
+}
+
+/** Environment variables for chat and repository levels (for UI state) */
+export interface EnvironmentVariables {
+  chat: EnvVar[]
+  repository: EnvVar[]
+}
+
+// =============================================================================
+// Messages
+// =============================================================================
+
+/** Message type for distinguishing system messages from regular chat */
+export type MessageType = "chat" | "git-operation" | "error"
+
+/** Action types for git-operation messages */
+export type MessageAction = "force-push" | "view-pr" | "view-branch"
+
+/** Metadata for git-operation messages */
+export interface MessageMetadata {
+  /** Action hint for rendering clickable links */
+  action?: MessageAction
+  /** PR URL for view-pr action */
+  prUrl?: string
+  /** PR number for view-pr action */
+  prNumber?: number
+}
+
+export interface Message {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  timestamp: number
+  /** Which agent produced this message */
+  agent?: string
+  /** Which model produced this message */
+  model?: string
+  /** Type of message - defaults to "chat" for regular messages */
+  messageType?: MessageType
+  /** For git-operation messages, whether this is an error */
+  isError?: boolean
+  /** Tool calls made by the assistant */
+  toolCalls?: Array<{
+    tool: string
+    summary: string
+    fullSummary?: string
+    output?: string
+  }>
+  /** Ordered content blocks (text and tool calls interleaved) */
+  contentBlocks?: ContentBlock[]
+  /** Files uploaded with this message (for user messages) */
+  uploadedFiles?: string[]
+  /** For git-operation merge messages: the branch the link should point at on GitHub. */
+  linkBranch?: string
+  /** Flexible metadata for actions, links, etc. */
+  metadata?: MessageMetadata
+  /** True for messages carried over from a parent chat when this chat was
+   *  branched. They're shown read-only for context and aren't persisted on
+   *  this chat. */
+  inherited?: boolean
+}
+
+// Special value for new repository (local git repo, no GitHub)
+export const NEW_REPOSITORY = "__new__"
+
+/** A repo string that maps to a real GitHub repo (not a draft / new-repo chat). */
+export function isRealRepo(repo: string | undefined | null): repo is string {
+  return !!repo && repo !== NEW_REPOSITORY
+}
+
+// =============================================================================
+// Skills
+// =============================================================================
+
+export interface Skill {
+  id: string
+  repo: string
+  publisher: string
+  name: string
+  fullHandle: string
+  url: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface SkillSearchResult {
+  publisher: string
+  name: string
+  fullHandle: string
+  description: string
+  url: string
+}
+
+
+export interface Chat {
+  id: string
+
+  /**
+   * Workspace this chat runs in, when it has one. The workspace supplies the
+   * repo, branch and agent, so UI that would let the user change those must be
+   * hidden when this is set. Null for chats created before workspaces existed.
+   */
+  workspaceId?: string | null
+
+  // Repo config (set when chat created, IMMUTABLE after first message)
+  repo: string           // "owner/repo" or NEW_REPOSITORY for local repo
+  baseBranch: string     // "main" - what we branched FROM (ignored for NEW_REPOSITORY)
+
+  // Created on first message
+  branch: string | null         // "swift-lunar-abc1" - the NEW branch we created
+  sandboxId: string | null      // Daytona sandbox ID
+  sessionId: string | null      // Agent session ID for conversation continuity
+  previewUrlPattern?: string    // URL pattern for dev server previews
+
+  // Active execution (for recovery after page refresh)
+  backgroundSessionId?: string  // Set when agent starts, cleared on completion
+
+  // Agent config (per-chat, can be changed)
+  agent?: string        // "claude-code" | "opencode" | "codex" | etc.
+  model?: string        // Model ID for the agent
+  planModeEnabled?: boolean  // Whether plan mode is enabled for this chat
+
+  // Chat data
+  messages: Message[]
+  /** Server-side message count (used when messages aren't loaded yet) */
+  messageCount?: number
+  createdAt: number
+  updatedAt: number
+  /** Timestamp of last activity: user message sent, agent content received, or agent completion. Used for sort order. */
+  lastActiveAt?: number
+
+  /** Messages queued while the agent was running. The next one is dispatched automatically on completion. */
+  queuedMessages?: QueuedMessage[]
+  /** When true, auto-dispatch of queued messages is suspended (e.g. user clicked Stop). Cleared when the user sends or queues again. */
+  queuePaused?: boolean
+
+  // Display name (auto-generated from first prompt)
+  displayName: string | null
+
+  /** Public share token. When set, the chat is viewable read-only at
+   *  /share/<shareId> without auth. Null/undefined = private. */
+  shareId?: string | null
+
+  /** When true, the chat is hidden from the main sidebar list and shown in the
+   *  "Archived" section instead. Archiving preserves everything (including the
+   *  share link); it is reversible, unlike deletion. */
+  archived?: boolean
+
+  /** Pinned chats sort to the top of the sidebar and command palettes. */
+  pinned?: boolean
+
+  /** When this chat was branched from another chat, the parent's id. */
+  parentChatId?: string
+
+  /** Array of preview items open in this chat's preview pane.
+   *  Multiple items can be open and user can switch between them. */
+  previewItems?: Array<
+    | { type: "file"; filePath: string; filename: string }
+    | { type: "terminal"; id: string }
+    | { type: "server"; port: number; url: string }
+    | { type: "plan"; content: string; messageId: string }
+  >
+
+  /** Index of the currently active preview item in previewItems array */
+  activePreviewIndex?: number
+
+  /** Whether the preview pane is hidden (items preserved but pane collapsed) */
+  previewPaneHidden?: boolean
+
+  // Status
+  status: ChatStatus
+
+  /** Last agent/streaming error message, surfaced when status is "error"
+   *  (real agent error → Retry) or "disconnected" (SSE stream died → Reload).
+   *  Cleared on the next send. */
+  errorMessage?: string
+
+  /** When status is "error", classifies the failure. "crash" = the agent
+   *  process exited without completing — often transient, so the UI offers
+   *  Reload (when partial output streamed) instead of Retry. "incomplete" = the
+   *  turn ended with no terminal event and no output; the agent may still be
+   *  running in the background, so the UI offers Reload instead of Retry.
+   *  Cleared on the next send. */
+  errorKind?: "crash" | "incomplete"
+
+  /** Set when a merge targets this branch but sandbox was stopped. Triggers pull on next execute. */
+  needsSync?: boolean
+
+  /** Set if the last attempt to fetch this chat's messages from the server
+   *  failed. Suppresses auto-retry on subsequent selects until the user
+   *  explicitly retries. */
+  messagesLoadFailed?: boolean
+}
+
+export type ChatStatus =
+  | "pending"
+  | "creating"
+  | "ready"
+  | "running"
+  /** The agent itself returned an error. Recovery: resend the last message (Retry). */
+  | "error"
+  /** The SSE stream died before the turn finished. The agent may still be
+   *  running in the background; recovery: refresh the chat history (Reload). */
+  | "disconnected"
+
+/** A message that the user submitted while the agent was busy. Files are not persisted. */
+export interface QueuedMessage {
+  id: string
+  content: string
+  agent?: string
+  model?: string
+}
+
+export type Theme = "light" | "dark" | "system"
+
+export interface Settings {
+  // null means "no preference" — resolve via getDefaultAgent() at the call site.
+  defaultAgent: string | null
+  defaultModel: string | null
+  theme: Theme
+  /** When true, run pre-push hooks during autopush (removes --no-verify flag) */
+  enablePrepushHooks: boolean
+  /** Notify (toast on web, native notification on desktop) when an agent turn finishes */
+  notifyOnAgentFinished: boolean
+  /** Notify when an agent's auto-push delivers new commits */
+  notifyOnAgentCommitted: boolean
+  /** Developer: expose the Eliza test agent in the agent picker (off by default) */
+  elizaEnabled: boolean
+  /** Play a sound when a notification is shown */
+  notificationSound: boolean
+}
+
+export type { CredentialId, Credentials, CredentialFlags } from "./credentials"
+
+// Re-export GitHub types from common
+export type { GitHubRepo, GitHubBranch, GitHubUser } from "@background-agents/common"
+
+// File upload types
+export interface PendingFile {
+  id: string
+  file: File
+  name: string
+  size: number
+}
+
+// =============================================================================
+// SSE Event Types
+// =============================================================================
+
+export interface SSEUpdateEvent {
+  status: "running" | "completed" | "error"
+  content: string
+  toolCalls: Array<{
+    tool: string
+    summary: string
+    fullSummary?: string
+    output?: string
+  }>
+  contentBlocks: Array<
+    | { type: "text"; text: string }
+    | { type: "tool_calls"; toolCalls: Array<{ tool: string; summary: string; fullSummary?: string; output?: string }> }
+  >
+  cursor: number
+  sessionId?: string
+  error?: string
+}
+
+export interface SSECompleteEvent {
+  status: "completed" | "error"
+  sessionId?: string
+  error?: string
+  /** When status is "error", classifies the failure. "crash" = the agent
+   *  process exited without completing; "incomplete" = the turn ended with no
+   *  terminal event and no output → the UI may offer Reload over Retry. */
+  errorKind?: "crash" | "incomplete"
+  cursor: number
+  /** Conflict state after agent completion - allows frontend to update warning icon */
+  conflictState?: {
+    inRebase: boolean
+    inMerge: boolean
+    conflictedFiles: string[]
+  }
+  /** Set when the post-completion auto-push transferred new commits to the remote */
+  push?: {
+    branch: string
+    commits: number
+    commitSha?: string
+  }
+}

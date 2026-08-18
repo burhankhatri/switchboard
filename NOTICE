@@ -1,0 +1,18 @@
+Switchboard
+Copyright 2026 Burhan Khatri
+
+This product includes software developed as part of background-agents
+(https://github.com/jamesmurdza/background-agents):
+
+  Copyright 2026 James Murdza
+  Copyright 2026 Daytona Platforms Inc.
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Significant changes made in this derivative work:
+  - Added a Workspace model: a workspace is a folder in one private git repo
+    carrying the skills, scripts and connections for one kind of work.
+  - Added workspace membership, sharing, and connection (env) management with
+    encrypted-at-rest storage and membership-gated injection.
+  - Added sparse cloning so a run fetches only its own workspace's assets.
+  - Added workspace file browsing, editing and upload, committing to the repo.
+  - Rebranded the product and reworked the interface around workspaces.

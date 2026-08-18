@@ -1,0 +1,593 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Subscription tier. See User.plan.
+enum Plan {
+  free
+  pro
+  unlimited
+}
+
+// =============================================================================
+// User - linked to GitHub OAuth
+// =============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  emailVerified DateTime?
+  githubId      String?   @unique
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Admin flag for analytics dashboard access
+  isAdmin Boolean @default(false)
+
+  // Subscription tier governing shared-pool budgets:
+  //   free      → per-provider daily budget
+  //   pro        → 2× the free daily budget
+  //   unlimited  → no shared-pool cap
+  plan Plan @default(free)
+
+  // JSONB for flexible settings storage (no migrations needed for new fields)
+  // { defaultAgent, defaultModel, theme }
+  settings Json?
+
+  // JSONB for encrypted credentials (no migrations needed for new keys)
+  // { anthropicApiKey, anthropicAuthToken, openaiApiKey, opencodeApiKey, geminiApiKey }
+  credentials Json?
+
+  // JSONB for encrypted repository-level environment variables
+  // { "owner/repo": { "KEY1": "encrypted_value1", ... }, ... }
+  repoEnvironmentVariables Json?
+
+  // JSONB list of user-defined custom endpoints (Custom endpoints settings tab).
+  // Array<{ id, name, type: "anthropic"|"codex"|"opencode", baseUrl, model, headers }>
+  // where `headers` is encrypted at rest (it can carry auth); the rest is plaintext.
+  customEndpoints Json?
+
+  // GitHub App installation id, captured in the install callback. Null until
+  // the user installs our GitHub App. Used to mint short-lived installation
+  // access tokens at agent-run time so the agent can call GitHub's MCP server
+  // with properly-scoped credentials.
+  githubAppInstallationId String?
+
+  chats         Chat[]
+  accounts      Account[]
+  sessions      Session[]
+  activityLogs  ActivityLog[]
+  scheduledJobs ScheduledJob[]
+  skills        Skill[]
+  workspaces    Workspace[]
+  workspaceMemberships WorkspaceMember[]
+  tokenUsages   TokenUsage[]
+}
+
+// =============================================================================
+// NextAuth.js required tables
+// =============================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  // GitHub returns this on the OAuth token response. NextAuth's Prisma adapter
+  // forwards the provider's payload to account.create() verbatim, so a column
+  // it does not know about is not ignored — it fails the whole callback with
+  // "Unknown argument", which surfaces to the user as ?error=Callback.
+  refresh_token_expires_in Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// =============================================================================
+// Chat - server-owned resource with server-generated IDs
+// =============================================================================
+
+model Chat {
+  id     String @id @default(cuid())
+  userId String
+
+  // The workspace this chat runs in. Nullable so chats created before
+  // workspaces existed keep working off Chat.repo/baseBranch alone.
+  workspaceId String?
+
+  // Repo config (immutable after first message)
+  repo       String // "owner/repo" or "__new__"
+  baseBranch String @default("main")
+
+  // Sandbox-related fields (synced cloud resources)
+  branch              String? // Git branch name created for this chat
+  sandboxId           String? // Daytona sandbox ID
+  sessionId           String? // Agent session ID for conversation continuity
+  previewUrlPattern   String? // URL pattern for dev server previews
+  backgroundSessionId String? // Active execution ID (for recovery)
+
+  // Agent config
+  agent           String  @default("opencode")
+  model           String?
+  planModeEnabled Boolean @default(false)
+
+  // Display
+  displayName String?
+  status      String  @default("pending") // pending, creating, ready, running, error
+
+  // Pinned chats are sorted to the top of the sidebar and command palettes.
+  pinned Boolean @default(false)
+
+  // Archived chats are hidden from the main sidebar list (shown in a separate
+  // "Archived" section) but otherwise fully preserved — including their public
+  // share link, which keeps working. Distinct from deletion, which is permanent.
+  archived Boolean @default(false)
+
+  // Public sharing: when set, this chat is viewable (read-only) at
+  // /share/<shareId> without authentication. Null = private. The token is
+  // unguessable and distinct from `id` so the private id never leaks.
+  shareId String? @unique
+
+  // Branching support
+  parentChatId String?
+  parentChat   Chat?   @relation("ChatBranches", fields: [parentChatId], references: [id], onDelete: SetNull)
+  childChats   Chat[]  @relation("ChatBranches")
+
+  // Timestamps
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lastActiveAt DateTime @default(now())
+
+  // Sync flag for git pull on next execution
+  needsSync Boolean @default(false)
+
+  // JSONB for encrypted chat-level environment variables
+  // { "KEY1": "encrypted_value1", ... }
+  environmentVariables Json?
+
+  // Relations
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace  Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  messages   Message[]
+  mcpServers McpServerConnection[]
+
+  // Link back to scheduled run (if this chat belongs to one)
+  scheduledJobRun ScheduledJobRun?
+
+  @@index([userId, updatedAt])
+  @@index([userId, lastActiveAt])
+  @@index([userId, archived])
+  @@index([workspaceId, updatedAt])
+}
+
+// =============================================================================
+// Workspace - a folder in a git repo that packages one kind of work
+// =============================================================================
+
+// A Workspace is nothing more than a folder in a git repo. It carries the skills,
+// the scripts, and the NAMES of the connections that kind of work needs. Loading a
+// workspace clones the repo into the sandbox and starts the agent with its cwd set
+// to <PATHS.PROJECT_DIR>/<path>, so Claude Code's skill discovery picks up both
+// `<path>/.claude/skills/` and any `.claude/skills/` at the repo root — the shared
+// set comes free from directory nesting, with no --add-dir.
+//
+// Workspaces are deliberately NOT user-scoped: every signed-in user sees all of
+// them, which is the whole point ("a skill someone builds becomes available to
+// everyone"). Attribution lives on Chat.userId and ScheduledJob.userId instead, so
+// sharing the workspace never costs us knowing who ran what.
+model Workspace {
+  id   String @id @default(cuid())
+  slug String @unique // "marketing-automation" — stable, URL-safe
+  name String // "Marketing Automation"
+
+  // Where the folder lives. `path` is repo-relative and must not be absolute or
+  // contain ".." — it is interpolated into the sandbox cwd.
+  repo       String // "owner/agent-workspaces"
+  path       String // "workspaces/marketing-automation"
+  baseBranch String @default("main")
+
+  // Agent config, same vocabulary as Chat. `agent` is the harness: swapping
+  // "claude" -> "opencode" is this one value (see the packages/sdk registry).
+  agent        String  @default("claude")
+  model        String?
+  systemPrompt String? @db.Text
+
+  // JSONB for encrypted workspace-level environment variables:
+  // { "KEY1": "encrypted_value1", ... }
+  // These are SHARED connections. Unlike Chat.environmentVariables they must not
+  // be shadowable by a single user's chat-level override.
+  environmentVariables Json?
+
+  // Hides the workspace from the picker without breaking existing chats or history.
+  archived Boolean @default(false)
+
+  // Who created it. Restrict, not Cascade: deleting a user must never take a
+  // shared workspace (and everyone else's chats) down with it.
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chats         Chat[]
+  scheduledJobs ScheduledJob[]
+  members       WorkspaceMember[]
+
+  @@index([archived, name])
+}
+
+// Membership is what "join a workspace" means. It is deliberately separate from
+// visibility: every signed-in user can SEE the workspace list (that is how you
+// find something to join), but joining is an explicit act that puts the
+// workspace in your sidebar and lets you start runs in it.
+//
+// Cascade on both sides — a membership has no meaning once either the user or
+// the workspace is gone. This is different from Workspace.createdBy, which is
+// Restrict precisely so a departing creator cannot delete shared work.
+model WorkspaceMember {
+  id          String @id @default(cuid())
+  workspaceId String
+  userId      String
+
+  // "owner" may edit workspace settings and remove members; "member" may run.
+  role String @default("member")
+
+  joinedAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// =============================================================================
+// McpServerConnection - per-owner MCP connections (via Smithery Connect)
+// =============================================================================
+// One row per attached MCP server. Owners are either Chat or ScheduledJob —
+// modelled as two nullable FKs so each side keeps its own CASCADE on delete.
+// Exactly one of (chatId, scheduledJobId) is set; the CHECK constraint added
+// in the migration enforces that at the DB level since Prisma can't model it.
+
+model McpServerConnection {
+  id             String  @id @default(cuid())
+  chatId         String?
+  scheduledJobId String?
+
+  // Identity from Smithery's registry
+  qualifiedName String // e.g. "exa/exa-search" — stable handle
+  displayName   String
+  iconUrl       String?
+
+  // Smithery Connect connection details. Null for non-Smithery rows (e.g. the
+  // GitHub MCP row, which goes directly to api.githubcopilot.com).
+  smitheryConnectionId String?
+  smitheryNamespace    String?
+  mcpUrl               String // remote MCP endpoint the agent will call
+
+  // Encrypted Smithery API key used to call mcpUrl. Stored per-row so that
+  // rotating the global key doesn't silently break existing connections.
+  encryptedApiKey String? @db.Text
+
+  // Lifecycle
+  status    String  @default("pending") // pending | connected | error
+  lastError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chat         Chat?         @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  scheduledJob ScheduledJob? @relation(fields: [scheduledJobId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, qualifiedName])
+  @@unique([scheduledJobId, qualifiedName])
+  @@index([chatId])
+  @@index([scheduledJobId])
+}
+
+// =============================================================================
+// Message - server-generated IDs, ordered by timestamp
+// =============================================================================
+
+model Message {
+  id     String @id @default(cuid())
+  chatId String
+
+  role      String // "user" | "assistant"
+  content   String @db.Text
+  timestamp BigInt // Unix timestamp in milliseconds
+
+  // Which agent/model produced this message (nullable for old messages)
+  agent String?
+  model String?
+
+  // Optional fields
+  messageType String? // "chat" | "git-operation"
+  isError     Boolean @default(false)
+
+  // JSONB for complex nested data (avoids separate tables)
+  toolCalls     Json? // Array<{ tool, summary, fullSummary?, output? }>
+  contentBlocks Json? // Array<ContentBlock>
+  uploadedFiles Json? // Array<string> - file paths
+
+  // Git operation message fields
+  linkBranch String?
+
+  // Flexible metadata for actions, links, etc.
+  // { action?: "force-push" | "view-pr" | "view-branch", prUrl?: string, ... }
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, timestamp])
+  @@index([chatId, id])
+}
+
+// =============================================================================
+// CcAuthInfo - kv blobs managed by ccauth + /api/cron/refresh-claude-creds
+// =============================================================================
+// Two well-known rows:
+//   id="claude-cookies":     { value: "<claude.ai cookies JSON>" }
+//   id="claude-credentials": { value: '{"claudeAiOauth":{...}}' }
+// Stored as text (not JSONB) — we hand the raw string to the agent's
+// CLAUDE_CODE_CREDENTIALS env var without re-serializing.
+
+model CcAuthInfo {
+  id        String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+// =============================================================================
+// CcAuthRun - audit log of every Claude credential refresh attempt
+// =============================================================================
+// One row per call to refreshCredentials() (hourly cron or admin panel action).
+// Powers the "Credentials" admin tab so operators can see refresh history,
+// durations, and failures at a glance. `durationMs` is the wall-clock time of
+// the whole attempt (the ccauth run in Daytona dominates real refreshes; skips
+// are near-instant).
+
+model CcAuthRun {
+  id             String    @id @default(cuid())
+  status         String // "skipped" | "refreshed" | "error"
+  code           String? // error code when status = "error": "COOKIES_UNAVAILABLE" | "CCAUTH_FAILED"
+  message        String?   @db.Text // error message when status = "error"
+  trigger        String // "cron" | "admin"
+  forced         Boolean   @default(false) // whether the skip-while-fresh threshold was bypassed
+  cookiesUpdated Boolean   @default(false) // whether this run also rotated the stored cookies
+  durationMs     Int // wall-clock duration of the attempt
+  expiresAt      DateTime? // resulting token expiry, when known (skipped/refreshed)
+  createdAt      DateTime  @default(now())
+
+  @@index([createdAt])
+}
+
+// =============================================================================
+// ActivityLog - tracks user actions for admin analytics
+// =============================================================================
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String // "login" | "logout" | "chat_created" | "chat_deleted" | "message_sent" | "settings_updated" | "admin_promoted" | "admin_demoted"
+  metadata  Json? // Flexible payload: { chatId, targetUserId, repo, model, etc. }
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// TokenUsage - per-turn token + cost ledger for rate limiting & analytics
+// =============================================================================
+// One row per (assistant turn × model). Values are the DELTA for that turn,
+// computed by diffing tokscale's cumulative-per-session totals against the
+// previous capture for the same (sessionId, model). The cumulative snapshot is
+// stored alongside the delta so the next turn knows what to diff against.
+//
+// `pool` distinguishes shared-credential usage ("shared") from a user's own key
+// ("user") — the dimension tokscale cannot know, stamped by the app at run time.
+// `provider` is our internal agent id (claude | gemini | opencode | ...);
+// `model` is the model id as reported by tokscale (e.g. "claude-opus-4-8").
+
+model TokenUsage {
+  id        String  @id @default(cuid())
+  userId    String
+  chatId    String?
+  messageId String? // assistant Message this delta is attributed to
+
+  provider String // internal agent id: "claude" | "gemini" | "opencode" | ...
+  model    String? // model id reported by tokscale
+  pool     String // "shared" | "user"
+
+  // Free models (e.g. OpenCode's free tier) are recorded for overall totals but
+  // excluded from shared-pool budgets/limits. Set at write time via isFreeModel.
+  freeModel Boolean @default(false)
+
+  // Per-turn delta (diff of tokscale cumulative session totals)
+  inputTokens      Int   @default(0)
+  outputTokens     Int   @default(0)
+  cacheReadTokens  Int   @default(0)
+  cacheWriteTokens Int   @default(0)
+  reasoningTokens  Int   @default(0)
+  totalTokens      Int   @default(0)
+  costUsd          Float @default(0)
+
+  // tokscale's self-reported attribution quality (0..1); low = under-counted turn.
+  coverage Float?
+
+  // Diff cursor: the agent session id (tokscale groupBy=session) and the
+  // cumulative totals at capture time, so the next turn computes its delta.
+  sessionId       String
+  cumulativeTotal Int    @default(0)
+  cumulativeCost  Float  @default(0)
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, pool, createdAt]) // limiter aggregation
+  @@index([userId, createdAt])
+  @@index([provider, createdAt]) // admin per-provider rollups
+  @@index([sessionId, model, createdAt]) // diff-cursor lookup
+}
+
+// =============================================================================
+// ScheduledJob - Automated agent runs on a schedule
+// =============================================================================
+
+model ScheduledJob {
+  id     String @id @default(cuid())
+  userId String
+
+  // Scheduled runs resolve a workspace exactly like chats do, so cron and
+  // on-demand stay one code path. Nullable for pre-workspace jobs.
+  workspaceId String?
+
+  // Config
+  name       String
+  prompt     String  @db.Text
+  repo       String // "owner/repo"
+  baseBranch String
+  agent      String
+  model      String?
+
+  // Trigger configuration
+  triggerType   String  @default("interval") // "interval" | "incoming"
+  // URL-embedded token for triggerType "incoming" — anyone POSTing to
+  // /api/webhooks/in/<token> fires this job. Rotateable from the form.
+  incomingToken String? @unique
+
+  // Schedule (used when triggerType = "interval")
+  intervalMinutes Int // e.g., 360 = every 6 hours
+  enabled         Boolean  @default(true)
+  nextRunAt       DateTime
+
+  // Auto-PR
+  autoPR Boolean @default(true)
+
+  // Continue from last run
+  continueFromLastRun Boolean @default(false)
+
+  // Draft state — true while the user is still in the create-job modal after
+  // materializing the row to attach MCP servers. Drafts are filtered out of
+  // the list, the cron, and the Run Now endpoint. Flipped to false on the
+  // final Create submit; DELETEd on Cancel.
+  isDraft Boolean @default(false)
+
+  // Failure tracking
+  consecutiveFailures Int @default(0)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace  Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  runs       ScheduledJobRun[]
+  mcpServers McpServerConnection[]
+
+  @@index([userId])
+  @@index([enabled, nextRunAt])
+}
+
+// =============================================================================
+// ScheduledJobRun - Each execution of a scheduled job
+// =============================================================================
+
+model ScheduledJobRun {
+  id    String @id @default(cuid())
+  jobId String
+
+  // Execution
+  status      String // "pending" | "running" | "completed" | "error"
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  // Trigger context (for webhook-triggered runs)
+  // { workflowName, workflowUrl, branch, commitSha, failedAt }
+  triggerContext Json?
+
+  // Results
+  sandboxId           String?
+  backgroundSessionId String?
+  branch              String?
+  baseBranch          String? // The branch this run was created from
+  commitCount         Int     @default(0)
+  prUrl               String?
+  prNumber            Int?
+  error               String? @db.Text
+
+  // Link to chat for full message history
+  chatId String? @unique
+  chat   Chat?   @relation(fields: [chatId], references: [id])
+
+  job ScheduledJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, startedAt])
+  @@index([status])
+}
+
+// =============================================================================
+// Skill - repo-scoped skill manifests
+// =============================================================================
+
+model Skill {
+  id     String @id @default(cuid())
+  userId String
+  repo   String // "owner/repo" — which repo this skill belongs to
+
+  // Skill identity
+  publisher  String // e.g. "anthropic", "vercel"
+  name       String // e.g. "code-review"
+  fullHandle String // "publisher/name" — the install handle
+
+  // Source
+  url String? // Source URL (skills.sh link)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repo, fullHandle])
+  @@index([userId, repo])
+}

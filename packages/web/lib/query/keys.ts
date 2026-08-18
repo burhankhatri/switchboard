@@ -1,0 +1,59 @@
+/**
+ * Query key factory for TanStack Query
+ *
+ * Provides type-safe, hierarchical query keys for cache management.
+ * Keys are structured for easy invalidation at different granularities.
+ */
+
+export const queryKeys = {
+  // Chats
+  chats: {
+    all: ["chats"] as const,
+    list: () => [...queryKeys.chats.all, "list"] as const,
+    detail: (chatId: string) => [...queryKeys.chats.all, "detail", chatId] as const,
+    messages: (chatId: string) => [...queryKeys.chats.detail(chatId), "messages"] as const,
+  },
+
+  // Settings
+  settings: {
+    all: ["settings"] as const,
+  },
+
+  // GitHub
+  github: {
+    all: ["github"] as const,
+    user: () => [...queryKeys.github.all, "user"] as const,
+    repos: () => [...queryKeys.github.all, "repos"] as const,
+    branches: (owner: string, repo: string) =>
+      [...queryKeys.github.all, "branches", owner, repo] as const,
+    compare: (owner: string, repo: string, base: string, head: string) =>
+      [...queryKeys.github.all, "compare", owner, repo, base, head] as const,
+  },
+
+  // Sandbox
+  sandbox: {
+    all: ["sandbox"] as const,
+    servers: (sandboxId: string) => [...queryKeys.sandbox.all, "servers", sandboxId] as const,
+    files: (sandboxId: string, filePath: string) =>
+      [...queryKeys.sandbox.all, "files", sandboxId, filePath] as const,
+  },
+
+  // Admin
+  admin: {
+    all: ["admin"] as const,
+    stats: (range?: string, excludeAdmins?: boolean, metric?: string) =>
+      [...queryKeys.admin.all, "stats", range, excludeAdmins, metric] as const,
+    activity: (page: number, filters?: {
+      action?: string
+      userId?: string
+      agent?: string
+      model?: string
+      dateFrom?: string
+      dateTo?: string
+    }) => [...queryKeys.admin.all, "activity", { page, ...filters }] as const,
+    users: (page: number, search?: string, sortField?: string, sortOrder?: string) =>
+      [...queryKeys.admin.all, "users", { page, search, sortField, sortOrder }] as const,
+    topUsers: (range: string) => [...queryKeys.admin.all, "topUsers", range] as const,
+    ccAuthRuns: () => [...queryKeys.admin.all, "ccAuthRuns"] as const,
+  },
+}

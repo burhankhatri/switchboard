@@ -1,0 +1,56 @@
+/**
+ * Test-only authentication endpoint
+ *
+ * Creates a test user and returns a valid session token.
+ * ONLY enabled when ENABLE_TEST_AUTH=true (should only be set in test environments)
+ */
+
+import { prisma } from "@/lib/db/prisma"
+import { encode } from "next-auth/jwt"
+import { internalError } from "@/lib/db/api-helpers"
+
+export async function POST() {
+  // Safety check: only allow in test mode
+  if (process.env.ENABLE_TEST_AUTH !== "true") {
+    return Response.json(
+      { error: "Test auth not enabled. Set ENABLE_TEST_AUTH=true in test environment." },
+      { status: 403 }
+    )
+  }
+
+  try {
+    // Create or find test user
+    const user = await prisma.user.upsert({
+      where: { email: "test@playwright.local" },
+      update: {},
+      create: {
+        email: "test@playwright.local",
+        name: "Playwright Test User",
+      },
+    })
+
+    // Generate session token
+    const token = await encode({
+      token: {
+        sub: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      secret: process.env.NEXTAUTH_SECRET!,
+    })
+
+    return Response.json({
+      token,
+      userId: user.id,
+      email: user.email,
+    })
+  } catch (error) {
+    console.error("Test auth error:", error)
+    return internalError(error)
+  }
+}
+
+// Also support GET for easier testing
+export async function GET() {
+  return POST()
+}

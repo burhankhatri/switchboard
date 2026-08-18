@@ -1,0 +1,135 @@
+import type { ScheduledJob as PrismaScheduledJob, ScheduledJobRun as PrismaScheduledJobRun } from "@prisma/client"
+
+// =============================================================================
+// Shared types for scheduled jobs
+// =============================================================================
+
+/**
+ * Matches any RFC-4122 UUID. The form mints incoming-webhook tokens with
+ * crypto.randomUUID() (v4); the create/update routes validate against this
+ * before persisting a client-supplied token.
+ */
+export const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Subset of run fields included in lastRun
+ */
+export interface ScheduledJobLastRun {
+  id: string
+  status: string
+  startedAt: number
+  completedAt: number | null
+  prUrl: string | null
+  prNumber: number | null
+  error: string | null
+}
+
+/**
+ * API response type for a scheduled job run
+ */
+export interface ScheduledJobRun {
+  id: string
+  status: string
+  startedAt: number
+  completedAt: number | null
+  branch: string | null
+  baseBranch: string | null
+  commitCount: number
+  prUrl: string | null
+  prNumber: number | null
+  error: string | null
+  chatId: string | null
+}
+
+/**
+ * API response type for a scheduled job
+ */
+export interface ScheduledJob {
+  id: string
+  name: string
+  prompt: string
+  repo: string
+  baseBranch: string
+  agent: string
+  model: string | null
+  triggerType: "interval" | "incoming"
+  intervalMinutes: number
+  enabled: boolean
+  nextRunAt: number
+  autoPR: boolean
+  continueFromLastRun: boolean
+  consecutiveFailures: number
+  createdAt: number
+  updatedAt: number
+  lastRun: ScheduledJobLastRun | null
+  /** Present only when triggerType === "incoming". Used to build the webhook URL. */
+  incomingToken: string | null
+}
+
+// =============================================================================
+// Conversion helpers (Prisma -> API response)
+// =============================================================================
+
+/**
+ * Convert a Prisma ScheduledJobRun to API response format
+ */
+export function toScheduledJobRunResponse(run: PrismaScheduledJobRun): ScheduledJobRun {
+  return {
+    id: run.id,
+    status: run.status,
+    startedAt: run.startedAt.getTime(),
+    completedAt: run.completedAt?.getTime() ?? null,
+    branch: run.branch,
+    baseBranch: run.baseBranch,
+    commitCount: run.commitCount,
+    prUrl: run.prUrl,
+    prNumber: run.prNumber,
+    error: run.error,
+    chatId: run.chatId,
+  }
+}
+
+/**
+ * Convert a Prisma ScheduledJobRun to lastRun format (subset of fields)
+ */
+function toLastRunResponse(run: PrismaScheduledJobRun): ScheduledJobLastRun {
+  return {
+    id: run.id,
+    status: run.status,
+    startedAt: run.startedAt.getTime(),
+    completedAt: run.completedAt?.getTime() ?? null,
+    prUrl: run.prUrl,
+    prNumber: run.prNumber,
+    error: run.error,
+  }
+}
+
+/**
+ * Convert a Prisma ScheduledJob (with optional runs) to API response format
+ */
+export function toScheduledJobResponse(
+  job: PrismaScheduledJob & { runs?: PrismaScheduledJobRun[] }
+): ScheduledJob {
+  const lastRun = job.runs?.[0]
+  return {
+    id: job.id,
+    name: job.name,
+    prompt: job.prompt,
+    repo: job.repo,
+    baseBranch: job.baseBranch,
+    agent: job.agent,
+    model: job.model,
+    triggerType: (job.triggerType as "interval" | "incoming") ?? "interval",
+    intervalMinutes: job.intervalMinutes,
+    enabled: job.enabled,
+    nextRunAt: job.nextRunAt.getTime(),
+    autoPR: job.autoPR,
+    continueFromLastRun: job.continueFromLastRun,
+    consecutiveFailures: job.consecutiveFailures,
+    createdAt: job.createdAt.getTime(),
+    updatedAt: job.updatedAt.getTime(),
+    lastRun: lastRun ? toLastRunResponse(lastRun) : null,
+    incomingToken: job.incomingToken ?? null,
+  }
+}

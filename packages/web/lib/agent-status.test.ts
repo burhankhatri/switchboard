@@ -1,0 +1,115 @@
+/**
+ * Unit tests for the agent readiness/status logic behind the picker dot:
+ * agentSharedPoolExhausted plus its effect on agentHasFreeUsage / agentIsReady.
+ *
+ * Pure functions — no mocks. The interesting case is the Claude shared pool
+ * being used up: the picker should show a red ("exhausted") dot, not green.
+ */
+import { describe, it, expect } from "vitest"
+import {
+  agentSharedPoolExhausted,
+  agentHasFreeUsage,
+  agentIsReady,
+  hasCredentialsForModel,
+  type CredentialFlags,
+} from "@background-agents/common"
+
+const sharedPoolFresh: CredentialFlags = { CLAUDE_SHARED_POOL_AVAILABLE: true }
+const sharedPoolUsedUp: CredentialFlags = {
+  CLAUDE_SHARED_POOL_AVAILABLE: true,
+  CLAUDE_DAILY_LIMIT_EXCEEDED: true,
+}
+const ownKeyButLimit: CredentialFlags = {
+  CLAUDE_SHARED_POOL_AVAILABLE: true,
+  CLAUDE_DAILY_LIMIT_EXCEEDED: true,
+  ANTHROPIC_API_KEY: true,
+}
+
+describe("agentSharedPoolExhausted", () => {
+  it("is true when the Claude shared pool is used up and there's no own key", () => {
+    expect(agentSharedPoolExhausted("claude-code", sharedPoolUsedUp)).toBe(true)
+  })
+
+  it("is false when the shared pool still has budget", () => {
+    expect(agentSharedPoolExhausted("claude-code", sharedPoolFresh)).toBe(false)
+  })
+
+  it("is false when the user has their own Anthropic key to fall back on", () => {
+    expect(agentSharedPoolExhausted("claude-code", ownKeyButLimit)).toBe(false)
+  })
+
+  it("is false for agents without a metered shared pool", () => {
+    expect(agentSharedPoolExhausted("opencode", sharedPoolUsedUp)).toBe(false)
+    expect(agentSharedPoolExhausted("kilo", sharedPoolUsedUp)).toBe(false)
+  })
+})
+
+describe("readiness when the Claude pool is used up", () => {
+  it("no longer reports free usage (so the dot won't be green)", () => {
+    expect(agentHasFreeUsage("claude-code", sharedPoolFresh)).toBe(true)
+    expect(agentHasFreeUsage("claude-code", sharedPoolUsedUp)).toBe(false)
+  })
+
+  it("is not 'ready' when exhausted with no fallback credential", () => {
+    expect(agentIsReady("claude-code", sharedPoolFresh)).toBe(true)
+    expect(agentIsReady("claude-code", sharedPoolUsedUp)).toBe(false)
+  })
+
+  it("stays ready when the user has their own key despite the limit", () => {
+    expect(agentIsReady("claude-code", ownKeyButLimit)).toBe(true)
+  })
+})
+
+describe("shared Claude pool does not leak to non-claude-code agents", () => {
+  // The shared pool / subscription token is only injected server-side for
+  // claude-code (see resolveSendCredentials), so other agents' Claude models
+  // must require a real ANTHROPIC_API_KEY — otherwise the picker shows a green
+  // "ready" dot for an agent that would actually fail to run.
+  const anthropicModel = { value: "claude-sonnet-4-5", label: "Sonnet", requiresKey: "anthropic" as const }
+
+  it("does not treat goose as ready off the shared Claude pool alone", () => {
+    expect(agentIsReady("goose", sharedPoolFresh)).toBe(false)
+    expect(hasCredentialsForModel(anthropicModel, sharedPoolFresh, "goose")).toBe(false)
+  })
+
+  it("treats goose as ready once the user has their own Anthropic key", () => {
+    expect(hasCredentialsForModel(anthropicModel, { ANTHROPIC_API_KEY: true }, "goose")).toBe(true)
+    expect(agentIsReady("goose", { ANTHROPIC_API_KEY: true })).toBe(true)
+  })
+
+  it("still lets claude-code use the shared pool", () => {
+    expect(hasCredentialsForModel(anthropicModel, sharedPoolFresh, "claude-code")).toBe(true)
+  })
+})
+
+describe("shared Gemini pool unlocks Flash but not Pro", () => {
+  // The server-shared Gemini key backs only the cheaper Flash tier for free
+  // usage; Pro-tier Gemini models must stay locked until the user adds their
+  // own key. This holds across every agent that exposes a Gemini model.
+  const geminiShared: CredentialFlags = { GEMINI_API_KEY: true, GEMINI_API_KEY_SHARED: true }
+  const geminiOwnKey: CredentialFlags = {
+    GEMINI_API_KEY: true,
+    GEMINI_API_KEY_USER: true,
+  }
+  const flash = { value: "gemini-2.5-flash", label: "Flash", requiresKey: "gemini" as const }
+  const pro = { value: "gemini-2.5-pro", label: "Pro", requiresKey: "gemini" as const }
+  const pro3 = { value: "gemini-3-pro-preview", label: "Pro 3", requiresKey: "gemini" as const }
+  const piPro = { value: "google/gemini-2.5-pro", label: "Pro", requiresKey: "gemini" as const }
+
+  it("allows Flash models on the shared pool", () => {
+    expect(hasCredentialsForModel(flash, geminiShared, "gemini")).toBe(true)
+  })
+
+  it("blocks Pro models on the shared pool across agents", () => {
+    expect(hasCredentialsForModel(pro, geminiShared, "gemini")).toBe(false)
+    expect(hasCredentialsForModel(pro3, geminiShared, "gemini")).toBe(false)
+    expect(hasCredentialsForModel(pro, geminiShared, "droid")).toBe(false)
+    expect(hasCredentialsForModel(piPro, geminiShared, "pi")).toBe(false)
+  })
+
+  it("unlocks Pro once the user brings their own Gemini key", () => {
+    expect(hasCredentialsForModel(pro, geminiOwnKey, "gemini")).toBe(true)
+    expect(hasCredentialsForModel(pro3, geminiOwnKey, "gemini")).toBe(true)
+    expect(hasCredentialsForModel(piPro, geminiOwnKey, "pi")).toBe(true)
+  })
+})
