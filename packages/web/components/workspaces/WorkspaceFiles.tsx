@@ -25,6 +25,13 @@ function toTree(files: RepoFile[]): Node {
   return root
 }
 
+/**
+ * Uploads are committed as UTF-8 text, so this is for skills, scripts and data
+ * files — not binaries. The cap keeps a stray large file from being turned into
+ * a commit.
+ */
+const MAX_UPLOAD_BYTES = 256 * 1024
+
 /** git has no empty directories, so a new folder is a folder with a .gitkeep. */
 const GITKEEP = ".gitkeep"
 
@@ -89,6 +96,7 @@ export function WorkspaceFiles() {
   const { activeWorkspace, setOpenFile } = useWorkspace()
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
 
@@ -122,15 +130,22 @@ export function WorkspaceFiles() {
   async function addFiles(files: File[]) {
     // Sequential: each write is a commit, and GitHub rejects concurrent writes
     // to the same branch with a 409.
+    const failed: string[] = []
     for (const f of files) {
       setBusy(f.name)
       try {
+        if (f.size > MAX_UPLOAD_BYTES) {
+          throw new Error(`${f.name} is larger than ${MAX_UPLOAD_BYTES / 1024}KB`)
+        }
         await write.mutateAsync({ path: `${base}/${f.name}`, content: await f.text() })
-      } catch {
-        /* surfaced via write.error */
+      } catch (e) {
+        // Collect and report: a swallowed failure in a loop looked to the user
+        // like the upload silently doing nothing.
+        failed.push(`${f.name}: ${(e as Error).message}`)
       }
     }
     setBusy(null)
+    setUploadError(failed.length ? failed.join("; ") : null)
   }
 
   const prompt = (label: string, placeholder: string) => {
@@ -194,8 +209,10 @@ export function WorkspaceFiles() {
         </div>
       )}
       {error && <p className="px-2 py-1.5 text-xs text-muted-foreground">Could not load files.</p>}
-      {write.error && (
-        <p className="px-2 py-1.5 text-xs text-destructive">{(write.error as Error).message}</p>
+      {(write.error || uploadError) && (
+        <p className="px-2 py-1.5 text-xs text-destructive break-words">
+          {uploadError ?? (write.error as Error).message}
+        </p>
       )}
 
       {data && [...toTree(data.workspace).children.values()].map((c) => (
@@ -204,7 +221,7 @@ export function WorkspaceFiles() {
 
       {data && data.workspace.length === 0 && !isLoading && (
         <p className="px-2 py-2 text-xs text-muted-foreground">
-          No files yet. Drop some here.
+          No files yet. Drop text files here.
         </p>
       )}
 
