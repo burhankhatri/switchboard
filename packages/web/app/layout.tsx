@@ -47,11 +47,10 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{if(window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.classList.add('dark')}catch(e){}`,
-          }}
-        />
+        {/* The app ships a single light "premium" gradient theme (.premium-bg is
+            applied unconditionally with no dark variant). Auto-switching to dark
+            based on the OS left dark popovers/cards floating over the light
+            background — so we intentionally do not add the `.dark` class. */}
         {/* Prevent iOS text size adjustment */}
         <meta name="x-apple-disable-message-reformatting" />
       </head>
