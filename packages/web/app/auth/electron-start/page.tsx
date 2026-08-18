@@ -77,7 +77,7 @@ export default function ElectronStartPage() {
         <div className="text-center p-6 max-w-md">
           <div className="text-red-500 text-4xl mb-4">!</div>
           <h1 className="text-xl font-semibold mb-2 text-gray-900">Authentication Error</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <p className="text-gray-900 mb-6">{error}</p>
           <button
             onClick={() => {
               setError(null)
@@ -99,7 +99,7 @@ export default function ElectronStartPage() {
         <div className="text-center p-6 max-w-md">
           <div className="text-green-500 text-4xl mb-4">✓</div>
           <h1 className="text-xl font-semibold mb-2 text-gray-900">Signed in successfully!</h1>
-          <p className="text-gray-600">You can close this tab and return to the app.</p>
+          <p className="text-gray-900">You can close this tab and return to the app.</p>
         </div>
       </div>
     )
@@ -109,7 +109,7 @@ export default function ElectronStartPage() {
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="text-center">
         <div className="animate-spin h-8 w-8 border-2 border-gray-800 border-t-transparent rounded-full mx-auto mb-4" />
-        <p className="text-gray-600">
+        <p className="text-gray-900">
           {status === "loading"
             ? "Loading..."
             : status === "authenticated"
