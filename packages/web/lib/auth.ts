@@ -70,11 +70,35 @@ export const authOptions: NextAuthOptions = {
       return baseUrl
     },
     async signIn({ user, profile }) {
+      const login = (profile as { login?: string } | undefined)?.login
+
+      // Who may sign in at all.
+      //
+      // This matters more here than in most apps: any signed-in user can see
+      // the workspace list and join one, and joining a workspace is what causes
+      // its decrypted credentials to be injected into a sandbox. Deployed to a
+      // public URL without this, a stranger could sign in, join, and receive
+      // someone's CRM or ad-platform credential — and spend the org's sandbox
+      // quota doing it.
+      //
+      // Unset means "allow anyone", which is right for local development and
+      // wrong for anything reachable from the internet. Set
+      // ALLOWED_GITHUB_LOGINS to a comma-separated list of handles.
+      const allowed = (process.env.ALLOWED_GITHUB_LOGINS ?? "")
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+      if (allowed.length > 0) {
+        if (!login || !allowed.includes(login.toLowerCase())) {
+          console.warn(`[auth] refused sign-in for ${login ?? "unknown login"}`)
+          return false
+        }
+      }
+
       // Capture the GitHub handle. NextAuth's adapter stores name/email/image
       // but not the login, and the login is the only identifier a teammate
       // actually knows — "add burhankhatri" rather than an account id nobody
       // has seen. Best-effort: a failure here must not block signing in.
-      const login = (profile as { login?: string } | undefined)?.login
       if (user?.id && login) {
         prisma.user
           .update({ where: { id: user.id }, data: { githubLogin: login } })
