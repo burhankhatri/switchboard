@@ -1,15 +1,13 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { HelpCircle, Command, ChevronLeft, Boxes, ArrowLeft } from "lucide-react"
+import { ChevronLeft, Boxes, ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { WorkspaceFileViewer } from "@/components/workspaces/WorkspaceFileViewer"
 
 interface WelcomeViewProps {
   isMobile: boolean
-  onOpenCommandPalette?: () => void
-  onOpenHelp: () => void
   /** The composer input element, built by ChatPanel and shared with other views. */
   chatInput: ReactNode
   /** The file-preview modal element (or null), shared with other views. */
@@ -25,8 +23,6 @@ interface WelcomeViewProps {
  */
 export function WelcomeView({
   isMobile,
-  onOpenCommandPalette,
-  onOpenHelp,
   chatInput,
   filePreviewModal,
 }: WelcomeViewProps) {
@@ -41,27 +37,6 @@ export function WelcomeView({
           isMobile ? "p-4 pb-safe" : "p-4"
         )}
       >
-        {/* Top-right icon bar */}
-        <div className="absolute top-3 right-3 z-10 flex items-center gap-1">
-          {onOpenCommandPalette && (
-            <button
-              onClick={onOpenCommandPalette}
-              className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              title="Commands"
-              aria-label="Open commands"
-            >
-              <Command className="h-4 w-4" />
-            </button>
-          )}
-          <button
-            onClick={onOpenHelp}
-            className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            title="Help"
-            aria-label="Help"
-          >
-            <HelpCircle className="h-4 w-4" />
-          </button>
-        </div>
 
         {!ready ? null : openFile ? (
           <WorkspaceFileViewer />

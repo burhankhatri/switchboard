@@ -14,6 +14,7 @@ import type { Chat, Settings, CredentialFlags } from "@/lib/types"
 import { NEW_REPOSITORY, agentSupportsPlanMode } from "@/lib/types"
 import type { SlashCommandType } from "./SlashCommandMenu"
 import { useChatComposer } from "@/lib/hooks/useChatComposer"
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 
 interface ChatPanelProps {
   chat: Chat | null
@@ -67,6 +68,7 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
     onUpdateChat,
     onSlashCommand,
   })
+  const { activeWorkspace } = useWorkspace()
   const {
     modals,
     git,
@@ -120,7 +122,8 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
   // A chat in a workspace gets its repo FROM the workspace, so offering a repo
   // picker would let the composer contradict the workspace it is running in.
   // Only chats with no workspace (pre-workspace rows) still choose one.
-  const showRepoButton = !chat.workspaceId && (canSelectExistingRepo || canCreateRepo)
+  const showRepoButton =
+    !activeWorkspace && !chat.workspaceId && (canSelectExistingRepo || canCreateRepo)
   // Only show welcome screen if no messages AND not loading messages AND not a child chat
   const isNewChat = chat.messages.length === 0 && !chat.parentChatId && !isLoadingMessages
 
@@ -218,8 +221,6 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
     return (
       <WelcomeView
         isMobile={isMobile}
-        onOpenCommandPalette={onOpenCommandPalette}
-        onOpenHelp={() => modals.setHelpOpen(true)}
         chatInput={chatInput}
         filePreviewModal={filePreviewModal}
       />
