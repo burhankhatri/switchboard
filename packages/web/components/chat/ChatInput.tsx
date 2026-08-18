@@ -150,14 +150,27 @@ export function ChatActionSlot({
         >
           <Square className={cn(isMobile ? "h-3.5 w-3.5" : "h-3 w-3", "fill-current")} />
         </button>
-      ) : canSend ? (
+      ) : (
+        // Rendered disabled rather than omitted. With nothing to send this used
+        // to return null, so the composer's right edge had only the microphone
+        // floating against a wide gap and the bar read as unbalanced.
         <button
           type="button"
           onClick={onSend}
-          title={showBranchAffordance ? "Send to a new branch" : undefined}
+          disabled={!canSend}
+          title={
+            !canSend
+              ? undefined
+              : showBranchAffordance
+                ? "Send to a new branch"
+                : undefined
+          }
           aria-label={showBranchAffordance ? "Send to a new branch" : "Send message"}
           className={cn(
-            "flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 transition-colors cursor-pointer",
+            "flex items-center justify-center rounded-lg transition-colors",
+            canSend
+              ? "bg-ink text-white hover:opacity-90 active:scale-[0.94] cursor-pointer"
+              : "bg-line-strong text-ink-2 cursor-not-allowed",
             isMobile ? "h-9 w-9" : "h-7 w-7"
           )}
         >
@@ -167,7 +180,7 @@ export function ChatActionSlot({
             <ArrowUp className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />
           )}
         </button>
-      ) : null}
+      )}
     </div>
   )
 }

@@ -39,7 +39,11 @@ describe("ChatActionSlot", () => {
       expect(runningProps["data-testid"]).toBe("chat-action-slot")
       expect(idleProps["data-testid"]).toBe("chat-action-slot")
       expect(runningProps.className).toBe(idleProps.className)
-      expect(idleProps.children).toBeNull()
+      // Idle renders a DISABLED send rather than nothing: an empty slot left
+      // the composer's right edge unanchored, with the microphone floating
+      // against a wide gap.
+      expect(idleProps.children).not.toBeNull()
+      expect(idleProps.children?.props.disabled).toBe(true)
     }
   )
 
@@ -57,6 +61,11 @@ describe("ChatActionSlot", () => {
     {
       name: "send",
       state: { isRunning: false, canSend: true },
+      label: "Send message",
+    },
+    {
+      name: "disabled send",
+      state: { isRunning: false, canSend: false },
       label: "Send message",
     },
   ])("renders the $name action for its composer state", ({ state, label }) => {
