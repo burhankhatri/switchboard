@@ -82,33 +82,40 @@
 
 /* B. GlassContainer */
 .glassContainer {
-  background: var(--glass-bg);
+  background: var(--surface);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: 28px;
-  box-shadow: var(--glass-shadow);
-  padding: 20px 24px 16px 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  /* Tight: the controls inside are 28px and sit at a 6px inset, which keeps
+     the corner of a control concentric with the corner of the panel. The old
+     20/24px padding made the composer a slab with a small input floating in it. */
+  padding: 6px;
   width: 100%;
   margin-inline: auto;
   position: relative;
+  /* isolate + overflow so the sweep canvas is clipped to the panel and cannot
+     paint over anything outside it. */
+  isolation: isolate;
+  overflow: hidden;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .glassContainerFocus {
-  border-color: rgba(17, 17, 20, 0.28);
-  box-shadow: 0 12px 36px rgba(15, 15, 20, 0.16);
+  border-color: var(--line-strong);
 }
 
 /* C. TextInputArea */
 .textInputArea {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 24px;
-  font-size: 20px;
-  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink);
   cursor: text;
   position: relative;
   min-height: 28px;
+  padding: 5px 4px;
 }
 
 .customPlaceholderContainer {
@@ -121,7 +128,7 @@
 }
 
 .placeholder {
-  color: var(--text-secondary);
+  color: var(--ink-3);
 }
 
 .hiddenInput {
@@ -135,17 +142,21 @@
 /* Fallback for the real textarea */
 .realTextarea {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   outline: none;
-  color: var(--text-primary);
-  font-size: 20px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 18px;
   resize: none;
-  line-height: 1.4;
   padding: 0;
   margin: 0;
-  min-height: 28px;
-  overflow: hidden;
+  min-height: 18px;
+  /* Grows to a compact maximum, then scrolls — an unbounded composer pushes the
+     conversation off screen while you are still typing. */
+  max-height: 160px;
+  overflow-y: auto;
 }
 .realTextarea::placeholder {
   color: var(--text-secondary);
@@ -153,29 +164,33 @@
 
 /* D. PillButton */
 .pillBtn {
-  background: var(--pill-bg);
+  background: transparent;
   border: none;
-  border-radius: 20px;
-  padding: 8px 16px;
-  color: var(--text-primary);
-  font-size: 13px;
+  border-radius: 999px;
+  padding: 0 10px;
+  height: 28px;
+  color: var(--ink-2);
+  font-size: 12px;
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
+/* Call sites pass their own Tailwind sizes; this used to override every one of
+   them to 16px. Only a floor is set now. */
 .pillBtn svg {
-  width: 16px;
-  height: 16px;
+  flex-shrink: 0;
 }
 .pillBtn:hover {
-  background: var(--pill-bg-hover);
+  background: var(--hover);
+  color: var(--ink);
 }
 .pillBtn:active {
-  background: var(--pill-bg-active);
-  transform: scale(0.98);
+  background: var(--hover);
+  transform: scale(0.96);
 }
 .pillBtn:disabled {
   opacity: 0.5;
@@ -185,38 +200,40 @@
 
 /* E. IconButton */
 .iconOnly {
-  padding: 8px;
-  border-radius: 50%;
-  aspect-ratio: 1/1;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
   justify-content: center;
 }
 
 /* F. PrimaryAction */
 .primaryBtn {
-  background: var(--accent-primary);
-  color: white;
-  padding: 8px;
+  background: var(--ink);
+  color: #fff;
+  padding: 0;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: 50%;
+  border-radius: 8px;
   cursor: pointer;
-  aspect-ratio: 1/1;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .primaryBtn svg {
-  width: 16px;
-  height: 16px;
+  flex-shrink: 0;
 }
 .primaryBtn:hover {
   background: var(--accent-hover);
 }
 .primaryBtn:active {
-  transform: scale(0.95);
+  transform: scale(0.94);
 }
 .primaryBtn:disabled {
-  opacity: 0.5;
+  background: var(--line-strong);
+  color: var(--ink-2);
   cursor: not-allowed;
   transform: none;
 }

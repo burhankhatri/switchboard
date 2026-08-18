@@ -439,8 +439,9 @@ export function ChatInput({
           isMobile={isMobile}
         />
 
-        {/* Text input area */}
-        <div className="relative z-10 w-full mb-4">
+        {/* Text input area. The grid below decides whether this sits inline
+            with the controls or takes its own full-width row. */}
+        <div className="relative z-10 w-full">
           {/* Slash Command Menu */}
           {hasSlashCommands && (
             <SlashCommandMenu
@@ -489,8 +490,8 @@ export function ChatInput({
         {/* File upload error message */}
         {fileError && (
           <div className={cn(
-            "relative z-10 flex items-start gap-2 text-destructive bg-destructive/10 rounded-md",
-            isMobile ? "mx-3 mb-2 px-3 py-2 text-sm" : "mx-4 mb-2 px-3 py-2 text-xs"
+            "relative z-10 flex items-start gap-2 text-destructive bg-destructive/10 rounded-chip",
+            isMobile ? "mx-1 mb-1 px-2 py-1.5 text-sm" : "mx-1 mb-1 px-2 py-1.5 text-xs"
           )}>
             <AlertTriangle className={cn("shrink-0 mt-0.5", isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />
             <span className="flex-1">{fileError}</span>
@@ -504,12 +505,12 @@ export function ChatInput({
           </div>
         )}
 
-        {/* Bottom row with selectors. `relative z-10` is load-bearing: the drag
-            catcher above is absolute inset-0, and without a stacking context
-            here it covers this row and eats every click. */}
+        {/* Controls row. `relative z-10` is load-bearing: the drag catcher
+            above is absolute inset-0, and without a stacking context here it
+            covers this row and eats every click. */}
         <div className={cn(
-          "relative z-10 flex justify-between items-center mt-2 w-full",
-          isMobile ? "px-3 py-2" : "px-4 py-2"
+          "relative z-10 flex justify-between items-center w-full gap-1",
+          isMobile ? "px-1 pb-0.5" : "px-1 pb-0.5"
         )}>
           {/* Left group */}
           <div className="flex items-center" style={{ gap: '10px' }}>

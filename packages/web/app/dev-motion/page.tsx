@@ -4,6 +4,10 @@ import { LoadingState } from "@/components/ui/LoadingState"
 import { DictationControl } from "@/components/chat/DictationControl"
 import { useModelSweep } from "@/components/chat/ModelSweep"
 import { SelectionActions } from "@/components/workspaces/SelectionActions"
+import { GlassContainer } from "@/components/glass-ui/GlassContainer"
+import { PillButton, IconButton, PrimaryAction } from "@/components/glass-ui/Buttons"
+import { TextInputArea } from "@/components/glass-ui/TextInputArea"
+import { Plus, Pencil, ArrowUp } from "lucide-react"
 
 /**
  * Visual harness for the motion primitives.
@@ -45,6 +49,27 @@ export default function MotionDevPage() {
           <LoadingState label="Creating sandbox" variant="Drive" />
           <LoadingState label="Responding" variant="Dots" />
           <LoadingState label="Thinking" variant="Orbit" />
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-ink-2 text-sm">Composer chrome</h2>
+        <div className="w-full max-w-[52rem]" data-testid="composer">
+          <GlassContainer className="flex flex-col relative">
+            <div className="relative z-10 w-full">
+              <TextInputArea value="" onChange={() => {}} placeholder="Enter prompt or /merge..." />
+            </div>
+            <div className="relative z-10 flex justify-between items-center w-full gap-1 px-1 pb-0.5">
+              <div className="flex items-center gap-1">
+                <IconButton type="button" icon={<Plus className="h-3.5 w-3.5" />} />
+                <PillButton type="button" icon={<Pencil className="h-3.5 w-3.5" />} label="Edit" />
+              </div>
+              <div className="flex items-center gap-1">
+                <DictationControl isListening={false} permissionDenied={false} transcript="" error={null} onToggle={() => {}} />
+                <PrimaryAction type="button" icon={<ArrowUp className="h-3.5 w-3.5" />} />
+              </div>
+            </div>
+          </GlassContainer>
         </div>
       </section>
 

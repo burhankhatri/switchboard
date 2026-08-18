@@ -47,7 +47,7 @@ export function PendingFilesDisplay({
       // z-10 for the same reason as the composer's button row: the drag catcher
       // in ChatInput is absolute inset-0 and would otherwise sit over these.
       "relative z-10 flex flex-wrap gap-2",
-      isMobile ? "px-3 pt-3 pb-1" : "px-4 pt-3 pb-1"
+      isMobile ? "px-1 pt-1 pb-1" : "px-1 pt-1 pb-1"
     )}>
       {pendingFiles.map((pf) => {
         const fileType = getFileTypeForFile(pf.file)
