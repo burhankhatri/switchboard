@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { WorkspaceRuns } from "@/components/workspaces/WorkspaceRuns"
 import { WorkspaceConnections } from "@/components/workspaces/WorkspaceConnections"
 import { WorkspaceFiles } from "@/components/workspaces/WorkspaceFiles"
+import { WorkspaceMembers } from "@/components/workspaces/WorkspaceMembers"
 import { WorkspaceDropdown } from "@/components/workspaces/WorkspaceDropdown"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { BRAND } from "@/lib/brand"
@@ -24,6 +25,7 @@ import type { Chat } from "@/lib/types"
 import { NEW_REPOSITORY } from "@/lib/types"
 import {
   UserMenu,
+  SidebarWorkspaceEmptyState,
   renderChatTree,
   renderMobileChatTree,
   getChatRepos,
@@ -331,6 +333,8 @@ export function Sidebar({
             <WorkspaceDropdown />
           </div>
 
+          {!activeWorkspace && <SidebarWorkspaceEmptyState isMobile />}
+
           {activeWorkspace && (
             <p className="px-6 pt-1 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
               Chats
@@ -406,6 +410,8 @@ export function Sidebar({
               <WorkspaceFiles />
               <div className="mx-6 my-2 border-t border-border" />
               <WorkspaceConnections />
+              <div className="mx-6 my-2 border-t border-border" />
+              <WorkspaceMembers />
               <WorkspaceRuns />
               <div className="h-8 shrink-0" />
             </>
@@ -551,6 +557,8 @@ export function Sidebar({
         <WorkspaceDropdown collapsed={collapsed} className={collapsed ? "" : "w-full"} />
       </div>
 
+      {!activeWorkspace && !collapsed && <SidebarWorkspaceEmptyState />}
+
       {activeWorkspace && !collapsed && (
         <p className="px-4 pt-1 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
           Chats
@@ -659,6 +667,8 @@ export function Sidebar({
           <WorkspaceFiles />
           <div className="mx-4 my-2 border-t border-border" />
           <WorkspaceConnections />
+          <div className="mx-4 my-2 border-t border-border" />
+          <WorkspaceMembers />
           <WorkspaceRuns />
           {/* So the last control never sits flush against the footer. */}
           <div className="h-6 shrink-0" />
