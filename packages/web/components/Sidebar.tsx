@@ -24,7 +24,6 @@ import type { Chat } from "@/lib/types"
 import { NEW_REPOSITORY } from "@/lib/types"
 import {
   UserMenu,
-  RepoFilterDropdown,
   renderChatTree,
   renderMobileChatTree,
   getChatRepos,
@@ -137,15 +136,6 @@ export function Sidebar({
   const [internalRepoFilter, setInternalRepoFilter] = useState<string>(ALL_REPOSITORIES)
   const repoFilter = controlledRepoFilter ?? internalRepoFilter
   const setRepoFilter = onRepoFilterChange ?? setInternalRepoFilter
-  const [repoDropdownOpen, setRepoDropdownOpen] = useState(false)
-  const repoDropdownRef = useRef<HTMLDivElement>(null)
-
-  // Get unique repositories from chats (shared with the command palette).
-  const uniqueRepos = useMemo(
-    () => getChatRepos(chats, currentUserLogin),
-    [chats, currentUserLogin]
-  )
-
   // Filter chats by selected repository. Pinned chats sort to the top; within
   // each group, newest-first by last activity. Visibility is delegated to the
   // shared isChatVisibleForFilter predicate so the rendered list can never drift
@@ -214,49 +204,6 @@ export function Sidebar({
     })
   }, [])
   const toggleChatCollapsed = controlledToggleChatCollapsed ?? defaultToggleChatCollapsed
-
-  // Count chats per repository (for dropdown display)
-  const repoCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    let total = 0
-    let noRepoCount = 0
-    let archivedCount = 0
-    chats.forEach((chat) => {
-      const hasMessages = chat.messages.length > 0 || (chat.messageCount ?? 0) > 0
-      if (!hasMessages) return
-      if (chat.archived) {
-        archivedCount++
-        return
-      }
-      total++
-      if (chat.repo === NEW_REPOSITORY) {
-        noRepoCount++
-      } else {
-        counts[chat.repo] = (counts[chat.repo] || 0) + 1
-      }
-    })
-    return { counts, total, noRepoCount, archivedCount }
-  }, [chats])
-
-  // Get display name for repository. Repos owned by the current user are shown
-  // without their `login/` prefix (e.g. "jamesmurdza/foo" → "foo"); repos owned
-  // by anyone else keep the full "owner/name" form.
-  const getRepoDisplayName = (repo: string) => {
-    if (repo === NEW_REPOSITORY) return "No repository"
-    if (repo === ALL_REPOSITORIES) return "Active chats"
-    if (repo === ARCHIVED_CHATS) return "Archived chats"
-    if (repo === NO_REPOSITORY) return "No repository"
-    if (currentUserLogin) {
-      const prefix = `${currentUserLogin}/`
-      if (repo.toLowerCase().startsWith(prefix.toLowerCase())) {
-        return repo.slice(prefix.length)
-      }
-    }
-    return repo
-  }
-
-  // Close repo dropdown when clicking outside
-  useClickOutside(repoDropdownRef, () => setRepoDropdownOpen(false), repoDropdownOpen)
 
   // Close mobile user menu when clicking outside
   useClickOutside(mobileUserMenuRef, () => setMobileUserMenuOpen(false), mobileUserMenuOpen)
@@ -415,20 +362,6 @@ export function Sidebar({
               <span className="text-base text-foreground">Search Chats</span>
             </button>
 
-          </div>
-
-          {/* Repository Filter */}
-          <div className="px-3 pb-2 relative" ref={repoDropdownRef}>
-            <RepoFilterDropdown
-              repoFilter={repoFilter}
-              setRepoFilter={setRepoFilter}
-              repoDropdownOpen={repoDropdownOpen}
-              setRepoDropdownOpen={setRepoDropdownOpen}
-              uniqueRepos={uniqueRepos}
-              repoCounts={repoCounts}
-              getRepoDisplayName={getRepoDisplayName}
-              variant="mobile"
-            />
           </div>
 
           {/* Chat List */}
@@ -659,20 +592,6 @@ export function Sidebar({
       {/* Chat List - only show when expanded */}
       {!collapsed && (
         <>
-          {/* Repository Filter */}
-          <div className="px-2 pb-2 relative" ref={repoDropdownRef}>
-            <RepoFilterDropdown
-              repoFilter={repoFilter}
-              setRepoFilter={setRepoFilter}
-              repoDropdownOpen={repoDropdownOpen}
-              setRepoDropdownOpen={setRepoDropdownOpen}
-              uniqueRepos={uniqueRepos}
-              repoCounts={repoCounts}
-              getRepoDisplayName={getRepoDisplayName}
-              variant="desktop"
-            />
-          </div>
-
           {/* Chat List */}
           {/* Bounded rather than flex-1: it used to take every remaining
               pixel, leaving the workspace sections below squeezed against the
