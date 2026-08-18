@@ -1,4 +1,5 @@
 export { UserMenu } from "./UserMenu"
+export { SidebarWorkspaceEmptyState } from "./SidebarWorkspaceEmptyState"
 export { ChatItem, type ChatItemProps } from "./ChatItem"
 export { MobileChatItem, type MobileChatItemProps } from "./MobileChatItem"
 export { RepoFilterDropdown } from "./RepoFilterDropdown"
