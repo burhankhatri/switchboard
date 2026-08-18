@@ -211,7 +211,7 @@ function DropdownPanel({
   return (
     <div
       className={cn(
-        "absolute z-50 w-72 rounded-lg border border-border bg-popover shadow-xl py-1",
+        "absolute z-50 w-72 rounded-lg border border-border bg-popover shadow-xl py-1 max-h-[min(420px,calc(100vh-8rem))] overflow-y-auto",
         side === "bottom"
           ? "top-[calc(100%+4px)] left-0"
           : "left-[calc(100%+4px)] top-0"

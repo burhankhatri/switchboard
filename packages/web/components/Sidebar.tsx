@@ -735,8 +735,8 @@ export function Sidebar({
       {/* Spacer when collapsed */}
       {collapsed && <div className="flex-1" />}
 
-      {/* Footer - User & Settings */}
-      <div className={cn("p-1.5", !collapsed && "border-t border-sidebar-border")}>
+      {/* Footer - User & Settings — always pinned to bottom-left */}
+      <div className={cn("mt-auto p-1.5", !collapsed && "border-t border-sidebar-border")}>
         {isSessionLoading ? (
           /* User skeleton while session is loading */
           <div className={cn("flex items-center gap-2 animate-pulse", collapsed ? "justify-center" : "px-2 py-1.5")}>
