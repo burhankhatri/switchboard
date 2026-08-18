@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { AlertTriangle, ChevronDown, Github, X, Pencil, Trash2, Loader2, Command, FolderDown } from "lucide-react"
+import { AlertTriangle, ChevronDown, Github, X, Pencil, Trash2, Loader2, Command, FolderDown, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useClickOutside } from "@/lib/hooks/useClickOutside"
 import { useElectron } from "@/lib/hooks/useElectron"
@@ -204,6 +204,17 @@ export function ChatHeader({
             <Command className="h-4 w-4" />
           </button>
         )}
+        {/* Settings was only reachable from the user menu at the foot of the
+            sidebar, which is a long way from where you are when a credential
+            turns out to be wrong. */}
+        <button
+          onClick={() => modals.openSettings()}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
+          title="Settings"
+          aria-label="Open settings"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
       </div>
     </div>
   )
