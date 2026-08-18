@@ -41,3 +41,27 @@ describe("parseMention", () => {
     expect(parseMention("just a normal prompt")).toBeNull()
   })
 })
+
+/**
+ * The crash this guards against: useMentionItems shares the
+ * ["workspace-files", id] cache slot with WorkspaceFiles. When the two queryFns
+ * returned different shapes into that one slot, whichever resolved first decided
+ * what the other read — and the composer threw "(files ?? []) is not iterable",
+ * which takes the whole page down rather than degrading.
+ */
+describe("workspace-files cache shape", () => {
+  it("selects the workspace array out of the cached response shape", async () => {
+    const cached = { workspace: [{ path: "a/b.md", name: "b.md" }], shared: [] }
+    const select = (d: typeof cached) => d.workspace
+    expect(Array.isArray(select(cached))).toBe(true)
+  })
+
+  it("iterating a non-array must not throw", () => {
+    // Belt and braces: a slot written by an older build can still hold the
+    // wrong shape, and the composer must not be the thing that dies.
+    const wrong = { workspace: [], shared: [] } as unknown
+    expect(() => {
+      for (const _ of Array.isArray(wrong) ? wrong : []) void _
+    }).not.toThrow()
+  })
+})

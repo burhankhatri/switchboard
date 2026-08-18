@@ -21,6 +21,12 @@ interface RepoFile {
   name: string
 }
 
+/** Exactly what GET /api/workspaces/:id/files returns, and what WorkspaceFiles caches. */
+interface WorkspaceFilesResponse {
+  workspace: RepoFile[]
+  shared: RepoFile[]
+}
+
 /**
  * The trailing `@word` the caret is currently inside, if any.
  *
@@ -71,13 +77,20 @@ export function useMentionItems(query: string): MentionItem[] {
     retry: false,
   })
 
+  // Shares the ["workspace-files", id] key with WorkspaceFiles, so the tree is
+  // fetched once for both. That means the shape stored under the key has to be
+  // the SAME shape WorkspaceFiles stores — a key is a cache slot, and two
+  // queryFns returning different shapes into one slot means whichever resolves
+  // first decides what the other one reads. `select` narrows for this consumer
+  // without changing what is cached.
   const { data: files } = useQuery({
     queryKey: ["workspace-files", wsId],
     queryFn: async () => {
       const r = await fetch(`/api/workspaces/${wsId}/files`)
       if (!r.ok) throw new Error(String(r.status))
-      return ((await r.json()) as { workspace: RepoFile[] }).workspace
+      return (await r.json()) as WorkspaceFilesResponse
     },
+    select: (d) => d.workspace,
     enabled: !!wsId,
     staleTime: 60_000,
     retry: false,
@@ -87,7 +100,7 @@ export function useMentionItems(query: string): MentionItem[] {
     const q = query.toLowerCase()
     const items: MentionItem[] = []
 
-    for (const c of connections ?? []) {
+    for (const c of Array.isArray(connections) ? connections : []) {
       const isMcp = c.kind === "mcp"
       items.push({
         key: `conn:${c.id}`,
@@ -98,7 +111,7 @@ export function useMentionItems(query: string): MentionItem[] {
       })
     }
 
-    for (const f of files ?? []) {
+    for (const f of Array.isArray(files) ? files : []) {
       items.push({
         key: `file:${f.path}`,
         token: f.name,
