@@ -33,10 +33,10 @@ npm run dev            # http://localhost:4000
 cd packages/web && npx tsc --noEmit -p tsconfig.json
 ```
 
-**There are 21 pre-existing type errors**, all in `components/sidebar.tsx`,
-`lib/hooks/usePaletteProps.ts` and `app/page.tsx` — a filename-casing conflict on
-case-insensitive filesystems. Compare the count against 21; do not try to reach
-zero and do not treat them as yours.
+**Typecheck must be clean — zero errors.** It used to carry 21, from a
+filename-casing conflict between `components/Sidebar.tsx` and `components/sidebar/`
+on case-insensitive filesystems; importing `@/components/sidebar/index`
+explicitly resolved it. If errors reappear there, that is the cause.
 
 ```bash
 cd packages/web && npx vitest run        # 187 tests; run from packages/web, the @/ alias breaks from the repo root

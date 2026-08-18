@@ -32,12 +32,12 @@ failure looked like.
 ## Before committing
 
 ```bash
-cd packages/web && npx tsc --noEmit -p tsconfig.json   # compare against 21, see AGENTS.md
+cd packages/web && npx tsc --noEmit -p tsconfig.json   # must be ZERO errors
 cd packages/web && npx vitest run                      # 187 tests
 ```
 
-Do not commit with new type errors or failing tests. If something is genuinely
-pre-existing, say so in the message rather than leaving it ambiguous.
+Do not commit with type errors or failing tests. The suite is green and the
+typecheck is clean — keep it that way rather than adding to a baseline.
 
 ## Changing behaviour
 

@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { ToolChips } from "@/components/agent/ToolChips"
+import { Thinking } from "@/components/agent/Thinking"
 import { ChevronDown, ChevronRight, Terminal, FileText, Search, LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ContentBlock, ToolCall } from "@/lib/types"
@@ -71,7 +73,27 @@ interface ToolCallGroupProps {
   isMobile?: boolean
 }
 
+/**
+ * Tool calls for one message.
+ *
+ * A short run renders as chips — scannable, and the answer stays on screen. A
+ * long run collapses into a trace instead, because twenty chips is the same
+ * wall of noise the chips were meant to replace.
+ */
 export function ToolCallGroup({ toolCalls, isMobile = false, onOpenFile }: ToolCallGroupProps) {
+  if (toolCalls.length === 0) return null
+
+  if (toolCalls.length > TRACE_THRESHOLD) {
+    return <Thinking toolCalls={toolCalls} />
+  }
+  return <ToolChips toolCalls={toolCalls} onOpenFile={onOpenFile} />
+}
+
+/** Above this many calls, the chip row stops being scannable. */
+const TRACE_THRESHOLD = 6
+
+/** Retained for the legacy stacked rendering; not used by ToolCallGroup. */
+export function ToolCallRowsLegacy({ toolCalls, isMobile = false, onOpenFile }: ToolCallGroupProps) {
   if (toolCalls.length === 0) return null
 
   return (
