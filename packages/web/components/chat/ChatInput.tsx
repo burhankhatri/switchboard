@@ -426,7 +426,7 @@ export function ChatInput({
         {/* File upload error message */}
         {fileError && (
           <div className={cn(
-            "flex items-start gap-2 text-destructive bg-destructive/10 rounded-md",
+            "relative z-10 flex items-start gap-2 text-destructive bg-destructive/10 rounded-md",
             isMobile ? "mx-3 mb-2 px-3 py-2 text-sm" : "mx-4 mb-2 px-3 py-2 text-xs"
           )}>
             <AlertTriangle className={cn("shrink-0 mt-0.5", isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />
@@ -441,9 +441,11 @@ export function ChatInput({
           </div>
         )}
 
-        {/* Bottom row with selectors */}
+        {/* Bottom row with selectors. `relative z-10` is load-bearing: the drag
+            catcher above is absolute inset-0, and without a stacking context
+            here it covers this row and eats every click. */}
         <div className={cn(
-          "flex justify-between items-center mt-2 w-full",
+          "relative z-10 flex justify-between items-center mt-2 w-full",
           isMobile ? "px-3 py-2" : "px-4 py-2"
         )}>
           {/* Left group */}
