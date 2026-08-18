@@ -180,7 +180,9 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
   // Use TanStack Query for server polling
   const serversQuery = useServersQuery(
     currentChat?.sandboxId,
-    currentChat?.previewUrlPattern
+    currentChat?.previewUrlPattern,
+    // Poll hard only while the agent could be starting or stopping a server.
+    currentChat?.status === "running" || currentChat?.status === "creating"
   )
   const availableServers = serversQuery.data ?? []
 

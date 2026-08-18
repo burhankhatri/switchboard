@@ -1,4 +1,4 @@
-import { Daytona } from "@daytonaio/sdk"
+import { getDaytona } from "@/lib/daytona-client"
 import { ensureSandboxStarted } from "@/lib/sandbox"
 import { getSandboxOrExpired, passiveReadGate } from "@/lib/sandbox-lifecycle"
 import { escapeShell } from "@switchboard/sdk"
@@ -54,13 +54,14 @@ export async function POST(req: Request) {
   const owner = await requireSandboxOwner(sandboxId)
   if (owner instanceof Response) return owner
 
-  const daytonaApiKey = process.env.DAYTONA_API_KEY
-  if (!daytonaApiKey) {
+  // Shared client: this route carries the list-servers poll, so it was
+  // rebuilding a connection-holding client on a timer.
+  const daytona = getDaytona()
+  if (!daytona) {
     return Response.json({ error: "Daytona API key not configured" }, { status: 500 })
   }
 
   try {
-    const daytona = new Daytona({ apiKey: daytonaApiKey })
     const sandbox = await getSandboxOrExpired(daytona, sandboxId)
     if (sandbox instanceof Response) return sandbox
 
