@@ -141,7 +141,7 @@ WORKSPACE_PATH=workspaces/lead-gen npx dotenv -e packages/web/.env.local -- node
 cd packages/web && GH_TOKEN=$(gh auth token) npx dotenv -e .env.local -- node ../../scripts/e2e-workspace.mjs
 ```
 
-> **`.env.local` is committed to this private repo.** `ENCRYPTION_KEY` and
-> `DATABASE_URL` together decrypt every stored workspace connection, and git
-> history retains them regardless of later deletion. Rotate rather than delete if
-> this repo's audience ever changes.
+> **`.env.local` is NOT in this repo and must never be.** It was committed
+> briefly while the repo was public; the file has been purged from history and
+> every credential in it was rotated. Get the current values from Burhan
+> directly.

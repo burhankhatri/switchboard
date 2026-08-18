@@ -52,8 +52,8 @@ the next run clones.
 
 ## Quick start
 
-Requires Node 20.9+. Secrets are in `packages/web/.env.local`, which is tracked
-in this repo — you do not need to create it.
+Requires Node 20.9+. Create `packages/web/.env.local` with the values from a
+teammate — it is gitignored and must never be committed.
 
 ```bash
 npm install

@@ -17,8 +17,8 @@ Derived from switchboard (Apache-2.0, see NOTICE).
 
 ## Setup
 
-Secrets live in **`packages/web/.env.local`, which is tracked in this repo** — do
-not expect them in the shell and do not recreate the file. It holds
+Secrets live in `packages/web/.env.local`, which is **gitignored and must stay
+that way**. Ask for the values; never commit them. It holds
 `DATABASE_URL` + `DIRECT_URL`, `DAYTONA_API_KEY`, GitHub OAuth,
 `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, `WORKSPACES_REPO`.
 
