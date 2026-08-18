@@ -13,6 +13,26 @@ const GH = "https://api.github.com"
 export const WORKSPACES_REPO = process.env.WORKSPACES_REPO ?? ""
 
 /**
+ * A service token with write access to WORKSPACES_REPO.
+ *
+ * Workspace membership is a database row, not a GitHub collaborator invite, so a
+ * member's personal OAuth token usually has no push access to the shared private
+ * repo — GitHub then answers writes (create workspace, save file) with a 404.
+ * When this is set, all repo operations authenticate as the service account
+ * instead, so any member can create workspaces and edit files; the acting user's
+ * identity is still recorded in every commit message. Server-side membership and
+ * path-containment checks in the routes remain the access boundary.
+ *
+ * Unset → fall back to the caller's token, preserving the old behaviour.
+ */
+const WORKSPACES_REPO_TOKEN = process.env.WORKSPACES_REPO_TOKEN ?? ""
+
+/** Prefer the shared service token; fall back to the caller's user token. */
+function repoAuth(userToken: string): string {
+  return WORKSPACES_REPO_TOKEN || userToken
+}
+
+/**
  * GitHub call with bounded retry on transient failures.
  *
  * Creating a workspace is several writes; a 5xx partway through would otherwise
@@ -67,7 +87,7 @@ export async function ensureWorkspacesRepo(token: string): Promise<void> {
   const [owner, repo] = WORKSPACES_REPO.split("/")
   if (!owner || !repo) throw new Error(`malformed WORKSPACES_REPO: ${WORKSPACES_REPO}`)
 
-  const existing = await ghFetch(`${GH}/repos/${owner}/${repo}`, { headers: headers(token) })
+  const existing = await ghFetch(`${GH}/repos/${owner}/${repo}`, { headers: headers(repoAuth(token)) })
   if (existing.ok) return
   if (existing.status !== 404) {
     throw new Error(`GitHub ${existing.status} checking ${WORKSPACES_REPO}: ${await existing.text()}`)
@@ -75,7 +95,7 @@ export async function ensureWorkspacesRepo(token: string): Promise<void> {
 
   const created = await ghFetch(`${GH}/user/repos`, {
     method: "POST",
-    headers: headers(token),
+    headers: headers(repoAuth(token)),
     body: JSON.stringify({
       name: repo,
       private: true,
@@ -98,12 +118,12 @@ async function putFile(
   const [owner, repo] = WORKSPACES_REPO.split("/")
   const url = `${GH}/repos/${owner}/${repo}/contents/${path}`
 
-  const head = await ghFetch(url, { headers: headers(token) })
+  const head = await ghFetch(url, { headers: headers(repoAuth(token)) })
   if (head.ok) return false
 
   const res = await ghFetch(url, {
     method: "PUT",
-    headers: headers(token),
+    headers: headers(repoAuth(token)),
     body: JSON.stringify({
       message,
       content: Buffer.from(content, "utf8").toString("base64"),
@@ -200,7 +220,7 @@ export async function listWorkspaceFiles(
   const [owner, repo] = WORKSPACES_REPO.split("/")
   const res = await ghFetch(
     `${GH}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-    { headers: headers(token) }
+    { headers: headers(repoAuth(token)) }
   )
   if (!res.ok) {
     throw new Error(`Could not list files: ${res.status} ${await res.text()}`)
@@ -246,7 +266,7 @@ export async function readWorkspaceFile(
   const [owner, repo] = WORKSPACES_REPO.split("/")
   const res = await ghFetch(
     `${GH}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}`,
-    { headers: headers(token) }
+    { headers: headers(repoAuth(token)) }
   )
   if (!res.ok) throw new Error(`Could not read ${path}: ${res.status}`)
   const data = (await res.json()) as {
@@ -292,7 +312,7 @@ export async function writeWorkspaceFile(
     `${GH}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}`,
     {
       method: "PUT",
-      headers: headers(token),
+      headers: headers(repoAuth(token)),
       body: JSON.stringify({
         message,
         content: Buffer.from(content, "utf8").toString("base64"),

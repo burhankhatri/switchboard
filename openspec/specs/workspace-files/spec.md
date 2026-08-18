@@ -27,6 +27,19 @@ The system SHALL persist an edit as a commit rather than to any other store.
 - **THEN** the save is rejected as a conflict rather than overwriting the other
   person, checked via the blob SHA the editor started from
 
+### Requirement: Repo access follows membership, not GitHub collaborators
+The system SHALL authenticate workspaces-repo reads and writes with a shared
+service credential when one is configured, so a member's own GitHub push access
+to the private repo is not required. Server-side membership and path-containment
+checks remain the access boundary.
+
+#### Scenario: A member without push access saves a file
+- **WHEN** a member who is not a GitHub collaborator on the workspaces repo saves
+  a file
+- **THEN** the commit still succeeds under the service credential, because
+  membership is a database row rather than a collaborator invite — otherwise the
+  write would fail with a GitHub 404
+
 ### Requirement: Paths are confined to the workspace
 The system SHALL reject reads and writes outside the workspace folder and the
 shared root.
