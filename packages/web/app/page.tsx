@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react"
 import { MobileHeader } from "@/components/MobileHeader"
 import { Sidebar } from "@/components/Sidebar"
 import { ChatPanel } from "@/components/ChatPanel"
+import { HomeView } from "@/components/chat/HomeView"
 import { PreviewView } from "@/components/PreviewView"
 import { AppModals } from "@/components/AppModals"
 import { useGitDialogs } from "@/components/modals/git-dialogs"
@@ -265,15 +266,16 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
   }, [isMobile, isHydrated, currentChatId, chats, selectChat])
 
 
-  // Auto-enter draft mode if user is authenticated but has no chat selected.
-  // This replaces the old auto-create behavior - now we just enter draft mode
-  // which doesn't create a database record until the first message is sent.
-  // Skip when there is a pending message in sessionStorage — the replay effect
-  // below will handle chat creation when sending the pending message.
+  // No chat selected means the home page, not a draft. This effect used to
+  // force draft mode the instant you landed, which is why "/" was a blank
+  // composer and the product never introduced itself. Drafts are entered
+  // deliberately now, via New chat, and live at /chat/new.
+  //
+  // The pending-message replay still needs a draft to send into, so that path
+  // keeps its own.
   useEffect(() => {
     if (!isHydrated || currentChatId || !session) return
-    if (hasPendingMessage()) return
-    // Enter draft mode instead of creating a real chat
+    if (!hasPendingMessage()) return
     startNewChat()
   }, [isHydrated, currentChatId, session, startNewChat])
 
@@ -654,6 +656,13 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
                   refreshKey={scheduledJobsRefreshKey}
                   urlJobId={urlJobId}
                   onNavigateToJob={handleNavigateToJob}
+                />
+              ) : !displayCurrentChatId ? (
+                <HomeView
+                  isMobile={isMobile}
+                  chats={chats}
+                  onSelectChat={handleSelectChat}
+                  onNewChat={handleNewChat}
                 />
               ) : (
                 <ChatPanelWithPalette

@@ -70,14 +70,13 @@ export function useUrlSync({
           break
 
         case "newChat":
-          // Drafts (new chats) don't get their own URL — show the home page
-          // (switchboard.local) instead. Enter draft mode if we aren't already in
-          // one, then rewrite the URL to "/".
+          // A draft lives at /chat/new. It used to be rewritten to "/", which
+          // meant the home URL *was* the composer and there was nowhere to land
+          // that showed you the workspace instead of a blank prompt.
           setViewMode("chat")
           if (!currentChatId || !isDraftChatId(currentChatId)) {
             startNewChat()
           }
-          window.history.replaceState(null, "", ROUTES.home.build())
           break
 
         case "agent": {
@@ -93,7 +92,7 @@ export function useUrlSync({
             // Unknown slug — fall back to a normal draft with the default agent.
             startNewChat()
           }
-          window.history.replaceState(null, "", ROUTES.home.build())
+          window.history.replaceState(null, "", ROUTES.newChat.build())
           break
         }
 
@@ -106,7 +105,7 @@ export function useUrlSync({
             if (!currentChatId || !isDraftChatId(currentChatId)) {
               startNewChat()
             }
-            window.history.replaceState(null, "", ROUTES.home.build())
+            window.history.replaceState(null, "", ROUTES.newChat.build())
             break
           }
           if (urlChatId !== currentChatId) {
@@ -120,17 +119,12 @@ export function useUrlSync({
         }
 
         case "home":
+          // "/" is the home page: what this workspace is, what it can reach and
+          // what the team has been doing. It used to promote whatever chat was
+          // last selected into the URL, which is why the app appeared to open
+          // straight into a conversation and never showed a home at all.
           setViewMode("chat")
-          // A real chat selected at "/" gets promoted to its own URL. Drafts (or
-          // no selection) stay on the home page; the auto-draft effect handles
-          // entering draft mode when nothing is selected.
-          if (currentChatId && !isDraftChatId(currentChatId)) {
-            window.history.replaceState(null, "", ROUTES.chat.build(currentChatId))
-          } else if (!isInitialSync) {
-            // Back/forward navigation to "/" should drop any open chat and show
-            // the home page (a fresh draft), not silently keep the chat.
-            selectChat(null)
-          }
+          selectChat(null)
           break
       }
     },
