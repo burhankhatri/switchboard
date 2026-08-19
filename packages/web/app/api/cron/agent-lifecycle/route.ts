@@ -13,6 +13,17 @@ import { finalizeInteractiveChat, markChatError } from "./_lib/interactive"
 // Vercel Pro plan allows up to 5 minutes for cron jobs
 export const maxDuration = 300
 
+// Scheduled every 10 minutes in vercel.json, and that number is a cost control
+// rather than a preference: every tick below queries Postgres, and Neon suspends
+// a compute only after five minutes without one. At the "* * * * *" this used to
+// run, the production database never suspended — it billed around the clock with
+// nobody using the app. Ten minutes is also the shortest interval a scheduled job
+// can have, so a faster cron cannot make anything more punctual.
+//
+// Interactive chats do not depend on this for correctness: the stream route
+// finalizes them (see agent/stream/_lib/persist-snapshot.ts). Phase 3 here is the
+// fallback for a run whose connection died.
+
 // =============================================================================
 // Main Handler
 // =============================================================================
