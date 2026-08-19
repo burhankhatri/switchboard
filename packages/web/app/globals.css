@@ -116,6 +116,13 @@
      white-on-light is invisible, which is why panels and hover states used to
      disappear. Rule of thumb when editing: surfaces = white + alpha,
      lines/fills that must be seen against white = rgba(17,17,20,...). */
+  /* The app forces the light theme (Providers sets forcedTheme="light"), so the
+     browser has to be told. Without this, a viewer whose OS is in dark mode
+     gets a dark UA canvas under every route that does not paint its own
+     background — and since --background is deliberately transparent (the app
+     shell paints the gradient instead), that meant black text on a black page.
+     Also keeps scrollbars and form controls light instead of mismatched. */
+  color-scheme: light;
   --background: transparent;
   --foreground: oklch(0 0 0);
   --card: rgba(255, 255, 255, 0.86);
