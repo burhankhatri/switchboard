@@ -158,3 +158,57 @@ describe("getChatIdForRepoFilter", () => {
     expect(getChatIdForRepoFilter(chats, "octocat/nonexistent", "a")).toBeNull()
   })
 })
+
+/**
+ * A workspace is a boundary, not a label: opening Marketing Automation should
+ * leave you looking at that team's work and nothing else. The scoping lives in
+ * the same predicate as every other visibility rule so the sidebar and
+ * Alt+Up/Down can never disagree about what exists.
+ */
+describe("workspace scoping", () => {
+  const inWs = makeChat({ id: "in", workspaceId: "ws-marketing" })
+  const otherWs = makeChat({ id: "other", workspaceId: "ws-support" })
+  const unbound = makeChat({ id: "unbound", workspaceId: null })
+
+  it("shows every chat when no workspace is open", () => {
+    for (const c of [inWs, otherWs, unbound]) {
+      expect(isChatVisibleForFilter(c, ALL_REPOSITORIES, null)).toBe(true)
+    }
+  })
+
+  it("shows only the open workspace's chats", () => {
+    expect(isChatVisibleForFilter(inWs, ALL_REPOSITORIES, "ws-marketing")).toBe(true)
+    expect(isChatVisibleForFilter(otherWs, ALL_REPOSITORIES, "ws-marketing")).toBe(false)
+  })
+
+  it("hides chats belonging to no workspace while one is open", () => {
+    // Chats from before workspaces existed, and any the binding bug left
+    // unbound. They are still reachable under "All workspaces".
+    expect(isChatVisibleForFilter(unbound, ALL_REPOSITORIES, "ws-marketing")).toBe(false)
+    expect(isChatVisibleForFilter(unbound, ALL_REPOSITORIES, null)).toBe(true)
+  })
+
+  it("scopes the archived view to the open workspace too", () => {
+    const archivedHere = makeChat({ id: "ah", workspaceId: "ws-marketing", archived: true })
+    const archivedElsewhere = makeChat({ id: "ae", workspaceId: "ws-support", archived: true })
+    expect(isChatVisibleForFilter(archivedHere, ARCHIVED_CHATS, "ws-marketing")).toBe(true)
+    expect(isChatVisibleForFilter(archivedElsewhere, ARCHIVED_CHATS, "ws-marketing")).toBe(false)
+  })
+
+  it("still applies the repo filter inside a workspace", () => {
+    const wrongRepo = makeChat({ id: "wr", workspaceId: "ws-marketing", repo: "octocat/other" })
+    expect(isChatVisibleForFilter(wrongRepo, "octocat/hello", "ws-marketing")).toBe(false)
+  })
+
+  it("keeps keyboard navigation to the open workspace", () => {
+    // The bug this prevents: Alt+Down walking into another team's chat that the
+    // sidebar is not showing.
+    const ids = buildTreeOrderedChatIds([inWs, otherWs, unbound], ALL_REPOSITORIES, "ws-marketing")
+    expect(ids).toEqual(["in"])
+  })
+
+  it("defaults to unscoped so existing callers are unaffected", () => {
+    expect(isChatVisibleForFilter(otherWs, ALL_REPOSITORIES)).toBe(true)
+    expect(buildTreeOrderedChatIds([inWs, otherWs], ALL_REPOSITORIES)).toHaveLength(2)
+  })
+})

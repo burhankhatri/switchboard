@@ -144,12 +144,12 @@ export function Sidebar({
   // from what keyboard navigation reaches.
   const filteredChats = useMemo(() => {
     return chats
-      .filter((chat) => isChatVisibleForFilter(chat, repoFilter))
+      .filter((chat) => isChatVisibleForFilter(chat, repoFilter, activeWorkspace?.id ?? null))
       .sort((a, b) => {
         if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1
         return (b.lastActiveAt ?? b.createdAt) - (a.lastActiveAt ?? a.createdAt)
       })
-  }, [chats, repoFilter])
+  }, [chats, repoFilter, activeWorkspace])
 
   // Whether the archived view is currently active — archived rows expose
   // Unarchive (instead of Archive) and omit drag-to-merge.

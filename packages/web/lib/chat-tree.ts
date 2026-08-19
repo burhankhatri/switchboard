@@ -20,10 +20,19 @@ import { ALL_REPOSITORIES, NO_REPOSITORY, ARCHIVED_CHATS } from "@/lib/contexts"
  * because "what's navigable" is defined as "what's visible". Do not re-implement
  * this logic anywhere else — import it.
  */
-export function isChatVisibleForFilter(chat: Chat, repoFilter: string): boolean {
+export function isChatVisibleForFilter(
+  chat: Chat,
+  repoFilter: string,
+  workspaceId: string | null = null
+): boolean {
   // Empty chats are only shown when branched (they carry a parentChatId).
   const hasMessages = chat.messages.length > 0 || (chat.messageCount ?? 0) > 0
   if (!hasMessages && !chat.parentChatId) return false
+  // A workspace is a boundary, not a label. With one open you are looking at
+  // that team's work only — including in the archived view, and including
+  // chats that belong to no workspace at all, which stay reachable under
+  // "All workspaces". Applied before every other rule because it outranks them.
+  if (workspaceId && chat.workspaceId !== workspaceId) return false
   // The "Archived chats" view shows only archived chats (across all repos);
   // every other filter shows only active (non-archived) chats.
   if (repoFilter === ARCHIVED_CHATS) return !!chat.archived
@@ -42,8 +51,12 @@ export function isChatVisibleForFilter(chat: Chat, repoFilter: string): boolean 
  * {@link isChatVisibleForFilter}) so the navigation order can never include a
  * chat the sidebar is hiding.
  */
-export function buildTreeOrderedChatIds(chats: Chat[], repoFilter: string): string[] {
-  const visible = chats.filter((c) => isChatVisibleForFilter(c, repoFilter))
+export function buildTreeOrderedChatIds(
+  chats: Chat[],
+  repoFilter: string,
+  workspaceId: string | null = null
+): string[] {
+  const visible = chats.filter((c) => isChatVisibleForFilter(c, repoFilter, workspaceId))
 
   visible.sort((a, b) => (b.lastActiveAt ?? b.createdAt) - (a.lastActiveAt ?? a.createdAt))
 
@@ -80,9 +93,10 @@ export function buildTreeOrderedChatIds(chats: Chat[], repoFilter: string): stri
 export function getChatIdForRepoFilter(
   chats: Chat[],
   repoFilter: string,
-  currentChatId: string | null
+  currentChatId: string | null,
+  workspaceId: string | null = null
 ): string | null {
-  const orderedIds = buildTreeOrderedChatIds(chats, repoFilter)
+  const orderedIds = buildTreeOrderedChatIds(chats, repoFilter, workspaceId)
   if (currentChatId && orderedIds.includes(currentChatId)) return currentChatId
   return orderedIds[0] ?? null
 }

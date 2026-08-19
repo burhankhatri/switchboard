@@ -117,7 +117,7 @@ export function useChatNavigation({
   const handleRepoFilterChange = useCallback(
     (filter: string) => {
       sidebar.setRepoFilter(filter)
-      const nextChatId = getChatIdForRepoFilter(chats, filter, currentChatId)
+      const nextChatId = getChatIdForRepoFilter(chats, filter, currentChatId, activeWorkspace?.id ?? null)
       // Only select when it differs from what's already selected (keeps the
       // current chat if it survives the filter; selects the first visible chat
       // otherwise). null means the filter matches no chats — leave as-is.
@@ -170,11 +170,11 @@ export function useChatNavigation({
       // Default to NEW_REPOSITORY (no repo)
       newChatId = await startNewChat()
     }
-    // New chats are drafts — they don't get their own URL. Show the home page
-    // instead of putting the draft id in the URL. Pushing a history entry keeps
-    // the back button working (returns to the prior chat).
+    // A draft gets /chat/new rather than "/", which now belongs to the home
+    // page. Pushing a history entry keeps the back button working (it returns
+    // to the prior chat, or to home).
     if (newChatId) {
-      window.history.pushState(null, "", ROUTES.home.build())
+      window.history.pushState(null, "", ROUTES.newChat.build())
     }
   }, [session, modals, closeOpenFile, sidebar, displayCurrentChat, repos, startNewChat, activeWorkspace])
 
@@ -206,8 +206,8 @@ export function useChatNavigation({
   // collapsed state — so Alt+Up/Down can reach every chat, expanding
   // collapsed ancestors along the way).
   const treeOrderedChatIds = useMemo(
-    () => buildTreeOrderedChatIds(chats, sidebar.repoFilter),
-    [chats, sidebar.repoFilter]
+    () => buildTreeOrderedChatIds(chats, sidebar.repoFilter, activeWorkspace?.id ?? null),
+    [chats, sidebar.repoFilter, activeWorkspace]
   )
 
   const handleRequestMergeChats = useCallback(
