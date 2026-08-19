@@ -17,7 +17,7 @@ import { basename } from "@/lib/format"
 import { useChatWithSync } from "@/lib/hooks/useChatWithSync"
 import { useMobile } from "@/lib/hooks/useMobile"
 import { useGitHubTokenCheck } from "@/lib/hooks/useGitHubTokenCheck"
-import { usePreview } from "@/lib/hooks/usePreview"
+import { isPreviewOpen, usePreview } from "@/lib/hooks/usePreview"
 import { usePageTitle } from "@/lib/hooks/usePageTitle"
 import { useUrlSync } from "@/lib/hooks/useUrlSync"
 import { useSandboxActions } from "@/lib/hooks/useSandboxActions"
@@ -186,7 +186,10 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
     currentChat?.sandboxId,
     currentChat?.previewUrlPattern,
     // Poll hard only while the agent could be starting or stopping a server.
-    currentChat?.status === "running" || currentChat?.status === "creating"
+    currentChat?.status === "running" || currentChat?.status === "creating",
+    // ...and keep a slow watch only while a preview is actually on screen.
+    // Otherwise the poll stops, which is what lets the database suspend.
+    isPreviewOpen(currentChat)
   )
   const availableServers = serversQuery.data ?? []
 

@@ -34,6 +34,20 @@ interface UsePreviewResult {
   startPreviewResize: (e: React.MouseEvent) => void
 }
 
+/**
+ * Whether a preview pane is on screen for a chat.
+ *
+ * Derived from the chat alone, so it can be read before usePreview runs — the
+ * servers poll has to gate on it, and usePreview takes that poll's result as an
+ * input. Exported rather than duplicated so the two can never disagree.
+ */
+export function isPreviewOpen(
+  currentChat: { previewItems?: unknown; previewPaneHidden?: boolean } | null | undefined
+): boolean {
+  const items = (currentChat?.previewItems ?? []) as unknown[]
+  return items.length > 0 && !(currentChat?.previewPaneHidden ?? false)
+}
+
 export function usePreview({ currentChat, updateCurrentChat, availableServers }: UsePreviewOptions): UsePreviewResult {
   const [previewWidth, setPreviewWidth] = useState(() => {
     if (typeof window === "undefined") return 520
@@ -54,7 +68,7 @@ export function usePreview({ currentChat, updateCurrentChat, availableServers }:
   const activePreviewIndex = currentChat?.activePreviewIndex ?? 0
   const previewItem = previewItems[activePreviewIndex] ?? null
   const previewPaneHidden = currentChat?.previewPaneHidden ?? false
-  const previewOpen = previewItems.length > 0 && !previewPaneHidden
+  const previewOpen = isPreviewOpen(currentChat)
 
   /** Get a unique key for a preview item */
   const getPreviewItemKey = useCallback((item: PreviewItem): string => {
