@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/cron/agent-lifecycle",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/30 * * * *"
     }
   ]
 }
