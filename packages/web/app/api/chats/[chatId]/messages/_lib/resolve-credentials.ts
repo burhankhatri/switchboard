@@ -10,6 +10,7 @@ import {
   claudeCredentialStatus,
   describeClaudeCredential,
 } from "@/lib/claude-credential-status"
+import { isCredentialKnownBad } from "@/lib/db/credential-health-db"
 
 export interface ResolvedCredentials {
   credentials: Credentials
@@ -83,6 +84,24 @@ export async function resolveSendCredentials(
         { status: 400 }
       )
     }
+  }
+
+  // The provider's own verdict, from the last run that got as far as calling
+  // it. claudeCredentialStatus above catches what can be judged locally —
+  // missing, malformed, expired — but a revoked key parses fine and looks
+  // unexpired, so without this the only way to discover it is to build a
+  // sandbox, start the agent, and wait for the 401. Checking here keeps that
+  // discovery to one run instead of every run.
+  if (await isCredentialKnownBad(userId, payload.agent)) {
+    return Response.json(
+      {
+        error: "CREDENTIAL_REJECTED",
+        message:
+          "Your last run was rejected by the model provider as an authentication failure, " +
+          "and the credential has not changed since. Update it in Settings and try again.",
+      },
+      { status: 400 }
+    )
   }
 
   // Shared-pool fallback for Claude Code: when the user hasn't stored their own
