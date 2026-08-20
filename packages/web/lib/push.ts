@@ -18,16 +18,26 @@ export interface PushableNotification {
   workspaceId: string | null
 }
 
-/** Where clicking the system notification should land. */
+/**
+ * Where clicking the notification should land.
+ *
+ * Must be a path the app's router actually matches. Routing here is
+ * path-based (ROUTES in lib/hooks/useUrlNavigation.ts) and query strings are
+ * ignored outright, so a "/?chat=<id>" form drops the reader on the home page
+ * and the notification appears to do nothing.
+ *
+ * There is deliberately no workspace URL: the active workspace lives in
+ * localStorage, not the address bar. Home is where the picker is, so that is
+ * the honest destination rather than a link that pretends to select one.
+ */
 export function pushTargetUrl({
   chatId,
-  workspaceId,
+  workspaceId: _workspaceId,
 }: {
   chatId: string | null
   workspaceId: string | null
 }): string {
-  if (chatId) return `/?chat=${encodeURIComponent(chatId)}`
-  if (workspaceId) return `/?workspace=${encodeURIComponent(workspaceId)}`
+  if (chatId) return `/chat/${encodeURIComponent(chatId)}`
   return "/"
 }
 

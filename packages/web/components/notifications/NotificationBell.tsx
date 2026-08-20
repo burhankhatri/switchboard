@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Bell, MessageCircleQuestion, UserPlus, UserMinus } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { pushTargetUrl } from "@/lib/push"
 import { usePushSubscription } from "@/lib/hooks/usePushSubscription"
 import {
   useNotificationsQuery,
@@ -141,8 +142,19 @@ export function NotificationBell({
 
   const navigate = (item: NotificationItem) => {
     setOpen(false)
-    if (item.chatId && onOpenChat) onOpenChat(item.chatId)
-    else if (item.workspaceId && onOpenWorkspace) onOpenWorkspace(item.workspaceId)
+    if (item.chatId && onOpenChat) return onOpenChat(item.chatId)
+    if (item.workspaceId && onOpenWorkspace) return onOpenWorkspace(item.workspaceId)
+
+    // No handler supplied: fall back to a real navigation rather than doing
+    // nothing. The bell is mounted deep in the header, several layers from the
+    // page that owns selectChat, and a notification that swallows its own click
+    // is worse than one extra page load. useUrlSync reconstructs state from the
+    // URL on load, so this lands correctly.
+    const url = pushTargetUrl({
+      chatId: item.chatId,
+      workspaceId: item.workspaceId,
+    })
+    window.location.assign(url)
   }
 
   return (

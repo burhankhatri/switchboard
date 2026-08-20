@@ -36,17 +36,26 @@ describe("buildPushPayload", () => {
 })
 
 describe("pushTargetUrl", () => {
-  it("deep-links to the chat when there is one", () => {
-    expect(pushTargetUrl({ chatId: "c1", workspaceId: "w1" })).toContain("c1")
+  it("uses the app's real chat route", () => {
+    // Must be a path the router actually understands. The app matches
+    // /chat/:chatId and ignores query strings entirely, so an earlier
+    // "/?chat=<id>" form silently dropped the user on the home page and the
+    // notification looked like it did nothing.
+    expect(pushTargetUrl({ chatId: "c1", workspaceId: "w1" })).toBe("/chat/c1")
   })
 
-  it("falls back to the workspace", () => {
-    const url = pushTargetUrl({ chatId: null, workspaceId: "w1" })
-    expect(url).toContain("w1")
+  it("sends a workspace notification to the home page", () => {
+    // There is no workspace route — the active workspace lives in
+    // localStorage. Home is where the picker is, so it is the honest target.
+    expect(pushTargetUrl({ chatId: null, workspaceId: "w1" })).toBe("/")
   })
 
   it("falls back to the app root when neither is set", () => {
     expect(pushTargetUrl({ chatId: null, workspaceId: null })).toBe("/")
+  })
+
+  it("encodes an id that would otherwise break the path", () => {
+    expect(pushTargetUrl({ chatId: "a/b", workspaceId: null })).toBe("/chat/a%2Fb")
   })
 })
 
