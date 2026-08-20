@@ -1,12 +1,15 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { config as loadEnv } from "dotenv"
 import { defineConfig } from "prisma/config"
+import { loadEnvFiles } from "./lib/load-env-files"
 
 const configDir = path.dirname(fileURLToPath(import.meta.url))
-// Mirror Next.js convention: .env.local overrides .env. Both are optional.
-loadEnv({ path: path.join(configDir, ".env") })
-loadEnv({ path: path.join(configDir, ".env.local"), override: true })
+// .env.local overrides .env, but neither overrides a variable already set in
+// the environment. Loading these with dotenv's `override: true` would clobber
+// an explicit DATABASE_URL — which is how `prisma migrate reset --force` in
+// e2e/global-setup.ts ended up resolving to production Neon despite being
+// handed a localhost URL. See lib/load-env-files.ts.
+loadEnvFiles(configDir)
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

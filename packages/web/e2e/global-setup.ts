@@ -40,6 +40,28 @@ export default async function globalSetup() {
     )
   }
 
+  // Belt and braces. The check above reads process.env; what actually gets
+  // reset is whatever prisma.config.ts resolves, and those were not always the
+  // same value — .env.local used to override an explicit DATABASE_URL, so this
+  // localhost check passed while `migrate reset` targeted production Neon.
+  // lib/load-env-files.ts fixes that, but ask Prisma directly rather than
+  // trusting it: this is the last gate before dropping every table.
+  const resolved = execSync("npx prisma migrate status", {
+    cwd: path.resolve(__dirname, ".."),
+    env: { ...process.env, DATABASE_URL: dbUrl },
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+  const datasource = resolved.match(/Datasource .*/)?.[0] ?? "(not reported)"
+  if (!/localhost|127\.0\.0\.1/.test(datasource)) {
+    throw new Error(
+      `\nRefusing to reset: Prisma resolved a non-local database.\n\n` +
+        `  ${datasource}\n\n` +
+        `DATABASE_URL was set to a localhost URL, so something downstream is\n` +
+        `overriding it — check packages/web/prisma.config.ts and .env.local.\n`
+    )
+  }
+
   console.log("🧪 Setting up test database...")
 
   try {
