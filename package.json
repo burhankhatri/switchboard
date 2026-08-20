@@ -30,6 +30,7 @@
     "start:electron": "dotenv -e packages/desktop/.env -e packages/web/.env -e .env -c -- sh -c 'BACKGROUND_AGENTS_URL=\"${BACKGROUND_AGENTS_URL:-https://switchboard.local}\" npm run start -w @switchboard/desktop'",
     "clean": "npm run clean --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @switchboard/web",
     "vercel-build": "npm run build --workspaces --if-present --workspace @switchboard/common --workspace @switchboard/agent-configuration --workspace @switchboard/claude-credentials --workspace @switchboard/mcp --workspace @switchboard/sandbox-git --workspace @switchboard/sandbox-jobs --workspace @switchboard/sandbox-skills --workspace @switchboard/sandbox-terminal --workspace @switchboard/sdk && npm run build -w @switchboard/web"
   },
   "devDependencies": {

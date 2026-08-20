@@ -1,0 +1,95 @@
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+  # No external services, no secrets. This job should always be green, and is
+  # the one to look at first when something goes red.
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      # A permanently-skipped test is a coverage claim that nothing backs.
+      - name: Fail on permanently-skipped tests
+        run: |
+          if grep -rnE "test\.skip\(true|it\.skip\(true|describe\.skip\(true" \
+               packages/*/lib packages/*/e2e packages/*/components 2>/dev/null; then
+            echo "Permanently skipped tests found — skipped is failing"; exit 1
+          fi
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: unit
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: switchboard_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/switchboard_test
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/switchboard_test
+      NEXTAUTH_URL: http://localhost:4000
+      ENABLE_TEST_AUTH: "true"
+      # Not real credentials — E2E signs in through /api/test/auth and pins the
+      # agent to Eliza, the local fake. Only the sandbox specs need a genuine
+      # Daytona key; set DAYTONA_API_KEY as a repository secret to run those.
+      NEXTAUTH_SECRET: e2e-only-not-a-real-secret
+      ENCRYPTION_KEY: e2e-only-not-a-real-encryption-key
+      GITHUB_CLIENT_ID: e2e
+      GITHUB_CLIENT_SECRET: e2e
+      WORKSPACES_REPO: ${{ vars.WORKSPACES_REPO || 'example/agent-workspaces' }}
+      DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # global-setup refuses a non-localhost DATABASE_URL, and the app reads
+      # .env.test ahead of the environment. Write it from the job env.
+      - name: Write packages/web/.env.test
+        run: |
+          cd packages/web
+          for v in DATABASE_URL DIRECT_URL NEXTAUTH_URL NEXTAUTH_SECRET \
+                   ENCRYPTION_KEY GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET \
+                   WORKSPACES_REPO DAYTONA_API_KEY ENABLE_TEST_AUTH; do
+            printf '%s=%s\n' "$v" "${!v}" >> .env.test
+          done
+
+      # Specs that drive a real sandbox need a Daytona key. Without one they
+      # would fail for a reason unrelated to the change under test, so run the
+      # suite that does not need it and say plainly what was left out.
+      - name: E2E (no sandbox required)
+        run: npx playwright test e2e/notifications.spec.ts e2e/repo-picker.spec.ts
+        working-directory: packages/web
+
+      - name: E2E (sandbox specs)
+        if: ${{ env.DAYTONA_API_KEY != '' }}
+        run: npx playwright test --grep-invert "@no-sandbox"
+        working-directory: packages/web
+
+      - name: Note skipped sandbox specs
+        if: ${{ env.DAYTONA_API_KEY == '' }}
+        run: |
+          echo "::warning::DAYTONA_API_KEY is not set — sandbox E2E specs did not run."
+          echo "Set it as a repository secret to cover streaming, idor, multi-window."
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: packages/web/playwright-report/
+          retention-days: 7
