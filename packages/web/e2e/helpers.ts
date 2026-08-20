@@ -57,3 +57,34 @@ export async function setDefaultAgentEliza(page: Page): Promise<void> {
     )
   }
 }
+
+/**
+ * Sign a context in as a named test user and return their id.
+ *
+ * Anything about one person acting on another — an invite, an access check —
+ * needs two distinct sessions, so the test-auth route takes an optional email.
+ * Omit `who` for the default Playwright user.
+ */
+export async function authAsUser(
+  page: Page,
+  context: BrowserContext,
+  who?: { email: string; name: string }
+): Promise<string> {
+  const res = await page.request.post("/api/test/auth", who ? { data: who } : undefined)
+  if (!res.ok()) {
+    throw new Error(`test auth failed: ${res.status()} - ${await res.text()}`)
+  }
+  const { token, userId } = await res.json()
+  await context.addCookies([
+    {
+      name: "next-auth.session-token",
+      value: token,
+      domain: "localhost",
+      path: "/",
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax",
+    },
+  ])
+  return userId
+}

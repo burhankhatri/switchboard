@@ -27,8 +27,13 @@ export async function GET(): Promise<Response> {
   if (isAuthError(auth)) return auth
   const { userId } = auth
 
+  // Members only. This used to return every workspace to every signed-in user
+  // so the launcher could offer an "Available to join" list — which also handed
+  // out each workspace's systemPrompt, describing how that team operates, to
+  // people with no relationship to it. Joining is owner-driven now, so there is
+  // nothing a non-member needs from this list.
   const workspaces = await prisma.workspace.findMany({
-    where: { archived: false },
+    where: { archived: false, members: { some: { userId } } },
     orderBy: { name: "asc" },
     select: {
       id: true,

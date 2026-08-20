@@ -1,28 +1,29 @@
 import { prisma } from "@/lib/db/prisma"
-import { requireAuth, isAuthError, notFound, badRequest } from "@/lib/db/api-helpers"
+import { requireAuth, isAuthError, forbidden, badRequest } from "@/lib/db/api-helpers"
 
 type Ctx = { params: Promise<{ id: string }> }
 
-/** POST — join a workspace. Idempotent: joining twice is not an error. */
-export async function POST(_req: Request, { params }: Ctx): Promise<Response> {
+/**
+ * POST — refused. Joining is not self-serve.
+ *
+ * This used to upsert the caller straight into the workspace, checking only
+ * that they were signed in. Membership is not a label: it decrypts that
+ * workspace's connection secrets into the sandbox on every run, so anyone who
+ * could reach this endpoint could take a live CRM token and an outbound email
+ * key. The only thing preventing that was an allowlist on sign-in, which meant
+ * the product could never be opened up without giving strangers those
+ * credentials.
+ *
+ * An owner adds people through POST /api/workspaces/[id]/members, which checks
+ * ownership and tells the person they were added. Kept as an explicit 403
+ * rather than deleted so an old client gets a reason instead of a 405 that
+ * reads like a bug.
+ */
+export async function POST(): Promise<Response> {
   const auth = await requireAuth()
   if (isAuthError(auth)) return auth
-  const { userId } = auth
-  const { id } = await params
 
-  const workspace = await prisma.workspace.findFirst({
-    where: { id, archived: false },
-    select: { id: true },
-  })
-  if (!workspace) return notFound("Workspace not found")
-
-  await prisma.workspaceMember.upsert({
-    where: { workspaceId_userId: { workspaceId: id, userId } },
-    create: { workspaceId: id, userId, role: "member" },
-    update: {},
-  })
-
-  return Response.json({ joined: true })
+  return forbidden("Ask a workspace owner to add you — workspaces are invite-only")
 }
 
 /**
