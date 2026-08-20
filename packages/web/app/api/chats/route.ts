@@ -108,6 +108,10 @@ export async function GET(req: NextRequest): Promise<Response> {
       pinned: chat.pinned,
       parentChatId: chat.parentChatId,
       needsSync: chat.needsSync,
+      // This response is an explicit field map, so anything left out simply
+      // does not exist as far as the whole client is concerned — the sidebar
+      // marker rendered zero times for exactly that reason.
+      awaitingInput: chat.awaitingInput,
       createdAt: chat.createdAt.getTime(),
       updatedAt: chat.updatedAt.getTime(),
       lastActiveAt: chat.lastActiveAt.getTime(),
