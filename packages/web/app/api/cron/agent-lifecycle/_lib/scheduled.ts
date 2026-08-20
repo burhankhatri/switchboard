@@ -1,5 +1,6 @@
 import { Daytona } from "@daytonaio/sdk"
 import { Prisma } from "@prisma/client"
+import { notifyAsync } from "@/lib/db/notifications"
 import { randomUUID } from "crypto"
 import { format } from "date-fns"
 import { createSandboxGit } from "@switchboard/sandbox-git"
@@ -389,8 +390,23 @@ export async function finalizeScheduledRun(
         backgroundSessionId: null,
         sessionId: snapshot.sessionId || undefined,
         lastActiveAt: new Date(),
+        awaitingInput: !!snapshot.needsInput,
       },
     })
+
+    // This is the case the whole feature exists for. A scheduled run fires on
+    // the cron with nobody watching; if it ends by asking a question, the run
+    // reports success and the question sits in a chat no one opens. Notifying
+    // is the only thing that makes it visible.
+    if (snapshot.needsInput) {
+      notifyAsync({
+        userId: job.userId,
+        kind: "agent_needs_input",
+        title: `${job.name} needs your input`,
+        body: "A scheduled run stopped to ask a question and is waiting for a reply.",
+        chatId: run.chatId,
+      })
+    }
   }
 
   // 2. Count commits and maybe create PR
