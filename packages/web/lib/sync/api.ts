@@ -247,6 +247,11 @@ export async function updateSettings(data: {
 export function toChatType(serverChat: ChatResponse): Chat {
   return {
     id: serverChat.id,
+    // Load-bearing: the sidebar and the home page filter chats by workspace.
+    // Dropping this here made every chat invisible the moment a workspace was
+    // opened, and did it silently — an empty list is a legitimate state, so it
+    // looked like "no chats here yet" rather than a mapping bug.
+    workspaceId: serverChat.workspaceId ?? null,
     repo: serverChat.repo,
     baseBranch: serverChat.baseBranch,
     branch: serverChat.branch,
