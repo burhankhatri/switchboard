@@ -33,6 +33,7 @@ export interface ChatResponse {
   pinned?: boolean
   parentChatId: string | null
   needsSync: boolean
+  awaitingInput?: boolean
   createdAt: number
   updatedAt: number
   lastActiveAt: number
@@ -263,6 +264,7 @@ export function toChatType(serverChat: ChatResponse): Chat {
     pinned: serverChat.pinned ?? false,
     parentChatId: serverChat.parentChatId || undefined,
     needsSync: serverChat.needsSync,
+    awaitingInput: serverChat.awaitingInput ?? false,
     createdAt: serverChat.createdAt,
     updatedAt: serverChat.updatedAt,
     lastActiveAt: serverChat.lastActiveAt,

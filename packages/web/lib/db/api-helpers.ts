@@ -388,6 +388,7 @@ export async function getChatWithAuth(
   pinned: boolean
   parentChatId: string | null
   needsSync: boolean
+  awaitingInput: boolean
   environmentVariables: unknown
   createdAt: Date
   updatedAt: Date

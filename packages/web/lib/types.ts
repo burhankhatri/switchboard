@@ -227,6 +227,8 @@ export interface Chat {
 
   /** Set when a merge targets this branch but sandbox was stopped. Triggers pull on next execute. */
   needsSync?: boolean
+  /** The last agent turn ended with a question. See lib/needs-input.ts. */
+  awaitingInput?: boolean
 
   /** Set if the last attempt to fetch this chat's messages from the server
    *  failed. Suppresses auto-retry on subsequent selects until the user

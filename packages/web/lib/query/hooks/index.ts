@@ -6,6 +6,8 @@ export { useReposQuery } from "./useReposQuery"
 export { useGitHubUserQuery } from "./useGitHubUserQuery"
 export { useBranchesQuery } from "./useBranchesQuery"
 export { useServersQuery } from "./useServersQuery"
+export { useNotificationsQuery, useMarkNotificationsRead } from "./useNotificationsQuery"
+export type { NotificationItem } from "./useNotificationsQuery"
 export type { ServerInfo } from "./useServersQuery"
 
 // Mutations

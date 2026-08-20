@@ -9,6 +9,7 @@ import { useRepoFolderButton } from "@/lib/hooks/useLocalSync"
 import { useModals, useGit } from "@/lib/contexts"
 import { Input } from "../ui/input"
 import { ShareButton } from "./ShareButton"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 import type { Chat } from "@/lib/types"
 import type { RebaseConflictState } from "@switchboard/common"
 
@@ -193,6 +194,7 @@ export function ChatHeader({
         style={isDesktopApp ? { WebkitAppRegion: "no-drag" } as React.CSSProperties : undefined}
       >
         <FolderSyncButton repo={chat.repo} />
+        <NotificationBell />
         <ShareButton key={chat.id} chatId={chat.id} initialShareId={chat.shareId} />
         {onOpenCommandPalette && (
           <button
