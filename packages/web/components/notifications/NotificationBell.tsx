@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { Bell, MessageCircleQuestion, UserPlus, UserMinus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { pushTargetUrl } from "@/lib/push"
+import { anchoredPanelPosition, type PanelPosition } from "@/lib/anchored-panel"
 import { usePushSubscription } from "@/lib/hooks/usePushSubscription"
 import {
   useNotificationsQuery,
@@ -108,7 +110,35 @@ export function NotificationBell({
   onOpenWorkspace?: (workspaceId: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState<PanelPosition | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  // The panel is portalled out of the sidebar, so it is NOT inside
+  // containerRef — the click-outside check has to know about it separately or
+  // it closes on the first click landing inside the panel itself.
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  const PANEL_WIDTH = 320
+
+  const reposition = useCallback(() => {
+    const button = containerRef.current?.querySelector("button")
+    if (!button) return
+    const rect = button.getBoundingClientRect()
+    setPosition(
+      anchoredPanelPosition({
+        anchor: { left: rect.left, bottom: rect.bottom },
+        viewportWidth: window.innerWidth,
+        panelWidth: PANEL_WIDTH,
+      })
+    )
+  }, [])
+
+  // Before paint, so the panel never shows at the wrong spot for a frame.
+  useLayoutEffect(() => {
+    if (!open) return
+    reposition()
+    window.addEventListener("resize", reposition)
+    return () => window.removeEventListener("resize", reposition)
+  }, [open, reposition])
   const { data } = useNotificationsQuery()
   const markRead = useMarkNotificationsRead()
 
@@ -121,7 +151,10 @@ export function NotificationBell({
     // control elsewhere should close this AND do its own job, rather than being
     // swallowed by an overlay.
     const onDocClick = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (containerRef.current?.contains(target)) return
+      if (panelRef.current?.contains(target)) return
+      setOpen(false)
     }
     const onEscape = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false)
     document.addEventListener("click", onDocClick, true)
@@ -177,33 +210,41 @@ export function NotificationBell({
         )}
       </button>
 
-      {open && (
-        <div
-          // Opens rightward, over the main content. Anchoring it to the right
-          // edge put a 320px panel inside a ~256px sidebar, so it ran off the
-          // left of the screen.
-          className="absolute left-0 top-9 z-50 w-80 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
-          data-testid="notification-panel"
-        >
-          <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <span className="text-[11.5px] font-medium text-muted-foreground">
-              Notifications
-            </span>
-            <PushToggle />
-          </div>
-          {items.length === 0 ? (
-            <p className="px-3 py-6 text-center text-[12.5px] text-muted-foreground">
-              Nothing yet.
-            </p>
-          ) : (
-            <div className="max-h-80 overflow-y-auto">
-              {items.map((item) => (
-                <NotificationRow key={item.id} item={item} onNavigate={navigate} />
-              ))}
+      {open &&
+        position &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={panelRef}
+            // Fixed and portalled to <body>. The sidebar sets backdrop-blur-xl,
+            // which creates a stacking context, so a panel rendered inside it
+            // is painted under the main content whatever its z-index — which is
+            // exactly what happened: the panel was visible up to the sidebar's
+            // edge and cut off there.
+            style={{ top: position.top, left: position.left, width: PANEL_WIDTH }}
+            className="fixed z-[100] overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+            data-testid="notification-panel"
+          >
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <span className="text-[11.5px] font-medium text-muted-foreground">
+                Notifications
+              </span>
+              <PushToggle />
             </div>
-          )}
-        </div>
-      )}
+            {items.length === 0 ? (
+              <p className="px-3 py-6 text-center text-[12.5px] text-muted-foreground">
+                Nothing yet.
+              </p>
+            ) : (
+              <div className="max-h-80 overflow-y-auto">
+                {items.map((item) => (
+                  <NotificationRow key={item.id} item={item} onNavigate={navigate} />
+                ))}
+              </div>
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
