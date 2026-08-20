@@ -28,7 +28,7 @@ export async function gateWorkspace(
   userId: string,
   opts: { requireOwner?: boolean } = {}
 ): Promise<
-  | { ok: true; workspace: { id: string; slug: string; path: string }; role: string }
+  | { ok: true; workspace: { id: string; slug: string; name: string; path: string }; role: string }
   | { ok: false; response: Response }
 > {
   const workspace = await prisma.workspace.findFirst({
@@ -36,6 +36,9 @@ export async function gateWorkspace(
     select: {
       id: true,
       slug: true,
+      // Carried so notifications can name the workspace the way people see it
+      // in the picker, rather than showing them a slug.
+      name: true,
       path: true,
       members: { where: { userId }, select: { role: true } },
     },

@@ -9,13 +9,14 @@ import {
   internalError,
 } from "@/lib/db/api-helpers"
 import { logActivityAsync } from "@/lib/db/activity-log"
+import { notifyAsync } from "@/lib/db/notifications"
 
 type Ctx = { params: Promise<{ id: string; userId: string }> }
 
 async function gateOwner(workspaceId: string, callerId: string) {
   const workspace = await prisma.workspace.findFirst({
     where: { id: workspaceId, archived: false },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, name: true },
   })
   if (!workspace) return { ok: false as const, response: notFound("Workspace not found") }
 
@@ -131,6 +132,16 @@ export async function DELETE(_req: NextRequest, { params }: Ctx): Promise<Respon
     logActivityAsync(auth.userId, "workspace_member_removed", {
       workspaceSlug: g.workspace.slug,
       targetUserId: userId,
+    })
+
+    // Losing access silently is worse than gaining it silently: the workspace
+    // simply vanishes from the picker and looks like a bug.
+    notifyAsync({
+      userId,
+      actorId: auth.userId,
+      kind: "workspace_member_removed",
+      title: `You were removed from ${g.workspace.name}`,
+      workspaceId: id,
     })
 
     return Response.json({ removed: true })

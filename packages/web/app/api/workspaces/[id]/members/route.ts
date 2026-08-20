@@ -9,6 +9,7 @@ import {
   internalError,
 } from "@/lib/db/api-helpers"
 import { logActivityAsync } from "@/lib/db/activity-log"
+import { notifyAsync } from "@/lib/db/notifications"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -28,7 +29,7 @@ type Ctx = { params: Promise<{ id: string }> }
 async function gate(workspaceId: string, userId: string, needOwner: boolean) {
   const workspace = await prisma.workspace.findFirst({
     where: { id: workspaceId, archived: false },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, name: true },
   })
   if (!workspace) return { ok: false as const, response: notFound("Workspace not found") }
 
@@ -146,6 +147,22 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
       workspaceSlug: g.workspace.slug,
       targetUserId: user.id,
       role,
+    })
+
+    // Membership is immediate — there is no invite to accept, which is the
+    // point: you are added and the workspace works. But being silently granted
+    // access to somebody's credentials is disorienting, so say so.
+    const actor = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { name: true, email: true },
+    })
+    notifyAsync({
+      userId: user.id,
+      actorId: auth.userId,
+      kind: "workspace_member_added",
+      title: `${actor?.name ?? actor?.email ?? "Someone"} added you to ${g.workspace.name}`,
+      body: "You can open it from the workspace picker.",
+      workspaceId: id,
     })
 
     return Response.json({
