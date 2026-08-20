@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Bell, MessageCircleQuestion, UserPlus, UserMinus } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { usePushSubscription } from "@/lib/hooks/usePushSubscription"
 import {
   useNotificationsQuery,
   useMarkNotificationsRead,
@@ -53,6 +54,43 @@ function NotificationRow({
       <span className="shrink-0 pt-0.5 text-[11px] tabular-nums text-muted-foreground">
         {shortAge(item.createdAt)}
       </span>
+    </button>
+  )
+}
+
+/**
+ * Turning browser push on, from inside the panel.
+ *
+ * Permission is requested here and nowhere else. Asking on page load is the
+ * fastest route to a permanent "block", which cannot be undone from the page —
+ * so the ask lives behind a control the user chose to click.
+ */
+function PushToggle() {
+  const { state, busy, subscribe, unsubscribe } = usePushSubscription()
+
+  // Nothing to offer if the browser cannot do it or the server has no keys.
+  if (state === "unsupported" || state === "unconfigured") return null
+
+  if (state === "denied") {
+    return (
+      <span
+        className="text-[11px] text-muted-foreground"
+        title="Notifications are blocked for this site. Re-enable them in your browser's site settings — a page cannot ask again once blocked."
+      >
+        Push blocked
+      </span>
+    )
+  }
+
+  const on = state === "subscribed"
+  return (
+    <button
+      onClick={() => (on ? unsubscribe() : subscribe())}
+      disabled={busy}
+      className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50 cursor-pointer"
+      data-testid="push-toggle"
+    >
+      {busy ? "…" : on ? "Disable push" : "Enable push"}
     </button>
   )
 }
@@ -128,8 +166,11 @@ export function NotificationBell({
           className="absolute right-0 top-9 z-50 w-80 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
           data-testid="notification-panel"
         >
-          <div className="border-b border-border px-3 py-2 text-[11.5px] font-medium text-muted-foreground">
-            Notifications
+          <div className="flex items-center justify-between border-b border-border px-3 py-2">
+            <span className="text-[11.5px] font-medium text-muted-foreground">
+              Notifications
+            </span>
+            <PushToggle />
           </div>
           {items.length === 0 ? (
             <p className="px-3 py-6 text-center text-[12.5px] text-muted-foreground">

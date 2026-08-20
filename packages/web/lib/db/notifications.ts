@@ -56,6 +56,25 @@ export async function notify(input: NotifyInput): Promise<void> {
     })
   } catch (err) {
     console.error("[notifications] failed to record", input.kind, err)
+    // No push either: pushing a notification the bell will never show would
+    // send the user to look for something that is not there.
+    return
+  }
+
+  // Imported lazily so this module — and everything that records a
+  // notification — does not pull the web-push dependency into paths that never
+  // send one. Also a no-op when VAPID keys are unset.
+  try {
+    const { sendPushToUser } = await import("./push-delivery")
+    await sendPushToUser(input.userId, {
+      kind: input.kind,
+      title: input.title,
+      body: input.body ?? null,
+      chatId: input.chatId ?? null,
+      workspaceId: input.workspaceId ?? null,
+    })
+  } catch (err) {
+    console.error("[notifications] push delivery failed", err)
   }
 }
 

@@ -27,6 +27,7 @@ Unit tests need none. E2E reads `packages/web/.env.test` (gitignored), which
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | NextAuth provider config at boot. |
 | `WORKSPACES_REPO` | Where workspace folders live. |
 | `DAYTONA_API_KEY` | Only needed by tests that actually spin a sandbox. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push. **Optional** — with these unset, push degrades to a no-op and the "Enable push" control hides itself, so the rest of notifications works unchanged. Generate a pair with `npx web-push generate-vapid-keys`; `VAPID_SUBJECT` is a `mailto:` or https URL identifying the sender. |
 
 ### Creating the test database
 
