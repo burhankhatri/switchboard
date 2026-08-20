@@ -4,6 +4,10 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/db/prisma"
 import { decrypt } from "@/lib/db/encryption"
 import {
+  shouldRefreshGitHubToken,
+  parseRefreshResponse,
+} from "@/lib/github-token-refresh"
+import {
   CREDENTIAL_KEYS,
   normalizeStoredCredentials,
   type Credentials,
@@ -272,11 +276,92 @@ export async function getGitHubToken(userId: string): Promise<string | null> {
 
   const account = await prisma.account.findFirst({
     where: { userId, provider: "github" },
-    select: { access_token: true },
+    select: {
+      id: true,
+      access_token: true,
+      refresh_token: true,
+      expires_at: true,
+    },
   })
-  const token = account?.access_token ?? null
-  if (token) tokenCache.set(userId, { token, expires: Date.now() + TOKEN_TTL_MS })
+  if (!account?.access_token) return null
+
+  if (
+    shouldRefreshGitHubToken({
+      expiresAt: account.expires_at ?? null,
+      hasRefreshToken: !!account.refresh_token,
+    })
+  ) {
+    const refreshed = await refreshGitHubAccount(account.id, account.refresh_token!)
+    if (refreshed) {
+      tokenCache.set(userId, { token: refreshed, expires: Date.now() + TOKEN_TTL_MS })
+      return refreshed
+    }
+    // Refresh failed — the refresh token is spent or revoked. Returning the
+    // dead access token would produce a 401 somewhere far from the cause; null
+    // surfaces as "GitHub account not linked", which tells the user to sign in
+    // again, which is the actual fix.
+    return null
+  }
+
+  const token = account.access_token
+  tokenCache.set(userId, { token, expires: Date.now() + TOKEN_TTL_MS })
   return token
+}
+
+/**
+ * Exchange the refresh token for a new access token and persist both.
+ *
+ * De-duplicated per account: GitHub rotates the refresh token on use, so two
+ * concurrent refreshes would race and the loser would have written a refresh
+ * token that is already spent — locking the user out more thoroughly than the
+ * expiry did.
+ */
+const refreshesInFlight = new Map<string, Promise<string | null>>()
+
+function refreshGitHubAccount(accountId: string, refreshToken: string): Promise<string | null> {
+  const existing = refreshesInFlight.get(accountId)
+  if (existing) return existing
+
+  const run = (async (): Promise<string | null> => {
+    try {
+      const res = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          client_id: process.env.GITHUB_CLIENT_ID,
+          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+        }),
+      })
+      const parsed = parseRefreshResponse(await res.json().catch(() => null))
+      if ("error" in parsed) {
+        console.error("[github] token refresh failed:", parsed.error)
+        return null
+      }
+
+      await prisma.account.update({
+        where: { id: accountId },
+        data: {
+          access_token: parsed.accessToken,
+          expires_at: parsed.expiresAt,
+          ...(parsed.refreshToken ? { refresh_token: parsed.refreshToken } : {}),
+          ...(parsed.refreshTokenExpiresIn
+            ? { refresh_token_expires_in: parsed.refreshTokenExpiresIn }
+            : {}),
+        },
+      })
+      return parsed.accessToken
+    } catch (err) {
+      console.error("[github] token refresh error:", err)
+      return null
+    } finally {
+      refreshesInFlight.delete(accountId)
+    }
+  })()
+
+  refreshesInFlight.set(accountId, run)
+  return run
 }
 
 /**
