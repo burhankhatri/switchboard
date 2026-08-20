@@ -4,7 +4,7 @@
  * Pure function — no mocks needed.
  */
 import { describe, it, expect } from "vitest"
-import { buildSystemPrompt } from "./session"
+import { buildSystemPrompt, buildContentBlocks } from "./session"
 import type { SkillCatalogEntry } from "./session"
 
 describe("buildSystemPrompt", () => {
@@ -166,5 +166,76 @@ describe("buildSystemPrompt — workspaces", () => {
       prompt.indexOf("<workspace_instructions>")
     )
     expect(prompt).toContain("they do not override any rule above")
+  })
+})
+
+/**
+ * A Read of a directory is not a file the viewer can open.
+ *
+ * getToolDetail sets filePath from the tool's input, which is all it has at
+ * tool_start. But Read accepts a directory, and ToolChips routes any chip with
+ * a filePath straight to the file viewer — so a directory read opened a blank
+ * canvas instead of showing the listing the agent actually got back.
+ *
+ * The payloads below are copied verbatim from a real run.
+ */
+describe("buildContentBlocks — Read on a directory", () => {
+  const dirOutput = [
+    "<path>/home/daytona/project/workspaces/gtm-lead-engine/.claude/skills</path>",
+    "<type>directory</type>",
+    "<entries>",
+    "gtm-lead-engine-guide/",
+    "instantly-campaigns/",
+    "lead-to-campaign/",
+    "",
+    "(3 entries)",
+    "</entries>",
+  ].join("\n")
+
+  const fileOutput = [
+    "<path>/home/daytona/project/workspaces/gtm-lead-engine/.claude/skills/lead-to-campaign/SKILL.md</path>",
+    "<type>file</type>",
+    "<content>",
+    "1: ---",
+    "2: name: lead-to-campaign",
+    "</content>",
+  ].join("\n")
+
+  const read = (path: string, output: string) =>
+    buildContentBlocks([
+      { type: "tool_start", name: "Read", input: { file_path: path } },
+      { type: "tool_end", output },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ] as any)
+
+  it("does not offer a directory to the file viewer", () => {
+    const { toolCalls } = read(
+      "/home/daytona/project/workspaces/gtm-lead-engine/.claude/skills",
+      dirOutput
+    )
+    expect(toolCalls[0].filePath).toBeUndefined()
+  })
+
+  it("keeps the listing as output so the chip can expand it", () => {
+    const { toolCalls } = read(
+      "/home/daytona/project/workspaces/gtm-lead-engine/.claude/skills",
+      dirOutput
+    )
+    expect(toolCalls[0].output).toContain("instantly-campaigns/")
+  })
+
+  it("still offers a real file to the file viewer", () => {
+    const path =
+      "/home/daytona/project/workspaces/gtm-lead-engine/.claude/skills/lead-to-campaign/SKILL.md"
+    const { toolCalls } = read(path, fileOutput)
+    expect(toolCalls[0].filePath).toBe(path)
+  })
+
+  it("leaves filePath alone when the output is in an unrecognised format", () => {
+    // Another agent CLI may not emit <type>. Guessing there would regress the
+    // common case, so an unknown shape keeps the pre-existing behaviour.
+    const path = "/home/daytona/project/README"
+    const { toolCalls } = read(path, "some other agent's output format")
+    expect(toolCalls[0].filePath).toBe(path)
   })
 })

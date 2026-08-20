@@ -18,6 +18,7 @@ import type {
 import type { ContentBlock, ToolCall } from "./types"
 import { PATHS, SANDBOX_CONFIG } from "./constants"
 import { basename } from "./format"
+import { isDirectoryReadOutput } from "./tool-output"
 
 // =============================================================================
 // Tool Name Mapping (SDK uses lowercase, UI expects PascalCase)
@@ -257,7 +258,16 @@ export function buildContentBlocks(events: Event[]): BuildContentBlocksResult {
         if (output.length > TOOL_OUTPUT_MAX_CHARS) {
           output = output.slice(0, TOOL_OUTPUT_MAX_CHARS) + "\n... (output truncated)"
         }
-        allToolCalls[allToolCalls.length - 1].output = output
+        const call = allToolCalls[allToolCalls.length - 1]
+        call.output = output
+        // getToolDetail set filePath from the input path, which is all it had
+        // at tool_start. The result is the first point where a directory read
+        // is distinguishable from a file read, and a directory is not
+        // something the file viewer can open — clearing it here lets the chip
+        // expand the listing instead of routing to an empty viewer.
+        if (call.filePath && isDirectoryReadOutput(output)) {
+          delete call.filePath
+        }
       }
     }
   }

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ChevronRight, FileText, FolderSearch, Pencil, Search, Terminal, Wrench } from "lucide-react"
 import type { ToolCall } from "@switchboard/common"
 import { cn } from "@/lib/utils"
+import { isDirectoryReadOutput } from "@/lib/tool-output"
 
 const ICONS: Record<string, typeof Wrench> = {
   write: Pencil, edit: Pencil, read: FileText,
@@ -33,11 +34,15 @@ export function ToolChips({
           const Icon = ICONS[tool.tool] ?? Wrench
           const open = openIndex === i
           const expandable = !!tool.output || !!tool.fullSummary
+          // Messages stored before the summariser learned to drop filePath for
+          // a directory still carry one, so check the output here too rather
+          // than sending an old chip to a viewer that renders nothing.
+          const viewable = !!tool.filePath && !isDirectoryReadOutput(tool.output)
           return (
             <button
               key={i}
               onClick={() => {
-                if (tool.filePath && onOpenFile) return onOpenFile(tool.filePath)
+                if (viewable && onOpenFile) return onOpenFile(tool.filePath!)
                 if (expandable) setOpenIndex(open ? null : i)
               }}
               className={cn(
@@ -45,7 +50,7 @@ export function ToolChips({
                 open
                   ? "border-primary/40 bg-accent text-foreground"
                   : "border-border bg-card/60 text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-                (expandable || tool.filePath) && "cursor-pointer"
+                (expandable || viewable) && "cursor-pointer"
               )}
               title={tool.fullSummary ?? tool.summary}
             >
