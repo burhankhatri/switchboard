@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from "vitest"
 import { buildSystemPrompt, buildContentBlocks } from "./session"
+import { NEEDS_INPUT_MARKER } from "./needs-input"
 import type { SkillCatalogEntry } from "./session"
 
 describe("buildSystemPrompt", () => {
@@ -98,6 +99,13 @@ describe("buildSystemPrompt", () => {
   it("always includes the logs directory section", () => {
     const prompt = buildSystemPrompt(repoPath)
     expect(prompt).toContain("## Logs Directory")
+  })
+
+  it("tells the agent to mark a blocked turn with the needs-input marker", () => {
+    // Without this the harness cannot tell "I am waiting on you" from "I am
+    // done", because both end the turn with prose.
+    const prompt = buildSystemPrompt(repoPath)
+    expect(prompt).toContain(NEEDS_INPUT_MARKER)
   })
 
   it("instructs the agent not to use AskUserQuestion and to ask inline instead", () => {
@@ -237,5 +245,46 @@ describe("buildContentBlocks — Read on a directory", () => {
     const path = "/home/daytona/project/README"
     const { toolCalls } = read(path, "some other agent's output format")
     expect(toolCalls[0].filePath).toBe(path)
+  })
+})
+
+/**
+ * The needs-input marker must never reach stored content.
+ *
+ * buildContentBlocks is the single place `content` and `contentBlocks` are
+ * produced for AgentSnapshot, so stripping here covers every persist path
+ * rather than relying on each one remembering.
+ */
+describe("buildContentBlocks — needs-input marker", () => {
+  const run = (text: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    buildContentBlocks([{ type: "token", text }] as any)
+
+  it("flags a turn that ends with the marker", () => {
+    const { needsInput } = run(`1. Which campaign?\n\n${NEEDS_INPUT_MARKER}`)
+    expect(needsInput).toBe(true)
+  })
+
+  it("strips the marker from content", () => {
+    const { content } = run(`1. Which campaign?\n\n${NEEDS_INPUT_MARKER}`)
+    expect(content).not.toContain("needs-input")
+    expect(content).toContain("1. Which campaign?")
+  })
+
+  it("strips the marker from text content blocks too", () => {
+    // The transcript renders contentBlocks, not `content`. Stripping only the
+    // latter would leave the marker in the thing people actually read.
+    const { contentBlocks } = run(`Question?\n\n${NEEDS_INPUT_MARKER}`)
+    const text = contentBlocks
+      .filter((b) => b.type === "text")
+      .map((b) => (b as { text: string }).text)
+      .join("")
+    expect(text).not.toContain("needs-input")
+  })
+
+  it("leaves an ordinary turn untouched", () => {
+    const { content, needsInput } = run("Done — pushed and green.")
+    expect(needsInput).toBe(false)
+    expect(content.trim()).toBe("Done — pushed and green.")
   })
 })

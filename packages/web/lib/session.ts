@@ -19,6 +19,7 @@ import type { ContentBlock, ToolCall } from "./types"
 import { PATHS, SANDBOX_CONFIG } from "./constants"
 import { basename } from "./format"
 import { isDirectoryReadOutput } from "./tool-output"
+import { extractNeedsInput, NEEDS_INPUT_MARKER } from "./needs-input"
 
 // =============================================================================
 // Tool Name Mapping (SDK uses lowercase, UI expects PascalCase)
@@ -123,6 +124,10 @@ ${catalog}
 - Never use the AskUserQuestion tool.
 - When you need clarification, ask the user directly by writing a numbered list of questions in your response.
 - After asking, finish your turn so the user can respond.
+- End that reply with this marker on its own final line, so the interface can show the user you are waiting on them:
+${NEEDS_INPUT_MARKER}
+- Use the marker ONLY when you genuinely cannot continue without an answer. Finishing work and offering to do more is not the same thing, and marking it as blocked trains the user to ignore the signal.
+- The marker is removed before the message is displayed. Do not mention it.
 
 ## User Slash Commands
 The user has access to the following slash commands in the chat interface:
@@ -213,6 +218,8 @@ export interface BuildContentBlocksResult {
   content: string
   toolCalls: ToolCall[]
   contentBlocks: ContentBlock[]
+  /** The agent signalled it is waiting on the user. See lib/needs-input.ts. */
+  needsInput: boolean
 }
 
 export function buildContentBlocks(events: Event[]): BuildContentBlocksResult {
@@ -280,10 +287,30 @@ export function buildContentBlocks(events: Event[]): BuildContentBlocksResult {
     blocks.push({ type: "text", text: pendingText })
   }
 
+  // The needs-input marker is stripped here, at the one place both `content`
+  // and `contentBlocks` are produced, rather than in each persist path. The
+  // transcript renders contentBlocks, so missing those would leave the marker
+  // in the thing people actually read.
+  const { content: cleaned, needsInput } = extractNeedsInput(allContent)
+  allContent = cleaned
+
+  if (needsInput) {
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i]
+      if (block.type !== "text") continue
+      blocks[i] = { type: "text", text: extractNeedsInput(block.text).content }
+    }
+  }
+
   // Ensure content ends with newline
   if (allContent && !allContent.endsWith("\n")) {
     allContent += "\n"
   }
 
-  return { content: allContent, toolCalls: allToolCalls, contentBlocks: blocks }
+  return {
+    content: allContent,
+    toolCalls: allToolCalls,
+    contentBlocks: blocks,
+    needsInput,
+  }
 }

@@ -107,3 +107,122 @@ describe("pg-sanitize", () => {
     expect(input.tool).toBe(`gr${NUL}ep`)
   })
 })
+
+describe("persistAgentSnapshot — awaiting input", () => {
+  it("marks the chat as awaiting input when the agent asked a question", async () => {
+    const { client, chat } = makeClient()
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot({ needsInput: true }),
+      isFinal: true,
+      userId: "user-1",
+    })
+    expect(chat.update.mock.calls[0][0].data.awaitingInput).toBe(true)
+  })
+
+  it("clears the flag on an ordinary finish", async () => {
+    // Not merely "leaves it alone": a chat that was waiting on an answer and
+    // has since run again is no longer waiting, and a stale flag would keep it
+    // badged forever.
+    const { client, chat } = makeClient()
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot(),
+      isFinal: true,
+      userId: "user-1",
+    })
+    expect(chat.update.mock.calls[0][0].data.awaitingInput).toBe(false)
+  })
+
+  it("does not touch the flag on a non-final write", async () => {
+    const { client, chat } = makeClient()
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot({ needsInput: true }),
+      isFinal: false,
+      userId: "user-1",
+    })
+    expect(chat.update).not.toHaveBeenCalled()
+  })
+
+  it("still releases the chat from running when it is awaiting input", async () => {
+    // A blocked turn is a finished turn. If status stayed "running" the user
+    // could not reply, which is the one thing the notification asks them to do.
+    const { client, chat } = makeClient()
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot({ needsInput: true }),
+      isFinal: true,
+      userId: "user-1",
+    })
+    const { data } = chat.update.mock.calls[0][0]
+    expect(data.status).toBe("ready")
+    expect(data.backgroundSessionId).toBeNull()
+  })
+})
+
+describe("persistAgentSnapshot — notifying", () => {
+  it("notifies the chat owner that the agent is waiting", async () => {
+    const { client } = makeClient()
+    const notify = vi.fn()
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot({ needsInput: true }),
+      isFinal: true,
+      userId: "user-1",
+      chatName: "GTM push",
+      notify,
+    })
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify.mock.calls[0][0]).toMatchObject({
+      userId: "user-1",
+      kind: "agent_needs_input",
+      chatId: "chat-1",
+    })
+    expect(notify.mock.calls[0][0].title).toContain("GTM push")
+  })
+
+  it("does not notify on an ordinary finish", async () => {
+    const { client } = makeClient()
+    const notify = vi.fn()
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot(),
+      isFinal: true,
+      userId: "user-1",
+      notify,
+    })
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it("does not notify when the chat status reset failed", async () => {
+    // The notification tells the user to go and reply. If the chat is still
+    // stranded as "running" they cannot, so sending them there is worse than
+    // saying nothing.
+    const { client, chat } = makeClient()
+    chat.update.mockRejectedValueOnce(new Error("db down"))
+    const notify = vi.fn()
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot({ needsInput: true }),
+      isFinal: true,
+      userId: "user-1",
+      notify,
+    })
+    expect(notify).not.toHaveBeenCalled()
+  })
+})

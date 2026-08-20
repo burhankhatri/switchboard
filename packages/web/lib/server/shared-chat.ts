@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma"
 import { NEW_REPOSITORY } from "@/lib/types"
+import { extractNeedsInput } from "@/lib/needs-input"
 
 // =============================================================================
 // Shared-chat data loading + sanitization
@@ -49,6 +50,11 @@ function sanitizeToolCalls(value: unknown): unknown {
   return value.map(sanitizeToolCall).filter(Boolean)
 }
 
+/** Strip the needs-input marker from a text block's text. */
+function sanitizeText(value: unknown): unknown {
+  return typeof value === "string" ? extractNeedsInput(value).content : value
+}
+
 /** Strip `filePath` from tool calls nested inside content blocks. */
 function sanitizeContentBlocks(value: unknown): unknown {
   if (!Array.isArray(value)) return value
@@ -60,6 +66,10 @@ function sanitizeContentBlocks(value: unknown): unknown {
     ) {
       const b = block as Record<string, unknown>
       return { ...b, toolCalls: sanitizeToolCalls(b.toolCalls) }
+    }
+    if (block && typeof block === "object" && (block as Record<string, unknown>).type === "text") {
+      const b = block as Record<string, unknown>
+      return { ...b, text: sanitizeText(b.text) }
     }
     return block
   })
@@ -73,7 +83,7 @@ function toSharedMessage(m: NonNullable<MessageRow>, inherited = false): SharedM
   return {
     id: inherited ? `inherited-${m.id}` : m.id,
     role: m.role,
-    content: m.content,
+    content: extractNeedsInput(m.content).content,
     timestamp: Number(m.timestamp),
     messageType: m.messageType,
     isError: m.isError,

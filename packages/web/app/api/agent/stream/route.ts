@@ -14,6 +14,7 @@ import { isAuthError, requireChatStreamAccess } from "@/lib/db/api-helpers"
 import { meterAssistantTurn } from "@/lib/server/token-metering"
 import { autoPushChat, type PushInfo } from "@/lib/git/auto-push"
 import { persistAgentSnapshot } from "./_lib/persist-snapshot"
+import { notifyAsync } from "@/lib/db/notifications"
 
 // Allow longer streaming connections (5 minutes max)
 export const maxDuration = 300
@@ -102,6 +103,9 @@ export async function GET(req: Request) {
           assistantMessageId,
           snapshot: snap,
           isFinal,
+          userId: auth.userId,
+          chatName: chat.displayName,
+          notify: notifyAsync,
         })
         lastDbPersist = Date.now()
       }

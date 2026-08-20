@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client"
 import type { AgentSnapshot } from "@/lib/agent-session"
 import { stripNullBytes, stripNullBytesDeep } from "@/lib/db/pg-sanitize"
+import type { NotifyInput } from "@/lib/db/notifications"
 
 /**
  * Minimal slice of PrismaClient this module needs. Declared structurally so the
@@ -36,8 +37,20 @@ export async function persistAgentSnapshot(params: {
   assistantMessageId: string
   snapshot: AgentSnapshot
   isFinal: boolean
+  /** Owner of the chat, so a blocked turn can notify them. */
+  userId?: string
+  /** Shown in the notification so it is identifiable without opening it. */
+  chatName?: string | null
+  /**
+   * Injected rather than imported, for the same reason the prisma client is:
+   * importing the notifications module pulls in the prisma singleton, which
+   * throws at module load without a DATABASE_URL and makes this file
+   * untestable without a database.
+   */
+  notify?: (input: NotifyInput) => void
 }): Promise<{ statusReset: boolean }> {
-  const { prisma, chatId, assistantMessageId, snapshot, isFinal } = params
+  const { prisma, chatId, assistantMessageId, snapshot, isFinal, userId, chatName, notify } =
+    params
 
   // 1. Persist the message body (best-effort, NUL-sanitized).
   try {
@@ -72,8 +85,25 @@ export async function persistAgentSnapshot(params: {
         status: snapshot.status === "error" ? "error" : "ready",
         backgroundSessionId: null,
         sessionId: snapshot.sessionId || undefined,
+        // Always written, never left alone: a chat that was waiting on an
+        // answer and has since run again is not waiting any more, and a stale
+        // flag would badge it forever.
+        awaitingInput: !!snapshot.needsInput,
       },
     })
+
+    // After the status reset, not before — a notification pointing at a chat
+    // still marked "running" sends the user somewhere they cannot reply.
+    if (snapshot.needsInput && userId && notify) {
+      notify({
+        userId,
+        kind: "agent_needs_input",
+        title: chatName ? `${chatName} needs your input` : "An agent needs your input",
+        body: "The agent asked a question and is waiting for your reply.",
+        chatId,
+      })
+    }
+
     return { statusReset: true }
   } catch (error) {
     console.error("[agent/stream] chat finalize error:", error)

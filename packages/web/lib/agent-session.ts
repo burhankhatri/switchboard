@@ -254,6 +254,12 @@ export interface AgentSnapshot {
    *  model-not-available) stay undefined. */
   errorKind?: "crash" | "incomplete"
   sessionId?: string
+  /**
+   * The agent ended this turn waiting on the user. Carried on the snapshot so
+   * the persist path can mark the chat and notify without re-parsing content
+   * that has already had the marker stripped out of it.
+   */
+  needsInput?: boolean
 }
 
 /**
@@ -266,7 +272,7 @@ function summarizeEvents(
   running: boolean,
   sessionId: string | null
 ): AgentSnapshot {
-  const { content, toolCalls, contentBlocks } = buildContentBlocks(events)
+  const { content, toolCalls, contentBlocks, needsInput } = buildContentBlocks(events)
 
   const crashEvent = events.find(
     (e) => (e as { type: string }).type === "agent_crashed"
@@ -335,6 +341,11 @@ function summarizeEvents(
     toolCalls,
     contentBlocks,
     sessionId: sessionId || undefined,
+    // Only on a clean finish. A turn that crashed or errored is not waiting on
+    // the user — it failed, and the error paths above say so. Telling someone a
+    // question is pending when the agent actually died sends them to a chat
+    // with nothing to answer.
+    needsInput: isCompleted ? needsInput : undefined,
   }
 }
 

@@ -93,6 +93,10 @@ export async function persistTurn(params: {
         status: "running",
         backgroundSessionId,
         lastActiveAt: new Date(),
+        // The user has answered, so the chat is no longer waiting on them.
+        // Cleared here rather than only when the agent next finishes, so the
+        // badge goes away as they hit send instead of minutes later.
+        awaitingInput: false,
         // Persist agent/model so subsequent messages on this chat keep them
         agent: payload.agent,
         model: payload.model,

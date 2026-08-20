@@ -137,6 +137,7 @@ export interface ChatStreamAccessResult {
     sandboxId: string | null
     backgroundSessionId: string | null
     previewUrlPattern: string | null
+    displayName: string | null
   }
 }
 
@@ -175,6 +176,9 @@ export async function requireChatStreamAccess(
       sandboxId: chat.sandboxId,
       backgroundSessionId: chat.backgroundSessionId,
       previewUrlPattern: chat.previewUrlPattern,
+      // Carried so a needs-input notification can name the chat rather than
+      // saying "an agent" — the row is already loaded, so this costs nothing.
+      displayName: chat.displayName,
     },
   }
 }

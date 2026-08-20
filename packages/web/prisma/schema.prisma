@@ -153,6 +153,12 @@ model Chat {
   displayName String?
   status      String  @default("pending") // pending, creating, ready, running, error
 
+  /// The last agent turn ended with a question rather than an answer. Separate
+  /// from `status`, which describes the run: a blocked turn is a *finished*
+  /// run (status "ready") that happens to be waiting on a person. Cleared when
+  /// the user replies or the agent runs again.
+  awaitingInput Boolean @default(false)
+
   // Pinned chats are sorted to the top of the sidebar and command palettes.
   pinned Boolean @default(false)
 
