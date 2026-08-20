@@ -44,7 +44,11 @@ function NotificationRow({
     >
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] text-foreground">{item.title}</span>
+        {/* Two lines, not truncate: the workspace or chat name sits at the END
+            of the title ("Wayne added you to Marketing Automation"), so a
+            single truncated line cuts off the one part that identifies what
+            the notification is about. */}
+        <span className="block line-clamp-2 text-[13px] text-foreground">{item.title}</span>
         {item.body && (
           <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
             {item.body}
@@ -163,7 +167,10 @@ export function NotificationBell({
 
       {open && (
         <div
-          className="absolute right-0 top-9 z-50 w-80 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+          // Opens rightward, over the main content. Anchoring it to the right
+          // edge put a 320px panel inside a ~256px sidebar, so it ran off the
+          // left of the screen.
+          className="absolute left-0 top-9 z-50 w-80 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
           data-testid="notification-panel"
         >
           <div className="flex items-center justify-between border-b border-border px-3 py-2">

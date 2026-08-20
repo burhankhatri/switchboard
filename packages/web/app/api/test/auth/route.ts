@@ -9,7 +9,7 @@ import { prisma } from "@/lib/db/prisma"
 import { encode } from "next-auth/jwt"
 import { internalError } from "@/lib/db/api-helpers"
 
-export async function POST() {
+export async function POST(req?: Request) {
   // Safety check: only allow in test mode
   if (process.env.ENABLE_TEST_AUTH !== "true") {
     return Response.json(
@@ -19,14 +19,23 @@ export async function POST() {
   }
 
   try {
-    // Create or find test user
+    // An optional email lets a test hold two distinct sessions, which is the
+    // only way to exercise anything involving one person acting on another —
+    // a workspace invite notification, for instance, is never sent to the actor.
+    let email = "test@playwright.local"
+    let name = "Playwright Test User"
+    if (req) {
+      const body = await req.json().catch(() => null)
+      if (typeof body?.email === "string" && body.email.endsWith(".local")) {
+        email = body.email
+        name = typeof body?.name === "string" ? body.name : body.email
+      }
+    }
+
     const user = await prisma.user.upsert({
-      where: { email: "test@playwright.local" },
+      where: { email },
       update: {},
-      create: {
-        email: "test@playwright.local",
-        name: "Playwright Test User",
-      },
+      create: { email, name },
     })
 
     // Generate session token

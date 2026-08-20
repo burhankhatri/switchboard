@@ -7,6 +7,7 @@ import { WorkspaceFiles } from "@/components/workspaces/WorkspaceFiles"
 import { WorkspaceDropdown } from "@/components/workspaces/WorkspaceDropdown"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { BRAND } from "@/lib/brand"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useSession, signOut } from "next-auth/react"
@@ -544,13 +545,22 @@ export function Sidebar({
             {BRAND.name}
           </h1>
         )}
-        <button
-          onClick={handleToggleCollapse}
-          className="p-1.5 rounded-md hover:bg-accent text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer"
+        {/* The bell lives here rather than in the chat header because it is
+            global, not per-chat — and the chat header does not render at all on
+            the home route, which is exactly where someone arriving to check
+            their notifications lands. */}
+        <div
+          className="flex items-center gap-0.5"
           style={isDesktopApp ? { WebkitAppRegion: "no-drag" } as React.CSSProperties : undefined}
         >
-          <PanelLeft className="h-4 w-4" />
-        </button>
+          {!collapsed && <NotificationBell />}
+          <button
+            onClick={handleToggleCollapse}
+            className="p-1.5 rounded-md hover:bg-accent text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer"
+          >
+            <PanelLeft className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Workspace dropdown — always visible, collapses to icon */}
