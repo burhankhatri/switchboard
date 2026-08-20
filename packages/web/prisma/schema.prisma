@@ -72,6 +72,8 @@ model User {
   workspaces    Workspace[]
   workspaceMemberships WorkspaceMember[]
   tokenUsages   TokenUsage[]
+  notifications Notification[]
+  pushSubscriptions PushSubscription[]
 }
 
 // =============================================================================
@@ -185,6 +187,7 @@ model Chat {
   user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace  Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   messages   Message[]
+  notifications Notification[]
   mcpServers McpServerConnection[]
 
   // Link back to scheduled run (if this chat belongs to one)
@@ -249,6 +252,7 @@ model Workspace {
   scheduledJobs ScheduledJob[]
   members       WorkspaceMember[]
   connections   WorkspaceConnection[]
+  notifications Notification[]
 
   @@index([archived, name])
 }
@@ -646,4 +650,60 @@ model Skill {
 
   @@unique([userId, repo, fullHandle])
   @@index([userId, repo])
+}
+
+/// Something happened that a specific person needs to know about.
+///
+/// Distinct from ActivityLog, which is an append-only audit trail nobody reads
+/// in the course of work. This is an inbox: it is per-recipient, it has a read
+/// state, and it is expected to be emptied.
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+
+  /// "workspace_member_added" | "workspace_member_removed" | "agent_needs_input"
+  kind String
+
+  title String
+  body  String? @db.Text
+
+  /// Where clicking the notification should land. Both nullable and both
+  /// SetNull on delete: deleting a chat must not erase the record that someone
+  /// was asked a question, it just leaves the notification unlinked.
+  chatId      String?
+  workspaceId String?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat      Chat?      @relation(fields: [chatId], references: [id], onDelete: SetNull)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  // Serves both the badge count (userId + readAt) and the list (userId, newest
+  // first) from one index.
+  @@index([userId, readAt, createdAt])
+}
+
+/// A browser push endpoint belonging to one signed-in user on one device.
+///
+/// Endpoints go stale constantly — a cleared site setting or an uninstalled
+/// PWA leaves a row that will never deliver again. The push service reports
+/// that as 404/410, and the sender prunes on it; without that this table only
+/// ever grows.
+model PushSubscription {
+  id     String @id @default(cuid())
+  userId String
+
+  /// The push service URL. Unique because re-subscribing on the same device
+  /// returns the same endpoint, and that must update rather than duplicate.
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
