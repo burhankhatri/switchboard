@@ -6,6 +6,7 @@ import { decrypt } from "@/lib/db/encryption"
 import {
   shouldRefreshGitHubToken,
   parseRefreshResponse,
+  tokenAfterRefresh,
 } from "@/lib/github-token-refresh"
 import {
   CREDENTIAL_KEYS,
@@ -292,15 +293,16 @@ export async function getGitHubToken(userId: string): Promise<string | null> {
     })
   ) {
     const refreshed = await refreshGitHubAccount(account.id, account.refresh_token!)
-    if (refreshed) {
-      tokenCache.set(userId, { token: refreshed, expires: Date.now() + TOKEN_TTL_MS })
-      return refreshed
+    // A failed refresh must not discard a token that still works. GitHub records
+    // an expires_at it does not reliably enforce — a token 2.5 days past its
+    // recorded expiry was still answering /user with 200 — so returning null
+    // here converted a healthy account into "GitHub account not linked": a
+    // permanent re-authorize banner and no sandbox creation at all.
+    const token = tokenAfterRefresh(refreshed, account.access_token)
+    if (token) {
+      tokenCache.set(userId, { token, expires: Date.now() + TOKEN_TTL_MS })
     }
-    // Refresh failed — the refresh token is spent or revoked. Returning the
-    // dead access token would produce a 401 somewhere far from the cause; null
-    // surfaces as "GitHub account not linked", which tells the user to sign in
-    // again, which is the actual fix.
-    return null
+    return token
   }
 
   const token = account.access_token

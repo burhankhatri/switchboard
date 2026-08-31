@@ -71,3 +71,24 @@ export function parseRefreshResponse(body: unknown): RefreshedToken | { error: s
       typeof b.refresh_token_expires_in === "number" ? b.refresh_token_expires_in : null,
   }
 }
+
+/**
+ * Which token to use after attempting a refresh.
+ *
+ * A failed refresh must never discard a stored token that still works. GitHub
+ * records an `expires_at` it does not reliably enforce — observed in
+ * production: a token 2.5 days past its recorded expiry still answered
+ * /user with 200. Treating the refresh as authoritative and returning null
+ * turned that working state into "GitHub account not linked", which showed a
+ * permanent re-authorize banner and stopped sandboxes being created at all.
+ *
+ * Falling back is strictly safer. If the stored token really is dead, the
+ * caller's own 401 handling surfaces it exactly as it did before any refresh
+ * existed; if it is alive, nothing breaks.
+ */
+export function tokenAfterRefresh(
+  refreshed: string | null,
+  stored: string | null
+): string | null {
+  return refreshed ?? stored ?? null
+}

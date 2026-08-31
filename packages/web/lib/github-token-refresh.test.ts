@@ -3,6 +3,7 @@ import {
   shouldRefreshGitHubToken,
   parseRefreshResponse,
   REFRESH_MARGIN_MS,
+  tokenAfterRefresh,
 } from "./github-token-refresh"
 
 const NOW = Date.UTC(2026, 7, 20, 18, 0, 0)
@@ -82,5 +83,23 @@ describe("parseRefreshResponse", () => {
   it("survives a response that omits expiry", () => {
     const out = parseRefreshResponse({ access_token: "gho_new" })
     expect(out).toMatchObject({ accessToken: "gho_new", expiresAt: null })
+  })
+})
+
+describe("tokenAfterRefresh", () => {
+  it("uses the refreshed token when the refresh worked", () => {
+    expect(tokenAfterRefresh("gho_new", "gho_old")).toBe("gho_new")
+  })
+
+  it("keeps the stored token when the refresh failed", () => {
+    // The regression this exists to prevent. Returning null here surfaced as
+    // "GitHub account not linked": a permanent re-authorize banner, no repo
+    // access, and no sandbox creation — while the stored token was still
+    // answering GitHub with 200.
+    expect(tokenAfterRefresh(null, "gho_old")).toBe("gho_old")
+  })
+
+  it("returns null only when there is genuinely nothing to use", () => {
+    expect(tokenAfterRefresh(null, null)).toBeNull()
   })
 })
