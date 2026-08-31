@@ -163,10 +163,30 @@ export const authOptions: NextAuthOptions = {
     },
   },
   events: {
-    async signIn({ user }) {
+    async signIn({ user, profile }) {
       // Log user login activity
       if (user?.id) {
         logActivityAsync(user.id, "login")
+      }
+
+      // Capture the GitHub handle here rather than in the signIn *callback*.
+      // That callback runs before the adapter has created the row, so on a
+      // first sign-in user.id is undefined and the handle was silently never
+      // stored — it only landed if the person signed in a second time. The
+      // handle is the one identifier a teammate actually knows, so without it
+      // "add them by GitHub username" fails for exactly the people being
+      // onboarded. This event fires after the row exists, on every sign-in.
+      const login = (profile as { login?: string } | undefined)?.login
+      if (user?.id && login) {
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { githubLogin: login },
+          })
+        } catch (err) {
+          // Never block a sign-in over this.
+          console.error("[auth] could not store githubLogin:", err)
+        }
       }
     },
     async signOut({ token }) {
