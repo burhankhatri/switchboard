@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/prisma"
 import { logActivityAsync } from "@/lib/db/activity-log"
 import { invalidateGitHubToken } from "@/lib/db/api-helpers"
+import { claimInvitesForLogin } from "@/lib/db/workspace-invites"
 
 /**
  * Cache of the isAdmin flag, for sessions whose token predates it carrying one.
@@ -187,6 +188,21 @@ export const authOptions: NextAuthOptions = {
           // Never block a sign-in over this.
           console.error("[auth] could not store githubLogin:", err)
         }
+
+        // Claim workspace invites addressed to this handle.
+        //
+        // This is what makes "add them before they have an account" work: the
+        // owner's grant is recorded against a GitHub handle and becomes real
+        // membership here, on whichever sign-in happens to be the first. It
+        // runs on every sign-in, not just account creation, so an invite sent
+        // to someone who already had an account lands on their next visit
+        // through the same path.
+        //
+        // Note the ordering: the allowlist in the signIn *callback* has already
+        // run and returned true by the time we get here. An invite therefore
+        // does not admit anyone ALLOWED_GITHUB_LOGINS excludes — a workspace
+        // owner must not be able to widen who may sign in to the deployment.
+        await claimInvitesForLogin(user.id, login)
       }
     },
     async signOut({ token }) {
