@@ -16,7 +16,10 @@ import { PaletteProvider, usePalette } from "@/components/search-palette"
 import { basename } from "@/lib/format"
 import { useChatWithSync } from "@/lib/hooks/useChatWithSync"
 import { useMobile } from "@/lib/hooks/useMobile"
-import { useGitHubTokenCheck } from "@/lib/hooks/useGitHubTokenCheck"
+import {
+  useGitHubSessionGuard,
+  SIGNED_OUT_REASON_KEY,
+} from "@/lib/hooks/useGitHubSessionGuard"
 import { isPreviewOpen, usePreview } from "@/lib/hooks/usePreview"
 import { usePageTitle } from "@/lib/hooks/usePageTitle"
 import { useUrlSync } from "@/lib/hooks/useUrlSync"
@@ -94,7 +97,22 @@ interface HomePageContentProps {
 function HomePageContent({ isMobile }: HomePageContentProps) {
   const pathname = usePathname()
   const { data: session } = useSession()
-  const { githubTokenInvalid, dismissReAuthBanner } = useGitHubTokenCheck()
+  useGitHubSessionGuard()
+
+  // Why the last session ended, when the guard ended it. Read once and cleared:
+  // a sign-out the user did not ask for reads as a bug without an explanation,
+  // and an explanation that outlives the reload reads as one too.
+  const [signedOutReason, setSignedOutReason] = useState<string | null>(null)
+  useEffect(() => {
+    try {
+      const reason = sessionStorage.getItem(SIGNED_OUT_REASON_KEY)
+      if (!reason) return
+      sessionStorage.removeItem(SIGNED_OUT_REASON_KEY)
+      setSignedOutReason(reason)
+    } catch {
+      /* storage disabled — no notice to show */
+    }
+  }, [])
   const modals = useModals()
   const sidebar = useSidebar()
   const { closeOpenFile } = useWorkspace()
@@ -741,6 +759,25 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
         <div className="fixed inset-0 z-[999] cursor-col-resize" />
       )}
 
+      {signedOutReason === "github-expired" && (
+        <div
+          role="alert"
+          className="fixed top-4 right-4 z-[1000] max-w-md rounded-md bg-popover border border-border px-4 py-3 shadow-lg text-sm animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <p className="font-medium">GitHub authorization expired</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            You have been signed out. Sign in again to restore access to
+            repositories, branches and sandboxes.
+          </p>
+          <button
+            onClick={() => setSignedOutReason(null)}
+            className="mt-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Transient error toast — auto-dismisses 5s after errorBanner is set. */}
       {errorBanner && (
         <div
@@ -753,8 +790,6 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
 
       <AppModals
         isMobile={isMobile}
-        githubTokenInvalid={githubTokenInvalid}
-        onDismissReAuthBanner={dismissReAuthBanner}
         onRepoSelect={handleRepoSelect}
         onSaveSettings={updateSettings}
         onSaveEnvVars={handleSaveEnvVars}
