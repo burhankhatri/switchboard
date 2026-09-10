@@ -110,33 +110,50 @@ export const authOptions: NextAuthOptions = {
         token.isAdmin = undefined
       }
       if (account) {
-        // The GitHub handle, and anything keyed off it, has to be done HERE.
+        // Who this GitHub account is. Both fields have to be recorded HERE.
         //
         // next-auth hands this callback the raw provider payload, which carries
-        // `login`. The signIn *event* gets the normalised profile instead — the
-        // GitHub provider's own profile() mapping, which returns only id, name,
-        // email and image (see next-auth/providers/github.js). So `profile.login`
-        // read from that event is always undefined, and the capture that lived
-        // there stored nothing: a first-time user ended up with a null
-        // githubLogin and any invite waiting on their handle stayed pending.
+        // `login`, and the account, which carries the numeric id. Every other
+        // hook is missing one of the three things needed — the raw profile, a
+        // real user id, or a linked account row:
         //
-        // The signIn *callback* does receive the raw profile, but it runs before
-        // the adapter has created the row, so for a new user its `user.id` is
-        // GitHub's numeric account id rather than ours and the update matches
-        // nothing. This callback is the only point with both the raw login and a
-        // real user id — it runs after the row exists and before the event.
+        //   signIn *event*     gets the NORMALISED profile: the GitHub
+        //                      provider's own profile() mapping returns id,
+        //                      name, email, image and drops `login` entirely
+        //                      (next-auth/providers/github.js), so reading
+        //                      profile.login there is undefined every time.
+        //   signIn *callback*  gets the raw profile, but runs before the
+        //                      adapter creates the row, so for a new user
+        //                      `user.id` is GitHub's numeric account id and an
+        //                      update keyed on it matches nothing.
+        //   createUser *event* fires between createUser and linkAccount
+        //                      (next-auth/core/lib/callback-handler.js), so the
+        //                      Account row it went looking for does not exist
+        //                      yet and githubId was never written.
+        //
+        // Each of those failed silently and left a new user half-identified:
+        // null githubLogin, so an invite waiting on their handle stayed
+        // pending, and null githubId. This callback runs after the row exists
+        // and before the event, with both values already in hand.
         const login = (profile as { login?: string } | undefined)?.login
-        if (token.sub && login) {
+        const githubId = account.provider === "github" ? account.providerAccountId : null
+
+        if (token.sub && (login || githubId)) {
           try {
             await prisma.user.update({
               where: { id: token.sub },
-              data: { githubLogin: login },
+              data: {
+                ...(login ? { githubLogin: login } : {}),
+                ...(githubId ? { githubId } : {}),
+              },
             })
           } catch (err) {
             // Never block a sign-in over this.
-            console.error("[auth] could not store githubLogin:", err)
+            console.error("[auth] could not store GitHub identity:", err)
           }
+        }
 
+        if (token.sub && login) {
           // Turn any invite addressed to this handle into real membership.
           // Awaited rather than fired off: the point of the feature is that the
           // workspace is already there when they land, and it costs one indexed
@@ -198,28 +215,13 @@ export const authOptions: NextAuthOptions = {
         logActivityAsync(user.id, "login")
       }
 
-      // The handle and any invite keyed to it are handled in the jwt callback.
-      // This event receives the provider's *normalised* profile, which for
-      // GitHub is {id, name, email, image} — there is no `login` here to read.
+      // Identity capture and invite claiming live in the jwt callback — this
+      // event gets the provider's normalised profile, which has no `login`.
     },
     async signOut({ token }) {
       // Log user logout activity
       if (token?.sub) {
         logActivityAsync(token.sub, "logout")
-      }
-    },
-    async createUser({ user }) {
-      // When a new user is created via OAuth, update with GitHub ID
-      // The adapter creates the user, but we need to ensure githubId is set
-      const account = await prisma.account.findFirst({
-        where: { userId: user.id, provider: "github" },
-        select: { providerAccountId: true },
-      })
-      if (account) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { githubId: account.providerAccountId },
-        })
       }
     },
   },
