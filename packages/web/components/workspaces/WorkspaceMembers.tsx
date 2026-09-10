@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Plus, Loader2, X, Crown, User as UserIcon, Users } from "lucide-react"
+import { Plus, Loader2, X, Crown, User as UserIcon, Users, Clock } from "lucide-react"
 import { BaseDialog } from "@/components/modals/BaseDialog"
 import { dialogIconClass } from "@/components/ui/dialog-parts"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,13 @@ interface Member {
   isYou: boolean
 }
 
+/** Someone invited by GitHub handle who has not signed in yet. */
+interface PendingInvite {
+  id: string
+  githubLogin: string
+  role: string
+}
+
 interface WorkspaceMembersDialogProps {
   open: boolean
   onClose: () => void
@@ -30,7 +37,9 @@ interface WorkspaceMembersDialogProps {
  * Members belong to the workspace as a whole, so this lives in a dialog
  * launched from the workspace selector rather than another sidebar section.
  * Adding someone by GitHub username gives them the skills, scripts and
- * connections immediately — no subscription of their own, no keys.
+ * connections immediately — no subscription of their own, no keys. A handle
+ * with no account behind it yet becomes a pending invite instead, listed here
+ * so the roster answers "who has access" rather than only "who turned up".
  */
 export function WorkspaceMembersDialog({ open, onClose }: WorkspaceMembersDialogProps) {
   const { activeWorkspace } = useWorkspace()
@@ -53,7 +62,11 @@ export function WorkspaceMembersDialog({ open, onClose }: WorkspaceMembersDialog
     queryFn: async () => {
       const r = await fetch(`/api/workspaces/${wsId}/members`)
       if (!r.ok) throw new Error(String(r.status))
-      return (await r.json()) as { members: Member[]; yourRole: string }
+      return (await r.json()) as {
+        members: Member[]
+        invites: PendingInvite[]
+        yourRole: string
+      }
     },
     enabled: !!wsId && open,
     staleTime: 30_000,
@@ -74,15 +87,23 @@ export function WorkspaceMembersDialog({ open, onClose }: WorkspaceMembersDialog
       })
       const body = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(body.error ?? "Could not add them")
-      return body as { added: boolean; alreadyMember?: boolean; member: Member }
+      return body as {
+        added: boolean
+        alreadyMember?: boolean
+        invited?: boolean
+        member?: Member
+        invite?: PendingInvite
+      }
     },
     onSuccess: (res) => {
       setIdentifier("")
       setError(null)
       setNote(
-        res.alreadyMember
-          ? `${res.member.name ?? "They"} is already in this workspace.`
-          : `${res.member.name ?? res.member.githubLogin ?? "They"} can use this workspace now.`
+        res.invited
+          ? `No account for @${res.invite?.githubLogin} yet — invited. They join automatically the first time they sign in.`
+          : res.alreadyMember
+            ? `${res.member?.name ?? "They"} is already in this workspace.`
+            : `${res.member?.name ?? res.member?.githubLogin ?? "They"} can use this workspace now.`
       )
       invalidate()
     },
@@ -115,6 +136,20 @@ export function WorkspaceMembersDialog({ open, onClose }: WorkspaceMembersDialog
       return body
     },
     onSuccess: () => { setError(null); invalidate() },
+    onError: (e: Error) => setError(e.message),
+  })
+
+  const revoke = useMutation({
+    mutationFn: async (githubLogin: string) => {
+      const r = await fetch(
+        `/api/workspaces/${wsId}/invites/${encodeURIComponent(githubLogin)}`,
+        { method: "DELETE" }
+      )
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(body.error ?? "Could not withdraw the invite")
+      return body
+    },
+    onSuccess: () => { setError(null); setNote(null); invalidate() },
     onError: (e: Error) => setError(e.message),
   })
 
@@ -177,6 +212,37 @@ export function WorkspaceMembersDialog({ open, onClose }: WorkspaceMembersDialog
           ))}
         </div>
 
+        {!!data?.invites.length && (
+          <div className="space-y-0.5 border-t border-border pt-2">
+            <p className="px-1 pb-0.5 text-[11px] font-medium text-muted-foreground">
+              Invited — joins on first sign-in
+            </p>
+            {data.invites.map((i) => (
+              <div
+                key={i.id}
+                className="group flex items-center gap-2 rounded-md px-1 py-1.5 text-sm"
+              >
+                <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Pending" />
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                  @{i.githubLogin}
+                  {i.role === "owner" && <span className="ml-1 text-[11px]">(as owner)</span>}
+                </span>
+
+                {isOwner && (
+                  <button
+                    onClick={() => revoke.mutate(i.githubLogin)}
+                    title="Withdraw this invite"
+                    aria-label={`Withdraw the invite for ${i.githubLogin}`}
+                    className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-muted-foreground hover:text-destructive cursor-pointer transition-opacity"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {isOwner && (
           <form
             className="flex items-center gap-1.5 pt-1"
@@ -212,7 +278,9 @@ export function WorkspaceMembersDialog({ open, onClose }: WorkspaceMembersDialog
         {isOwner && (
           <p className="text-[11px] leading-snug text-muted-foreground">
             Anyone you add gets this workspace&apos;s skills, scripts and connections
-            straight away — they need no subscription and no keys of their own.
+            straight away — they need no subscription and no keys of their own. No
+            account yet? Add their GitHub username anyway; they land here the first
+            time they sign in.
           </p>
         )}
       </div>
