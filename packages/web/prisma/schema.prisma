@@ -74,6 +74,7 @@ model User {
   tokenUsages   TokenUsage[]
   notifications Notification[]
   pushSubscriptions PushSubscription[]
+  workspaceInvitesSent WorkspaceInvite[]
 }
 
 // =============================================================================
@@ -257,6 +258,7 @@ model Workspace {
   chats         Chat[]
   scheduledJobs ScheduledJob[]
   members       WorkspaceMember[]
+  invites       WorkspaceInvite[]
   connections   WorkspaceConnection[]
   notifications Notification[]
 
@@ -712,4 +714,40 @@ model PushSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// A workspace membership granted to someone who does not have an account yet.
+///
+/// Adding a teammate used to require that they had already signed in once,
+/// which pushed the coordination onto the person doing the onboarding: chase
+/// them, wait, remember to come back. This row is the promise instead —
+/// `claimInvitesForLogin` turns it into a real `WorkspaceMember` on their
+/// first sign-in, so an invite sent today lands whenever they get round to it.
+///
+/// Claimed invites are deleted rather than flagged. A row that survived
+/// acceptance would re-add someone who had since been removed from the
+/// workspace, quietly undoing a revocation.
+model WorkspaceInvite {
+  id          String @id @default(cuid())
+  workspaceId String
+
+  /// GitHub handle, lowercased on write. Sign-in claims by equality against
+  /// this column, so normalising here keeps that an index hit rather than a
+  /// case-insensitive scan of every pending invite in the deployment.
+  githubLogin String
+
+  /// Same vocabulary as WorkspaceMember.role: "owner" or "member".
+  role String @default("member")
+
+  /// Who sent it. Cascade, unlike Workspace.createdBy: an invite is a personal
+  /// act with nothing hanging off it, so it can go when its sender does.
+  invitedById String
+
+  createdAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, githubLogin])
+  @@index([githubLogin])
 }

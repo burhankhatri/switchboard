@@ -33,6 +33,13 @@ export type ActivityAction =
   | "workspace_member_added"
   | "workspace_member_removed"
   | "workspace_member_role_changed"
+  // An invite aimed at a GitHub handle with no account yet, and what became of
+  // it. Audited for the same reason membership is: accepting one hands over the
+  // workspace's credentials, and the grant happens at sign-in, long after and
+  // far away from the owner who authorised it.
+  | "workspace_invite_sent"
+  | "workspace_invite_revoked"
+  | "workspace_invite_accepted"
 
 /**
  * Metadata types for different actions
