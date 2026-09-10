@@ -5,70 +5,13 @@
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
-  /* Near-white base with barely-there colour. The hues are the same as the
-     original mesh, held at very low alpha so they read as a faint tint on white
-     rather than a saturated gradient. Adjust the alphas together to change how
-     present the colour is. */
-  background-color: #f7f6fa;
-  background-image:
-      radial-gradient(circle at 10% 80%, rgba(104, 100, 205, 0.26) 0%, transparent 55%),
-      radial-gradient(circle at 90% 20%, rgba(235, 132, 107, 0.24) 0%, transparent 60%),
-      radial-gradient(circle at 80% 80%, rgba(184, 110, 151, 0.20) 0%, transparent 55%),
-      radial-gradient(circle at 30% 10%, rgba(244, 222, 198, 0.30) 0%, transparent 55%);
+  /* Flat canvas. This is the element that actually painted the app background —
+     the four-corner mesh gradient, the turbulence noise layer and the decorative
+     grid lines all lived here, not in the .premium-bg rules in globals.css,
+     which were never applied to anything. One token, no image layers. */
+  background-color: var(--canvas);
   display: flex;
   flex-direction: column;
-}
-.bgNoise {
-  position: absolute; 
-  inset: 0; 
-  pointer-events: none; 
-  z-index: 1;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
-}
-
-/* Thin rgba(255,255,255,0.15) 1px lines for grids */
-.bgGridXLeft {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 8%;
-  width: 1px;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(15, 15, 20, 0.075) 15%, rgba(15, 15, 20, 0.075) 85%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.bgGridXRight {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 8%;
-  width: 1px;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(15, 15, 20, 0.075) 15%, rgba(15, 15, 20, 0.075) 85%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.bgGridYTop {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 8%;
-  height: 1px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(15, 15, 20, 0.075) 15%, rgba(15, 15, 20, 0.075) 85%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.bgGridYBottom {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 8%;
-  height: 1px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(15, 15, 20, 0.075) 15%, rgba(15, 15, 20, 0.075) 85%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  z-index: 1;
 }
 
 .contentWrapper {
@@ -83,10 +26,8 @@
 /* B. GlassContainer */
 .glassContainer {
   background: var(--surface);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 10px;
   box-shadow: var(--shadow-card);
   /* Tight: the controls inside are 28px and sit at a 6px inset, which keeps
      the corner of a control concentric with the corner of the panel. The old

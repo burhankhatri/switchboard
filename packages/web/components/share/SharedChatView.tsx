@@ -36,11 +36,8 @@ export function SharedChatView({ chat }: SharedChatViewProps) {
     // Fixed viewport height + min-h-0 on the scroll region: the app shell sets
     // `body { overflow: hidden }`, so the page itself can't scroll — the
     // messages area must be its own scroll container.
-    // bg-canvas, not bg-background: --background is transparent because the app
-    // shell (BackgroundSystem, mounted only in app/page.tsx) paints the gradient
-    // behind it. A shared link is a public route that never mounts that shell,
-    // so it has to paint its own opaque surface or it inherits whatever the
-    // browser's canvas happens to be.
+    // bg-canvas explicitly: a shared link is a public route that never mounts
+    // the app shell, so it paints its own surface rather than relying on one.
     <div className="flex flex-col h-screen bg-canvas text-ink">
       {/* Header */}
       <header className="border-b border-border shrink-0">
