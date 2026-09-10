@@ -66,7 +66,7 @@ export function MobileHeader({
             className="flex items-center gap-1 text-base font-semibold truncate max-w-full hover:bg-accent active:bg-accent rounded-md px-2 py-1 -ml-2 transition-colors"
           >
             <span className="flex items-center gap-2 truncate">
-              {!chat && <Image src="/maloewe-logo.svg" alt="MaLoewe logo" width={20} height={20} className="shrink-0 dark:invert" />}
+              {!chat && <Image src="/maloewe-logo.svg" alt={`${BRAND.name} logo`} width={20} height={20} className="shrink-0 dark:invert" />}
               {chat?.displayName || BRAND.name}
             </span>
             {chat && <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}

@@ -85,7 +85,7 @@ export function WorkspaceLauncher({
     <div className="w-full max-w-3xl mx-auto px-6 py-10">
       <header className="mb-8">
         <div className="flex items-center gap-3 mb-1">
-          <Image src="/maloewe-logo.svg" alt="MaLoewe logo" width={40} height={40} className="dark:invert" />
+          <Image src="/maloewe-logo.svg" alt={`${BRAND.name} logo`} width={40} height={40} className="dark:invert" />
           <h1 className="font-display text-3xl tracking-tight text-foreground">{BRAND.name}</h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">{BRAND.tagline}</p>

@@ -133,7 +133,7 @@ export async function PUT(req: NextRequest, { params }: Ctx): Promise<Response> 
       path,
       body.content,
       body.sha ?? "",
-      `Update ${path.split("/").pop()} in ${workspace.slug} (via Switchboard by ${user?.name ?? userId})`
+      `Update ${path.split("/").pop()} in ${workspace.slug} (via Shared Agents by ${user?.name ?? userId})`
     )
     return Response.json({ path, sha })
   } catch (err) {

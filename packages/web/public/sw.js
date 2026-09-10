@@ -24,11 +24,11 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data.json()
   } catch {
-    payload = { title: "Switchboard", body: event.data.text(), url: "/" }
+    payload = { title: "Shared Agents", body: event.data.text(), url: "/" }
   }
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || "Switchboard", {
+    self.registration.showNotification(payload.title || "Shared Agents", {
       body: payload.body || "",
       // Collapses repeats: five overnight questions leave one notification to
       // deal with rather than five to dismiss.

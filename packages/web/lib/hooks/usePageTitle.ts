@@ -9,11 +9,11 @@ import { formatPageTitle } from "@/lib/config"
  * @param parts - Title parts to include (filtered for null/undefined)
  *
  * @example
- * // Sets title to "My Chat · Switchboard"
+ * // Sets title to "My Chat · Shared Agents"
  * usePageTitle("My Chat")
  *
  * @example
- * // Sets title to "Switchboard" when chat has no name
+ * // Sets title to "Shared Agents" when chat has no name
  * usePageTitle(chat?.displayName)
  */
 export function usePageTitle(...parts: (string | null | undefined)[]) {
