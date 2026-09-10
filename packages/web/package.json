@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/dev-migrate.mjs",
     "dev": "next dev --port 4000",
     "prebuild": "node scripts/prisma-deploy.mjs",
     "build": "next build",
