@@ -96,18 +96,12 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // Capture the GitHub handle. NextAuth's adapter stores name/email/image
-      // but not the login, and the login is the only identifier a teammate
-      // actually knows — "add burhankhatri" rather than an account id nobody
-      // has seen. Best-effort: a failure here must not block signing in.
-      if (user?.id && login) {
-        prisma.user
-          .update({ where: { id: user.id }, data: { githubLogin: login } })
-          .catch((err) => console.error("[auth] could not store githubLogin:", err))
-      }
+      // The handle is captured in the jwt callback, not here. For a new user
+      // this runs before the adapter has created the row, so `user.id` is
+      // GitHub's numeric account id and any update keyed on it matches nothing.
       return true
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, profile }) {
       // On initial sign in, persist user id
       if (user) {
         token.sub = user.id
@@ -116,6 +110,40 @@ export const authOptions: NextAuthOptions = {
         token.isAdmin = undefined
       }
       if (account) {
+        // The GitHub handle, and anything keyed off it, has to be done HERE.
+        //
+        // next-auth hands this callback the raw provider payload, which carries
+        // `login`. The signIn *event* gets the normalised profile instead — the
+        // GitHub provider's own profile() mapping, which returns only id, name,
+        // email and image (see next-auth/providers/github.js). So `profile.login`
+        // read from that event is always undefined, and the capture that lived
+        // there stored nothing: a first-time user ended up with a null
+        // githubLogin and any invite waiting on their handle stayed pending.
+        //
+        // The signIn *callback* does receive the raw profile, but it runs before
+        // the adapter has created the row, so for a new user its `user.id` is
+        // GitHub's numeric account id rather than ours and the update matches
+        // nothing. This callback is the only point with both the raw login and a
+        // real user id — it runs after the row exists and before the event.
+        const login = (profile as { login?: string } | undefined)?.login
+        if (token.sub && login) {
+          try {
+            await prisma.user.update({
+              where: { id: token.sub },
+              data: { githubLogin: login },
+            })
+          } catch (err) {
+            // Never block a sign-in over this.
+            console.error("[auth] could not store githubLogin:", err)
+          }
+
+          // Turn any invite addressed to this handle into real membership.
+          // Awaited rather than fired off: the point of the feature is that the
+          // workspace is already there when they land, and it costs one indexed
+          // query when there is nothing waiting.
+          await claimInvitesForLogin(token.sub, login)
+        }
+
         // Sync the fresh token to the Account table. The PrismaAdapter only
         // writes Account rows on the very first link (create, not upsert), so
         // on re-authorization the DB row keeps the old, revoked token. All
@@ -164,46 +192,15 @@ export const authOptions: NextAuthOptions = {
     },
   },
   events: {
-    async signIn({ user, profile }) {
+    async signIn({ user }) {
       // Log user login activity
       if (user?.id) {
         logActivityAsync(user.id, "login")
       }
 
-      // Capture the GitHub handle here rather than in the signIn *callback*.
-      // That callback runs before the adapter has created the row, so on a
-      // first sign-in user.id is undefined and the handle was silently never
-      // stored — it only landed if the person signed in a second time. The
-      // handle is the one identifier a teammate actually knows, so without it
-      // "add them by GitHub username" fails for exactly the people being
-      // onboarded. This event fires after the row exists, on every sign-in.
-      const login = (profile as { login?: string } | undefined)?.login
-      if (user?.id && login) {
-        try {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { githubLogin: login },
-          })
-        } catch (err) {
-          // Never block a sign-in over this.
-          console.error("[auth] could not store githubLogin:", err)
-        }
-
-        // Claim workspace invites addressed to this handle.
-        //
-        // This is what makes "add them before they have an account" work: the
-        // owner's grant is recorded against a GitHub handle and becomes real
-        // membership here, on whichever sign-in happens to be the first. It
-        // runs on every sign-in, not just account creation, so an invite sent
-        // to someone who already had an account lands on their next visit
-        // through the same path.
-        //
-        // Note the ordering: the allowlist in the signIn *callback* has already
-        // run and returned true by the time we get here. An invite therefore
-        // does not admit anyone ALLOWED_GITHUB_LOGINS excludes — a workspace
-        // owner must not be able to widen who may sign in to the deployment.
-        await claimInvitesForLogin(user.id, login)
-      }
+      // The handle and any invite keyed to it are handled in the jwt callback.
+      // This event receives the provider's *normalised* profile, which for
+      // GitHub is {id, name, email, image} — there is no `login` here to read.
     },
     async signOut({ token }) {
       // Log user logout activity
