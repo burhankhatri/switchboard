@@ -117,7 +117,7 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
   if (openFile) {
     return (
       <div
-        className="flex-1 flex flex-col bg-transparent backdrop-blur-xl border-l border-border/10 min-h-0 p-4"
+        className="flex-1 flex flex-col bg-transparent border-l border-border min-h-0 p-4"
         data-testid="workspace-file-view"
       >
         <WorkspaceFileViewer />
@@ -246,7 +246,7 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
   // Chat with messages
   return (
     <div
-      className="flex-1 flex flex-col bg-transparent backdrop-blur-xl border-l border-border/10 min-h-0"
+      className="flex-1 flex flex-col bg-transparent border-l border-border min-h-0"
       data-testid="chat-container"
       data-chat-status={chat?.status}
       data-chat-id={chat?.id}

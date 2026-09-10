@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#12100e",
+  themeColor: "#fafaf9",
   // Mobile viewport optimization
   width: "device-width",
   initialScale: 1,
@@ -47,10 +47,9 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* The app ships a single light "premium" gradient theme (.premium-bg is
-            applied unconditionally with no dark variant). Auto-switching to dark
-            based on the OS left dark popovers/cards floating over the light
-            background — so we intentionally do not add the `.dark` class. */}
+        {/* One flat light theme, no dark variant. Auto-switching to dark on the
+            OS preference left dark popovers and cards floating over light
+            surfaces, so the `.dark` class is intentionally never added. */}
         {/* Prevent iOS text size adjustment */}
         <meta name="x-apple-disable-message-reformatting" />
       </head>

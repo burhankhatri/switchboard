@@ -32,7 +32,7 @@ export function WelcomeView({
     <>
       <div
         className={cn(
-          "flex-1 flex flex-col bg-transparent backdrop-blur-xl relative overflow-y-auto",
+          "flex-1 flex flex-col bg-transparent relative overflow-y-auto",
           "items-center justify-center",
           isMobile ? "p-4 pb-safe" : "p-4"
         )}

@@ -123,42 +123,50 @@
      shell paints the gradient instead), that meant black text on a black page.
      Also keeps scrollbars and form controls light instead of mismatched. */
   color-scheme: light;
-  --background: transparent;
-  --foreground: oklch(0 0 0);
-  --card: rgba(255, 255, 255, 0.86);
-  --card-foreground: oklch(0 0 0);
-  --popover: rgba(255, 255, 255, 0.96);
-  --popover-foreground: oklch(0 0 0);
+  /* Opaque, not transparent. The tokens here used to be translucent white
+     because they were drawn for a mesh gradient behind them — but .premium-bg
+     was never applied to anything, so they were compositing against the plain
+     UA canvas and every "glass" surface was doing a 40px blur of nothing.
+     Solid surfaces on a flat canvas is what was actually rendering; this states
+     it, and drops the cost of pretending otherwise. */
+  --background: #fafaf9;
+  --foreground: #111114;
+  --card: #ffffff;
+  --card-foreground: #111114;
+  --popover: #ffffff;
+  --popover-foreground: #111114;
+  /* The one accent. Reserved for actions and focus — never decoration. */
   --primary: oklch(0.62 0.16 62);
   --primary-foreground: oklch(0.98 0 0);
-  --secondary: rgba(255, 255, 255, 0.82);
-  --secondary-foreground: oklch(0.10 0 0);
+  --secondary: #ffffff;
+  --secondary-foreground: #111114;
   /* muted/accent are FILLS (chips, hover, selected rows). Dark-on-light. */
-  --muted: rgba(17, 17, 20, 0.075);
-  --muted-foreground: oklch(0 0 0);
-  --accent: rgba(17, 17, 20, 0.09);
-  --accent-foreground: oklch(0 0 0);
+  --muted: rgba(17, 17, 20, 0.05);
+  --muted-foreground: rgba(17, 17, 20, 0.60);
+  --accent: rgba(17, 17, 20, 0.06);
+  --accent-foreground: #111114;
   --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(1 0 0);
-  --border: rgba(17, 17, 20, 0.16);
-  --input: rgba(255, 255, 255, 0.92);
+  --border: rgba(17, 17, 20, 0.10);
+  --input: #ffffff;
   --ring: oklch(0.62 0.16 62);
-  --radius: 0.75rem;
-  --sidebar: rgba(255, 255, 255, 0.72);
-  --sidebar-foreground: oklch(0 0 0);
-  --sidebar-border: rgba(17, 17, 20, 0.14);
+  /* Tighter corners read as more deliberate at this weight of border. */
+  --radius: 0.5rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #111114;
+  --sidebar-border: rgba(17, 17, 20, 0.10);
 
-  /* Glassmorphism System — the blur is what produces the bokeh. Keep it high
-     enough that text behind a panel is unreadable, not merely soft. */
-  --glass-bg: rgba(255, 255, 255, 0.82);
-  --glass-border: rgba(17, 17, 20, 0.16);
-  --glass-blur: blur(40px) saturate(140%);
-  --glass-shadow: 0 10px 34px rgba(15, 15, 20, 0.14);
+  /* Kept as tokens so the components that reference them still resolve, but
+     there is no glass any more: an opaque surface and a hairline. */
+  --glass-bg: #ffffff;
+  --glass-border: rgba(17, 17, 20, 0.10);
+  --glass-blur: none;
+  --glass-shadow: 0 0 0 1px rgba(17, 17, 20, 0.05);
 
   /* Button System */
-  --pill-bg: rgba(255, 255, 255, 0.86);
-  --pill-bg-hover: rgba(255, 255, 255, 0.96);
-  --pill-bg-active: rgba(255, 255, 255, 1);
+  --pill-bg: #ffffff;
+  --pill-bg-hover: #f5f5f4;
+  --pill-bg-active: #ededec;
 
   /* ---------------------------------------------------------------------
      Named scale used by the shared components. The semantic tokens above are
@@ -170,24 +178,27 @@
      line  = hairlines. hover = interactive fills.
      --------------------------------------------------------------------- */
   --ink: #111114;
-  --ink-2: rgba(17, 17, 20, 0.66);
-  --ink-3: rgba(17, 17, 20, 0.45);
-  --surface: rgba(255, 255, 255, 0.92);
-  --canvas: #f7f6fa;
-  --inset: rgba(17, 17, 20, 0.05);
-  --field: rgba(255, 255, 255, 0.92);
-  --line: rgba(17, 17, 20, 0.14);
-  --line-strong: rgba(17, 17, 20, 0.28);
-  --hover: rgba(17, 17, 20, 0.07);
-  --hover-2: rgba(17, 17, 20, 0.04);
-  --accent-tint: rgba(224, 122, 43, 0.14);
+  --ink-2: rgba(17, 17, 20, 0.60);
+  --ink-3: rgba(17, 17, 20, 0.40);
+  --surface: #ffffff;
+  --canvas: #fafaf9;
+  --inset: rgba(17, 17, 20, 0.04);
+  --field: #ffffff;
+  --line: rgba(17, 17, 20, 0.10);
+  --line-strong: rgba(17, 17, 20, 0.20);
+  --hover: rgba(17, 17, 20, 0.05);
+  --hover-2: rgba(17, 17, 20, 0.03);
+  --accent-tint: rgba(224, 122, 43, 0.10);
   --accent-ink: #b45309;
   --green: #15803d;
-  --radius-chip: 8px;
-  --shadow-hairline: 0 0 0 1px rgba(17, 17, 20, 0.08);
-  --shadow-card: 0 1px 2px rgba(15, 15, 20, 0.06), 0 4px 12px rgba(15, 15, 20, 0.06);
-  --shadow-raised: 0 2px 6px rgba(15, 15, 20, 0.08), 0 12px 32px rgba(15, 15, 20, 0.14);
-  --shadow-overlay: 0 8px 24px rgba(15, 15, 20, 0.16);
+  --radius-chip: 6px;
+  /* Elevation is carried by a hairline, not a drop shadow. Only things that
+     genuinely float above the page — dialogs, menus — get a soft shadow, and
+     even then a small one. */
+  --shadow-hairline: 0 0 0 1px rgba(17, 17, 20, 0.06);
+  --shadow-card: 0 0 0 1px rgba(17, 17, 20, 0.06);
+  --shadow-raised: 0 0 0 1px rgba(17, 17, 20, 0.08), 0 1px 2px rgba(15, 15, 20, 0.04);
+  --shadow-overlay: 0 0 0 1px rgba(17, 17, 20, 0.08), 0 8px 24px rgba(15, 15, 20, 0.08);
 
   /* Colors */
   --text-primary: #111111;
@@ -321,141 +332,40 @@
 }
 
 /* Modal / dialog scrim. Every overlay uses this one class so "focus the thing
-   you clicked" is a single knob. The blur has to be large enough that body text
-   behind the dialog is genuinely unreadable — at 1px it merely looked soft and
-   the page competed with the dialog for attention. */
+   you clicked" is a single knob. A plain dim rather than a blur: the point is
+   that the page stops competing with the dialog, and opacity does that without
+   a full-viewport backdrop-filter repainting on every scroll behind it. */
 .app-scrim {
-  background-color: rgba(15, 15, 20, 0.24);
-  backdrop-filter: blur(20px) saturate(115%);
-  -webkit-backdrop-filter: blur(20px) saturate(115%);
+  background-color: rgba(15, 15, 20, 0.32);
 }
 
-/* Premium grainy gradient background */
-.premium-bg {
-  background-color: #cb8bb4 !important;
-  background-image: 
-    radial-gradient(circle at 0% 0%, rgba(252, 234, 210, 0.95), transparent 60%),
-    radial-gradient(circle at 100% 0%, rgba(231, 142, 117, 0.95), transparent 65%),
-    radial-gradient(circle at 100% 100%, rgba(212, 137, 164, 0.95), transparent 60%),
-    radial-gradient(circle at 0% 100%, rgba(125, 133, 222, 0.95), transparent 60%) !important;
-  background-size: cover !important;
-  background-attachment: fixed !important;
-}
+/* The mesh gradient, the film grain and the decorative grid lines that used to
+   live here are gone.
 
-body::before {
-  content: "" !important;
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  pointer-events: none !important;
-  z-index: 9999 !important;
-  opacity: 0.065 !important;
-  mix-blend-mode: overlay !important;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E") !important;
-  background-repeat: repeat !important;
-}
+   .premium-bg and .premium-grid-line-* were never applied to a single element —
+   dead rules describing a background the app did not actually paint. The grain
+   WAS live, as an unconditional body::before at z-index 9999 covering the
+   viewport with a turbulence SVG on every route. Neither belongs in a flat
+   theme, and the overlay was compositing a full-screen layer above all content
+   for a 6% texture nobody asked about. */
 
-.grain-overlay {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.055;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-}
-
-.premium-grid-line-v-left {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 8%;
-  width: 1px;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 15%, rgba(255, 255, 255, 0.12) 85%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.premium-grid-line-v-right {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 8%;
-  width: 1px;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 15%, rgba(255, 255, 255, 0.12) 85%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.premium-grid-line-h-top {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 8%;
-  height: 1px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 15%, rgba(255, 255, 255, 0.12) 85%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.premium-grid-line-h-bottom {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 8%;
-  height: 1px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 15%, rgba(255, 255, 255, 0.12) 85%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Glassmorphism panel styles */
+/* Panels, inputs and pills. Named "glass" for the components that already
+   reference them; there is no blur left in any of them. A surface is an opaque
+   fill and a hairline, which is the whole elevation system now. */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.12) !important;
-  backdrop-filter: blur(24px) saturate(120%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(120%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05) !important;
-}
-
-.dark .glass-panel {
-  background: rgba(15, 15, 20, 0.25) !important;
-  backdrop-filter: blur(24px) saturate(120%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(120%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2) !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: none !important;
 }
 
 .glass-input {
-  background: rgba(255, 255, 255, 0.15) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-}
-
-.dark .glass-input {
-  background: rgba(255, 255, 255, 0.06) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: var(--field) !important;
+  border: 1px solid var(--line) !important;
 }
 
 .glass-pill {
-  background: rgba(255, 255, 255, 0.2) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 9999px !important;
-}
-
-.dark .glass-pill {
-  background: rgba(255, 255, 255, 0.06) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: var(--pill-bg) !important;
+  border: 1px solid var(--line) !important;
   border-radius: 9999px !important;
 }
 
@@ -518,6 +428,7 @@ body::before {
   }
   body {
     @apply text-foreground;
+    background-color: var(--canvas);
   }
   /* Secondary text is a real tier again.
 
@@ -633,11 +544,9 @@ body::before {
   padding-right: var(--safe-area-inset-right);
 }
 
-/* Mobile drawer overlay */
+/* Mobile drawer overlay. Matches .app-scrim: a dim, no blur. */
 .mobile-overlay {
-  background-color: rgba(15, 15, 20, 0.24);
-  backdrop-filter: blur(20px) saturate(115%);
-  -webkit-backdrop-filter: blur(20px) saturate(115%);
+  background-color: rgba(15, 15, 20, 0.32);
 }
 
 /* Mobile drawer animation */

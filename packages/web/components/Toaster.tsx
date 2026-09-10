@@ -60,7 +60,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       onMouseLeave={() => setPaused(false)}
       className={cn(
         "pointer-events-auto relative w-80 overflow-hidden rounded-[12px]",
-        "border border-line bg-surface shadow-raised backdrop-blur-xl",
+        "border border-line bg-surface shadow-raised",
         toast.chatId && "cursor-pointer"
       )}
       style={{

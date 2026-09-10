@@ -309,7 +309,7 @@ export function Sidebar({
         {/* Mobile drawer */}
         <div
           ref={sidebarRef}
-          className="fixed inset-y-0 left-0 z-50 w-[280px] flex flex-col bg-sidebar border-r border-sidebar-border backdrop-blur-xl transition-transform duration-300 ease-out"
+          className="fixed inset-y-0 left-0 z-50 w-[280px] flex flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-out"
           style={{
             transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
           }}
@@ -520,7 +520,7 @@ export function Sidebar({
     <div
       ref={sidebarRef}
       className={cn(
-        "relative flex h-full flex-col bg-sidebar border-r border-sidebar-border backdrop-blur-xl hide-mobile",
+        "relative flex h-full flex-col bg-sidebar border-r border-sidebar-border hide-mobile",
         isAnimating && "transition-[width] duration-200 ease-in-out"
       )}
       style={{ width: collapsed ? COLLAPSED_WIDTH : width }}

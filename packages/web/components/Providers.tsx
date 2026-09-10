@@ -23,10 +23,9 @@ export function Providers({ children, session }: ProvidersProps) {
   return (
     <SessionProvider session={session}>
       <QueryProvider>
-        {/* The app has a single light "premium" theme: .premium-bg is always
-            light with no dark variant, so following the OS into dark mode left
-            dark popovers/cards clashing over the light background. Force light
-            until a real dark theme exists. */}
+        {/* One flat light theme with no dark variant, so following the OS into
+            dark mode left dark popovers and cards clashing over light surfaces.
+            Force light until a real dark theme exists. */}
         <ThemeProvider
           attribute="class"
           forcedTheme="light"

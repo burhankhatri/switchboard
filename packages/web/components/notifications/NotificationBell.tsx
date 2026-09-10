@@ -216,11 +216,13 @@ export function NotificationBell({
         createPortal(
           <div
             ref={panelRef}
-            // Fixed and portalled to <body>. The sidebar sets backdrop-blur-xl,
-            // which creates a stacking context, so a panel rendered inside it
-            // is painted under the main content whatever its z-index — which is
-            // exactly what happened: the panel was visible up to the sidebar's
-            // edge and cut off there.
+            // Fixed and portalled to <body>. This was needed because the
+            // sidebar's backdrop-blur-xl created a stacking context that painted
+            // the panel under the main content whatever its z-index — visible up
+            // to the sidebar's edge and cut off there. The blur is gone with the
+            // flat theme, but the portal stays: the sidebar still clips its own
+            // overflow and the mobile drawer still carries a transform, either of
+            // which reintroduces the same trap.
             style={{ top: position.top, left: position.left, width: PANEL_WIDTH }}
             className="fixed z-[100] overflow-hidden rounded-lg border border-border bg-card shadow-lg"
             data-testid="notification-panel"
