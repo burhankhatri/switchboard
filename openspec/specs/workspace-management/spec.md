@@ -60,3 +60,45 @@ The system SHALL refuse to remove the final owner of a workspace.
 - **WHEN** the only `owner` DELETEs their membership
 - **THEN** the request is rejected with 400, because a shared workspace nobody
   can administer is a failure that would surface much later
+
+### Requirement: An invited GitHub handle joins on first sign-in
+The system SHALL let an owner add someone who has no account yet, by GitHub
+handle, and SHALL convert that invite into membership on that person's next
+sign-in.
+
+Membership needs a `User` row to point at, so this used to be refused outright
+and onboarding stalled on the one person who was not there to be chased.
+Nothing is emailed: a GitHub handle does not yield an address, and the claim
+does not need one.
+
+#### Scenario: Adding a handle with no account behind it
+- **WHEN** an owner POSTs an unrecognised GitHub handle to
+  `/api/workspaces/<id>/members`
+- **THEN** a `WorkspaceInvite` row is written against the lowercased handle and
+  the response reports `invited: true`
+
+#### Scenario: The invited person signs in for the first time
+- **WHEN** they complete GitHub OAuth under that handle, in any casing
+- **THEN** the sign-in event creates their `WorkspaceMember` row with the
+  invited role and deletes the invite, so the workspace is already there when
+  they arrive
+
+#### Scenario: An identifier that is not a handle
+- **WHEN** the unrecognised identifier is an email address or a display name
+- **THEN** the request is rejected with 400, because GitHub reports a login at
+  sign-in and an invite held against anything else could never be claimed
+
+#### Scenario: A claimed invite is not reusable
+- **WHEN** an invite has been claimed and the member is later removed
+- **THEN** they are not re-added on their next sign-in, because claiming
+  deletes the invite rather than flagging it
+
+#### Scenario: An invite does not widen who may sign in
+- **WHEN** `ALLOWED_GITHUB_LOGINS` is set and does not list the invited handle
+- **THEN** sign-in is still refused and no invite is claimed, because a
+  workspace owner must not be able to admit users to the deployment
+
+#### Scenario: Withdrawing an unclaimed invite
+- **WHEN** an owner DELETEs `/api/workspaces/<id>/invites/<handle>`
+- **THEN** the invite is removed, so a mistyped handle is not a standing grant
+  of the workspace's credentials

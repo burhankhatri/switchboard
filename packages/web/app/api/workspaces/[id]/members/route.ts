@@ -10,6 +10,10 @@ import {
 } from "@/lib/db/api-helpers"
 import { logActivityAsync } from "@/lib/db/activity-log"
 import { notifyAsync } from "@/lib/db/notifications"
+import {
+  normalizeGithubLogin,
+  isValidGithubLogin,
+} from "@/lib/db/workspace-invites"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -63,6 +67,14 @@ export async function GET(_req: NextRequest, { params }: Ctx): Promise<Response>
     },
   })
 
+  // Invites sit alongside the roster rather than in their own list: to the
+  // person reading it they are the same question — who has access to this.
+  const invites = await prisma.workspaceInvite.findMany({
+    where: { workspaceId: id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, githubLogin: true, role: true, createdAt: true },
+  })
+
   return Response.json({
     members: members.map((m) => ({
       userId: m.user.id,
@@ -74,12 +86,18 @@ export async function GET(_req: NextRequest, { params }: Ctx): Promise<Response>
       joinedAt: m.joinedAt,
       isYou: m.user.id === auth.userId,
     })),
+    invites: invites.map((i) => ({
+      id: i.id,
+      githubLogin: i.githubLogin,
+      role: i.role,
+      invitedAt: i.createdAt,
+    })),
     yourRole: g.role,
   })
 }
 
 interface AddBody {
-  /** Email or GitHub login of someone who has signed in at least once. */
+  /** Email, display name, or GitHub login. */
   identifier?: string
   role?: string
 }
@@ -87,10 +105,13 @@ interface AddBody {
 /**
  * POST — add someone to the workspace.
  *
- * They must have signed in before, because a WorkspaceMember row needs a User
- * to point at and we do not invent accounts. That is the honest constraint to
- * surface: "ask them to sign in once" is actionable, a silently-created ghost
- * account is not.
+ * If they have an account they become a member immediately. If they do not,
+ * the GitHub handle is recorded as an invite and claimed on their first
+ * sign-in. This used to be a 400 telling the owner to chase them and come back
+ * afterwards, which meant onboarding stalled on the one person who was not in
+ * the room. Nothing is emailed: a GitHub handle does not give us an address,
+ * and the claim does not need one — signing in is enough, however they get
+ * there.
  */
 export async function POST(req: NextRequest, { params }: Ctx): Promise<Response> {
   const auth = await requireAuth()
@@ -123,9 +144,58 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
       select: { id: true, name: true, email: true, image: true, githubLogin: true },
     })
     if (!user) {
-      return badRequest(
-        `No account for "${identifier}". They need to sign in to Switchboard once before they can be added.`
-      )
+      // No account yet. An email or a display name identifies nobody we can
+      // match at sign-in — GitHub reports a login and nothing else — so only a
+      // handle can become an invite.
+      const pendingHandle = normalizeGithubLogin(identifier)
+      if (!isValidGithubLogin(pendingHandle)) {
+        return badRequest(
+          `No account for "${identifier}", and it is not a GitHub username we can hold an invite against. Invite them by their GitHub handle instead.`
+        )
+      }
+
+      // Re-inviting is how you change a pending invite's role, so upsert rather
+      // than refuse — refusing would leave no way to correct a mistyped role
+      // short of revoking first.
+      const invite = await prisma.workspaceInvite.upsert({
+        where: { workspaceId_githubLogin: { workspaceId: id, githubLogin: pendingHandle } },
+        create: {
+          workspaceId: id,
+          githubLogin: pendingHandle,
+          role,
+          invitedById: auth.userId,
+        },
+        update: { role, invitedById: auth.userId },
+        select: { id: true, githubLogin: true, role: true, createdAt: true },
+      })
+      logActivityAsync(auth.userId, "workspace_invite_sent", {
+        workspaceSlug: g.workspace.slug,
+        githubLogin: pendingHandle,
+        role,
+      })
+
+      return Response.json({
+        added: false,
+        invited: true,
+        invite: {
+          id: invite.id,
+          githubLogin: invite.githubLogin,
+          role: invite.role,
+          invitedAt: invite.createdAt,
+        },
+      })
+    }
+
+    // They have an account now, so any invite still sitting there is stale.
+    // Left behind it would re-add them after a later removal. Keyed off their
+    // stored handle rather than what was typed: the match above also accepts an
+    // email or a display name, neither of which an invite is filed under.
+    if (user.githubLogin) {
+      await prisma.workspaceInvite
+        .deleteMany({
+          where: { workspaceId: id, githubLogin: normalizeGithubLogin(user.githubLogin) },
+        })
+        .catch(() => {})
     }
 
     const existing = await prisma.workspaceMember.findUnique({
