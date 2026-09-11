@@ -36,7 +36,13 @@ async function json<T>(res: Response): Promise<T> {
 export function WorkspaceLauncher({
   onOpen,
 }: {
-  onOpen?: (workspace: WorkspaceSummary) => void
+  /**
+   * Required, not optional. HomeView rendered this without a handler and every
+   * card click silently did nothing — and because selecting a workspace is a
+   * localStorage write rather than a fetch, there was no failed request to
+   * notice either. A required prop turns that into a build error.
+   */
+  onOpen: (workspace: WorkspaceSummary) => void
 }) {
   const { status } = useSession()
   const [creating, setCreating] = useState(false)
@@ -72,7 +78,7 @@ export function WorkspaceLauncher({
       setName("")
       setSystemPrompt("")
       setError(null)
-      onOpen?.(res.workspace)
+      onOpen(res.workspace)
     },
     onError: (e: Error) => {
       setCreateStartedAt(null)
@@ -216,7 +222,7 @@ export function WorkspaceLauncher({
             {mine.map((w) => (
               <button
                 key={w.id}
-                onClick={() => onOpen?.(w)}
+                onClick={() => onOpen(w)}
                 className={cn(
                   "group text-left rounded-xl border border-border bg-card p-4",
                   "hover:border-primary/50 hover:bg-accent/40 transition-colors cursor-pointer"

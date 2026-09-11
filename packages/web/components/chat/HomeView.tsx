@@ -39,7 +39,7 @@ function ago(ts: number): string {
  * request: the overview is the same cache entry the Connections panel reads.
  */
 export function HomeView({ isMobile, chats, onSelectChat, onNewChat }: HomeViewProps) {
-  const { activeWorkspace: active, ready } = useWorkspace()
+  const { activeWorkspace: active, setActiveWorkspace: setActive, ready } = useWorkspace()
   const { data: overview } = useWorkspaceOverview(active?.id)
 
   if (!ready) return null
@@ -49,7 +49,7 @@ export function HomeView({ isMobile, chats, onSelectChat, onNewChat }: HomeViewP
   if (!active) {
     return (
       <div className="flex-1 overflow-y-auto p-4 flex items-center justify-center">
-        <WorkspaceLauncher />
+        <WorkspaceLauncher onOpen={(w) => setActive(w)} />
       </div>
     )
   }
