@@ -91,6 +91,41 @@
   color: var(--ink-3);
 }
 
+.mentionHighlight {
+  position: absolute;
+  top: 5px;
+  left: 4px;
+  right: 4px;
+  pointer-events: none;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  max-height: 160px;
+  color: var(--ink);
+}
+
+.realTextareaMentionOverlay {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--ink);
+}
+
+.realTextareaMentionOverlay::selection {
+  background: color-mix(in srgb, var(--primary) 28%, transparent);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.mentionChip {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+  border-radius: 4px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 /* D. PillButton */
 .pillBtn {
   background: transparent;

@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, useCallback, useState } from "react"
+import { useRef, useEffect, useCallback, useState, useMemo } from "react"
 import { AlertTriangle, ArrowUp, Square, ChevronDown, X, Plus, Pencil, ListChecks, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { GlassContainer } from "../glass-ui/GlassContainer"
@@ -368,6 +368,11 @@ export function ChatInput({
   const mention = parseMention(input)
   const mentionQuery = mention?.query ?? ""
   const mentionItems = useMentionItems(mentionQuery)
+  const allMentionItems = useMentionItems("")
+  const mentionTokens = useMemo(
+    () => allMentionItems.map((item) => item.token),
+    [allMentionItems]
+  )
   const mentionOpen = mention !== null
   const [mentionIndex, setMentionIndex] = useState(0)
 
@@ -505,6 +510,7 @@ export function ChatInput({
             data-chat-prompt
             data-testid="chat-input"
             value={input}
+            highlightMentionTokens={mentionTokens}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={handleKeyDownWithMentions}
             onPaste={onPaste}
