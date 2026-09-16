@@ -29,6 +29,7 @@ import {
   workspaceSessionOptions,
   type WorkspaceRuntime,
 } from "@/lib/workspace"
+import { workspaceRunEnv } from "@/lib/workspace-run-env"
 
 // =============================================================================
 // Job Execution
@@ -59,6 +60,10 @@ export async function startJobExecution(
   const chat = await prisma.chat.create({
     data: {
       userId: job.userId,
+      // Carried through so the run shows up under the workspace it ran in,
+      // and so anything reading Chat.workspaceId sees the same binding the
+      // job has. Without it a scheduled run looked workspace-less.
+      workspaceId: job.workspaceId,
       repo: job.repo,
       baseBranch: job.baseBranch,
       agent: job.agent,
@@ -172,7 +177,20 @@ export async function startJobExecution(
 
   // 7. Create background session
   const repoPath = `${PATHS.SANDBOX_HOME}/project`
-  const env = getEnvForModel(job.model ?? undefined, job.agent as Agent, credentials, customEndpoints)
+  // The workspace's connections go on last, exactly as they do for an
+  // interactive turn. A scheduled run used to get the workspace's cwd and
+  // system prompt but none of its credentials, so an audit job would start,
+  // read a skill telling it to call an API, and have no key to call it with.
+  // Membership is re-checked inside, and a revoked member throws here rather
+  // than running the job without the credential it was written against.
+  const env = {
+    ...getEnvForModel(job.model ?? undefined, job.agent as Agent, credentials, customEndpoints),
+    ...(await workspaceRunEnv({
+      workspaceId: job.workspaceId,
+      workspace: job.workspace,
+      userId: job.userId,
+    })),
+  }
 
   // Load job-scoped MCP servers. The loader marks rows with status="error" and
   // a descriptive lastError if the GitHub App is gone or any other auth issue
