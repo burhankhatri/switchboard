@@ -23,6 +23,13 @@ const check = (name, ok, detail = "") => {
   ok ? pass++ : fail++
   return ok
 }
+// Some assertions need a credential that can push to the workspaces repo. When
+// there isn't one, saying so beats a row of FAILs that look like broken code.
+let skip = 0
+const skipped = (name, why) => {
+  console.log(`  SKIP  ${name}  - ${why}`)
+  skip++
+}
 
 async function cookieFor(userId) {
   const token = await encode({ token: { sub: userId }, secret: process.env.NEXTAUTH_SECRET })
@@ -192,6 +199,107 @@ await prisma.user.delete({ where: { id: outsider.id } }).catch(() => {})
 
 // (decrypt round-trip is covered by lib/workspace.test.ts — node cannot
 // import the TS helper directly from here.)
+
+// ── 10. skills ───────────────────────────────────────────────────────────────
+console.log("\n10. workspace skills")
+
+const ghHeaders = {
+  Authorization: `Bearer ${process.env.GH_TOKEN}`,
+  Accept: "application/vnd.github+json",
+}
+const repoPerms = await fetch(`https://api.github.com/repos/${process.env.WORKSPACES_REPO}`, {
+  headers: ghHeaders,
+}).then((x) => (x.ok ? x.json() : {})).then((b) => b.permissions ?? {})
+// Writes go out under WORKSPACES_REPO_TOKEN when it is set, and under the
+// acting user's OAuth token otherwise. Neither can commit without push.
+const canPush = !!process.env.WORKSPACES_REPO_TOKEN || repoPerms.push === true
+const noPush = "no credential with push to the workspaces repo (set WORKSPACES_REPO_TOKEN)"
+
+r = await call(`/api/workspaces/${ws.id}/skills`)
+check("GET skills returns 200", r.status === 200, `status ${r.status}`)
+const starter = r.body.skills?.find((x) => x.slug === "lead-gen-guide")
+check("the starter skill is listed", !!starter, JSON.stringify(r.body.skills ?? r.body).slice(0, 140))
+check("its description comes from the frontmatter", !!starter?.description, String(starter?.description).slice(0, 80))
+check("its path is the discovery path", starter?.path === `${ws.path}/.claude/skills/lead-gen-guide/SKILL.md`, String(starter?.path))
+check("a loose file in .claude/skills is not a skill", !r.body.skills?.some((x) => x.slug.endsWith(".md")))
+
+const NEW_SKILL_PATH = `${ws.path}/.claude/skills/campaign-audit/SKILL.md`
+if (!canPush) {
+  skipped("POST skills commits a SKILL.md", noPush)
+  skipped("the server places it, slugified", noPush)
+  skipped("a duplicate slug is refused", noPush)
+} else {
+  // Repeatable like the workspace row: the folder is left in the repo between
+  // runs, so a create that should return 201 would hit the duplicate guard.
+  const stale = await fetch(`https://api.github.com/repos/${process.env.WORKSPACES_REPO}/contents/${NEW_SKILL_PATH}`, {
+    headers: ghHeaders,
+  }).then((x) => (x.ok ? x.json() : null))
+  if (stale?.sha) {
+    await fetch(`https://api.github.com/repos/${process.env.WORKSPACES_REPO}/contents/${NEW_SKILL_PATH}`, {
+      method: "DELETE",
+      headers: ghHeaders,
+      body: JSON.stringify({ message: "e2e: drop previous run's skill", sha: stale.sha }),
+    })
+  }
+
+  r = await call(`/api/workspaces/${ws.id}/skills`, {
+    method: "POST",
+    body: JSON.stringify({ name: "Campaign Audit", description: "Weekly check of a live campaign: bounces, replies, sending volume." }),
+  })
+  check("POST skills returns 201", r.status === 201, `status ${r.status} ${JSON.stringify(r.body).slice(0,140)}`)
+  check("the server placed it, slugified", r.body.skill?.path === NEW_SKILL_PATH, String(r.body.skill?.path))
+  check("the SKILL.md is really in the repo", (await gh(NEW_SKILL_PATH)) === 200)
+
+  // The frontmatter has to survive a description containing a colon - unquoted
+  // it would parse as a different key and the skill would list as undescribed.
+  r = await call(`/api/workspaces/${ws.id}/skills`)
+  const added = r.body.skills?.find((x) => x.slug === "campaign-audit")
+  check("the new skill reads back with its description", added?.description?.startsWith("Weekly check of a live campaign:"), String(added?.description))
+
+  r = await call(`/api/workspaces/${ws.id}/skills`, {
+    method: "POST",
+    body: JSON.stringify({ name: "campaign audit", description: "A second one." }),
+  })
+  check("a duplicate slug is refused", r.status === 400, `status ${r.status}`)
+}
+
+// Validation runs before any write, so these hold with or without push.
+r = await call(`/api/workspaces/${ws.id}/skills`, {
+  method: "POST",
+  body: JSON.stringify({ name: "No Description" }),
+})
+check("a skill with no description is refused", r.status === 400, `status ${r.status}`)
+
+r = await call(`/api/workspaces/${ws.id}/skills`, {
+  method: "POST",
+  body: JSON.stringify({ name: "...", description: "Nothing usable in the name." }),
+})
+check("a name with no usable characters is refused", r.status === 400, `status ${r.status}`)
+
+// A non-member needs a linked GitHub account, or requireGitHubAuth refuses at
+// the auth gate (401) and the membership check below is never reached.
+const stranger = await prisma.user.create({
+  data: {
+    name: "Stranger",
+    accounts: {
+      create: {
+        type: "oauth",
+        provider: "github",
+        providerAccountId: `e2e-stranger-${Date.now()}`,
+        access_token: "not-a-real-token",
+      },
+    },
+  },
+})
+const call4 = api(await cookieFor(stranger.id))
+r = await call4(`/api/workspaces/${ws.id}/skills`)
+check("a non-member cannot list skills", r.status === 403, `status ${r.status}`)
+r = await call4(`/api/workspaces/${ws.id}/skills`, {
+  method: "POST",
+  body: JSON.stringify({ name: "Sneak", description: "Should not land." }),
+})
+check("a non-member cannot add a skill", r.status === 403, `status ${r.status}`)
+await prisma.user.delete({ where: { id: stranger.id } }).catch(() => {})
 
 // ── 8. unauth ─────────────────────────────────────────────────────────────
 console.log("\n8. auth gate")
