@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { useCopyToClipboard } from "@/lib/hooks/useCopyToClipboard"
 import { type ScheduledJob } from "@/lib/scheduled-jobs/types"
 import { scheduleNameFromPrompt } from "@/lib/scheduled-jobs/prompt-name"
 import { jobTargetFields } from "@/lib/scheduled-jobs/job-target"
@@ -64,7 +63,10 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
   const isRepoLess = !repo
   const [agent, setAgent] = useState<Agent>((job?.agent as Agent) ?? "opencode")
   const [model, setModel] = useState(job?.model ?? "")
-  const [triggerType, setTriggerType] = useState<"interval" | "incoming">(job?.triggerType ?? "interval")
+  // Every job is a schedule. The API still takes a triggerType, and the
+  // webhook receiver at /wh/<token> still exists for anything already wired
+  // up, but nothing in this form can create one.
+  const triggerType = "interval" as const
   const initialIntervalMode = inferIntervalMode(job?.intervalMinutes ?? 1440)
   const [intervalMinutes, setIntervalMinutes] = useState(initialIntervalMode.intervalMinutes)
   const [isCustomInterval, setIsCustomInterval] = useState(initialIntervalMode.isCustom)
@@ -91,11 +93,6 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
 
-  // Incoming-webhook URL state. The token comes from the saved job and can be
-  // swapped out via the rotate-token endpoint without closing the modal.
-  const [incomingToken, setIncomingToken] = useState<string | null>(job?.incomingToken ?? null)
-  const { copied: copiedUrl, copy: copyUrl } = useCopyToClipboard(1500)
-  const [rotating, setRotating] = useState(false)
 
   // The user's custom endpoints, merged into the model list by name.
   const { data: settingsData } = useSettingsQuery()
@@ -121,7 +118,7 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
   // weekly audit wants, and its repo-less wording would be shown for a job
   // that does have a repo - the workspace's. Auto-PR would open a pull
   // request against the workspaces repo on a cron.
-  const showContinueOption = triggerType === "interval" && !inWorkspace
+  const showContinueOption = !inWorkspace
   const showAutoPROption = !isRepoLess && !inWorkspace
   const hasOptions = showContinueOption || showAutoPROption
 
@@ -138,7 +135,6 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
       setBaseBranch(job?.baseBranch ?? "main")
       setAgent(initialAgent)
       setModel(job?.model ?? initialModels[0]?.value ?? "")
-      setTriggerType(job?.triggerType ?? "interval")
       const mode = inferIntervalMode(job?.intervalMinutes ?? 1440)
       setIntervalMinutes(mode.intervalMinutes)
       setIsCustomInterval(mode.isCustom)
@@ -150,8 +146,6 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
       setContinueFromLastRun(job?.continueFromLastRun ?? false)
       setError(null)
       setMaterializedJobId(null)
-      setIncomingToken(job?.incomingToken ?? null)
-      setRotating(false)
     }
   }, [open, job, initialPrompt])
 
@@ -163,12 +157,6 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
       setModel(models[0].value)
     }
   }, [agent, model, customEndpoints])
-
-  useEffect(() => {
-    if (triggerType === "incoming" && !incomingToken) {
-      setIncomingToken(crypto.randomUUID())
-    }
-  }, [triggerType, incomingToken])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -196,7 +184,7 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
       setError("Prompt is required")
       return null
     }
-    if (triggerType === "interval" && effectiveIntervalMinutes < 10) {
+    if (effectiveIntervalMinutes < 10) {
       setError("Interval must be at least 10 minutes")
       return null
     }
@@ -207,9 +195,9 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
       workspaceId,
       ...jobTargetFields({ inWorkspace, repo, baseBranch, agent, model }),
       triggerType,
-      intervalMinutes: triggerType === "interval" ? effectiveIntervalMinutes : undefined,
-      runAtHour: triggerType === "interval" && effectiveIntervalMinutes >= 1440 ? runAtHourUtc : undefined,
-      runAtDay: triggerType === "interval" && effectiveIntervalMinutes === 10080 ? runAtDay : undefined,
+      intervalMinutes: effectiveIntervalMinutes,
+      runAtHour: effectiveIntervalMinutes >= 1440 ? runAtHourUtc : undefined,
+      runAtDay: effectiveIntervalMinutes === 10080 ? runAtDay : undefined,
       // Auto-PR has nothing to push to in repo-less mode, and nothing it
       // should push to in a workspace.
       autoPR: isRepoLess || inWorkspace ? false : autoPR,
@@ -227,10 +215,6 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
    * until the user hits "Create" (PATCH to flip enabled on) or "Cancel"
    * (DELETE the row).
    *
-   * Works for both interval and incoming triggers — the POST mints an
-   * incomingToken regardless, so the URL panel can render immediately for
-   * incoming-typed drafts. If the user flips the trigger pill after
-   * materialize, the final-submit PATCH carries the new triggerType.
    */
   async function materializeJob(_draftId: string): Promise<string | null> {
     setError(null)
@@ -247,16 +231,7 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
           prompt: prompt.trim() || "(draft)",
           workspaceId,
           ...jobTargetFields({ inWorkspace, repo, baseBranch, agent, model }),
-          triggerType,
-          // Carry the client-minted token (if any) so the persisted URL matches
-          // what the panel is already showing. Null on interval drafts — the
-          // server mints a dormant one.
-          incomingToken: incomingToken ?? undefined,
-          // intervalMinutes is required by the POST for "interval" — pass a
-          // safe placeholder for incoming drafts so the validator doesn't
-          // reject. Final submit overrides whichever value matters.
-          intervalMinutes:
-            triggerType === "interval" ? effectiveIntervalMinutes : 10,
+          intervalMinutes: effectiveIntervalMinutes,
           autoPR,
           continueFromLastRun,
           enabled: false,
@@ -272,9 +247,6 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
       setMaterializedJobId(created.id)
       // Capture the token minted by POST so the URL panel can render the
       // moment the user flips to "Via webhook".
-      if (created.incomingToken) {
-        setIncomingToken(created.incomingToken)
-      }
       return created.id
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save job")
@@ -303,15 +275,10 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
       // For materialized rows we created with enabled: false + isDraft: true;
       // promote both on final Create. For real edits, we leave existing state
       // alone.
-      // Persist the client-minted token on every create path so the saved URL
-      // matches what the panel shows — including after a pre-save rotate. Edits
-      // leave the token alone (rotation there goes through the server endpoint).
       const body =
         materializedJobId && !isEditing
-          ? { ...payload, enabled: true, isDraft: false, incomingToken: incomingToken ?? undefined }
-          : isUpdate
-            ? payload
-            : { ...payload, incomingToken: incomingToken ?? undefined }
+          ? { ...payload, enabled: true, isDraft: false }
+          : payload
 
       const res = await fetch(url, {
         method,
@@ -352,53 +319,6 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
       }
     }
     onClose()
-  }
-
-  /**
-   * Build the URL the user pastes into their external app. Browser-only —
-   * SSR returns an empty string and the panel hides the value until hydration.
-   */
-  const incomingWebhookUrl = useMemo(() => {
-    if (!incomingToken) return ""
-    if (typeof window === "undefined") return ""
-    return `${window.location.origin}/wh/${incomingToken}`
-  }, [incomingToken])
-
-  const handleCopyUrl = async () => {
-    if (!incomingWebhookUrl) return
-    await copyUrl(incomingWebhookUrl)
-  }
-
-  const handleRotateToken = async () => {
-    // Create mode: the URL hasn't been handed out anywhere yet, so "rotate" is
-    // just minting a fresh client-side UUID. No server round-trip, no confirm —
-    // the new token is persisted on save (create POST / final PATCH carry it).
-    if (!isEditing) {
-      setIncomingToken(crypto.randomUUID())
-      return
-    }
-    // Edit mode: the URL is live (the user may have wired it into an external
-    // app), so rotate server-side to invalidate the old one immediately.
-    const targetId = job?.id
-    if (!targetId) return
-    if (!confirm("Rotating will invalidate the existing webhook URL. Continue?")) return
-    setRotating(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/scheduled-jobs/${targetId}/rotate-token`, {
-        method: "POST",
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || "Failed to rotate token")
-      }
-      const updated = await res.json()
-      setIncomingToken(updated.incomingToken ?? null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to rotate token")
-    } finally {
-      setRotating(false)
-    }
   }
 
   const handleAgentChange = (newAgent: Agent) => {
@@ -443,9 +363,6 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
     materializedJobId,
     showAgentDropdown,
     showModelDropdown,
-    incomingToken,
-    copiedUrl,
-    rotating,
     // derived
     availableModels,
     customEndpoints,
@@ -454,14 +371,12 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
     showContinueOption,
     showAutoPROption,
     hasOptions,
-    incomingWebhookUrl,
     // setters
     setName,
     setPrompt,
     setRepo,
     setBaseBranch,
     setModel,
-    setTriggerType,
     setIntervalMinutes,
     setIsCustomInterval,
     setCustomIntervalValue,
@@ -476,8 +391,6 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
     materializeJob,
     handleSubmit,
     handleClose,
-    handleCopyUrl,
-    handleRotateToken,
     handleAgentChange,
     handleModelChange,
   }

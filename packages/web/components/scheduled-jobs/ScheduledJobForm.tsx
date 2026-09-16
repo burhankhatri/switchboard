@@ -1,7 +1,7 @@
 "use client"
 
 import * as Dialog from "@radix-ui/react-dialog"
-import { Clock, ChevronDown, X, Copy, RefreshCw, Check } from "lucide-react"
+import { Clock, ChevronDown, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ModalHeader, focusChatPrompt } from "@/components/ui/modal-header"
 import { RepoCombobox } from "@/components/chat/RepoCombobox"
@@ -11,7 +11,7 @@ import { type ScheduledJob } from "@/lib/scheduled-jobs/types"
 import { agentLabels, getModelLabel } from "@/lib/types"
 import { AgentIcon } from "@/components/icons/agent-icons"
 import { ScheduleFields } from "@/components/scheduled-jobs/ScheduleFields"
-import { TRIGGER_TYPES, AVAILABLE_AGENTS } from "@/components/scheduled-jobs/form-config"
+import { AVAILABLE_AGENTS } from "@/components/scheduled-jobs/form-config"
 import { useScheduledJobForm } from "@/lib/hooks/useScheduledJobForm"
 
 // =============================================================================
@@ -45,7 +45,6 @@ export function ScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess,
     isRepoLess,
     agent,
     model,
-    triggerType,
     intervalMinutes,
     isCustomInterval,
     customIntervalValue,
@@ -59,9 +58,6 @@ export function ScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess,
     materializedJobId,
     showAgentDropdown,
     showModelDropdown,
-    incomingToken,
-    copiedUrl,
-    rotating,
     availableModels,
     customEndpoints,
     timezoneName,
@@ -69,12 +65,10 @@ export function ScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess,
     showContinueOption,
     showAutoPROption,
     hasOptions,
-    incomingWebhookUrl,
     setName,
     setPrompt,
     setRepo,
     setBaseBranch,
-    setTriggerType,
     setIntervalMinutes,
     setIsCustomInterval,
     setCustomIntervalValue,
@@ -88,8 +82,6 @@ export function ScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess,
     materializeJob,
     handleSubmit,
     handleClose,
-    handleCopyUrl,
-    handleRotateToken,
     handleAgentChange,
     handleModelChange,
   } = useScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess })
@@ -151,98 +143,23 @@ export function ScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess,
               />
             </div>
 
-            {/* Trigger Type - Segmented Control. Always editable — PATCH
-                handles the swap for both still-open drafts and existing
-                jobs. */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Trigger</label>
-              <div className="inline-flex rounded-md bg-muted p-0.5">
-                {TRIGGER_TYPES.map((t) => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    onClick={() => setTriggerType(t.value)}
-                    className={cn(
-                      "px-3 py-1 text-sm rounded-md transition-colors cursor-pointer",
-                      triggerType === t.value
-                        ? "bg-background shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Schedule - only for scheduled trigger */}
-            {triggerType === "interval" && (
-              <ScheduleFields
-                isCustomInterval={isCustomInterval}
-                intervalMinutes={intervalMinutes}
-                customIntervalValue={customIntervalValue}
-                customIntervalUnit={customIntervalUnit}
-                runAtDay={runAtDay}
-                runAtHourLocal={runAtHourLocal}
-                effectiveIntervalMinutes={effectiveIntervalMinutes}
-                timezoneName={timezoneName}
-                setIsCustomInterval={setIsCustomInterval}
-                setIntervalMinutes={setIntervalMinutes}
-                setCustomIntervalValue={setCustomIntervalValue}
-                setCustomIntervalUnit={setCustomIntervalUnit}
-                setRunAtDay={setRunAtDay}
-                setRunAtHourLocal={setRunAtHourLocal}
-              />
-            )}
-
-            {/* Incoming webhook URL panel — shown only for incoming triggers.
-                The token is minted client-side as soon as the trigger is
-                picked, so the URL (with copy + rotate) renders immediately,
-                even before the job is saved. The fallback below only shows for
-                the brief moment before the mint effect runs. */}
-            {triggerType === "incoming" && (
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Webhook URL</label>
-
-                {incomingToken ? (
-                  <>
-                    <div className="flex items-stretch gap-1">
-                      <input
-                        type="text"
-                        readOnly
-                        value={incomingWebhookUrl}
-                        onFocus={(e) => e.currentTarget.select()}
-                        className="flex-1 min-w-0 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleCopyUrl}
-                        className="inline-flex items-center justify-center rounded-md border border-border bg-background px-2 hover:bg-accent transition-colors cursor-pointer"
-                        title={copiedUrl ? "Copied" : "Copy URL"}
-                      >
-                        {copiedUrl ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleRotateToken}
-                        disabled={rotating}
-                        className="inline-flex items-center justify-center rounded-md border border-border bg-background px-2 hover:bg-accent transition-colors cursor-pointer disabled:opacity-50"
-                        title="Generate a new URL and invalidate the existing one"
-                      >
-                        <RefreshCw className={cn("h-3.5 w-3.5", rotating && "animate-spin")} />
-                      </button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Anyone with this URL can fire this agent — rotate it if it leaks.
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Preparing your webhook URL…
-                  </p>
-                )}
-              </div>
-            )}
+            {/* Every job is a schedule, so there is no trigger to pick. */}
+            <ScheduleFields
+              isCustomInterval={isCustomInterval}
+              intervalMinutes={intervalMinutes}
+              customIntervalValue={customIntervalValue}
+              customIntervalUnit={customIntervalUnit}
+              runAtDay={runAtDay}
+              runAtHourLocal={runAtHourLocal}
+              effectiveIntervalMinutes={effectiveIntervalMinutes}
+              timezoneName={timezoneName}
+              setIsCustomInterval={setIsCustomInterval}
+              setIntervalMinutes={setIntervalMinutes}
+              setCustomIntervalValue={setCustomIntervalValue}
+              setCustomIntervalUnit={setCustomIntervalUnit}
+              setRunAtDay={setRunAtDay}
+              setRunAtHourLocal={setRunAtHourLocal}
+            />
 
             {/* Prompt Field - styled like ChatInput */}
             <div>

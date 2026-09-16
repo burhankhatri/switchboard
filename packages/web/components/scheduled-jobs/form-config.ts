@@ -26,21 +26,8 @@ export function localHourToUtc(localHour: number): number {
 }
 
 // =============================================================================
-// Trigger / Schedule Constants
+// Schedule Constants
 // =============================================================================
-
-export const TRIGGER_TYPES = [
-  {
-    label: "On a schedule",
-    value: "interval",
-    description: "Run at regular intervals"
-  },
-  {
-    label: "Via webhook",
-    value: "incoming",
-    description: "Triggered by any external app (GitHub, Jira, Slack, Linear, …) — paste the generated URL into the source app"
-  },
-] as const
 
 export const INTERVAL_PRESETS = [
   { label: "10 minutes", value: 10 },
