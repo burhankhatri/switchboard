@@ -175,6 +175,7 @@ export function AppModals({
       {/* Scheduled Job Form */}
       <ScheduledJobForm
         open={modals.scheduledJobFormOpen}
+        initialPrompt={modals.scheduledJobPrompt}
         onClose={() => modals.setScheduledJobFormOpen(false)}
         onSuccess={() => {
           modals.setScheduledJobFormOpen(false)

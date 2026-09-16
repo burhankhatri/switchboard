@@ -44,6 +44,13 @@ export interface ModalContextValue {
   // Scheduled jobs
   scheduledJobFormOpen: boolean
   setScheduledJobFormOpen: (open: boolean) => void
+  /**
+   * Prompt the create form opens with, when a schedule is being made out of
+   * something that already ran. Null for a form opened from scratch.
+   */
+  scheduledJobPrompt: string | null
+  /** Open the create form seeded with a prompt - "run this again, weekly". */
+  openScheduledJobWithPrompt: (prompt: string) => void
 
   // Mobile-specific modals
   mobileCommandsOpen: boolean
@@ -98,7 +105,19 @@ export function ModalProvider({ children, isMobile, onMobileSidebarClose }: Moda
   const [mcpServersModalOpen, setMcpServersModalOpen] = useState(false)
 
   // Scheduled jobs
-  const [scheduledJobFormOpen, setScheduledJobFormOpen] = useState(false)
+  const [scheduledJobFormOpen, setScheduledJobFormOpenState] = useState(false)
+  const [scheduledJobPrompt, setScheduledJobPrompt] = useState<string | null>(null)
+  const openScheduledJobWithPrompt = useCallback((prompt: string) => {
+    setScheduledJobPrompt(prompt)
+    setScheduledJobFormOpenState(true)
+  }, [])
+  // Closing drops the seed. Otherwise the next "New Job" opens pre-filled with
+  // a message from some earlier chat, which reads as the form remembering
+  // something it should not.
+  const setScheduledJobFormOpen = useCallback((open: boolean) => {
+    if (!open) setScheduledJobPrompt(null)
+    setScheduledJobFormOpenState(open)
+  }, [])
 
   // Mobile-specific modals
   const [mobileCommandsOpen, setMobileCommandsOpen] = useState(false)
@@ -181,6 +200,8 @@ export function ModalProvider({ children, isMobile, onMobileSidebarClose }: Moda
     // Scheduled jobs
     scheduledJobFormOpen,
     setScheduledJobFormOpen,
+    scheduledJobPrompt,
+    openScheduledJobWithPrompt,
 
     // Mobile-specific modals
     mobileCommandsOpen,

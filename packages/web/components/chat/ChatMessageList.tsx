@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LoadingState } from "@/components/ui/LoadingState"
+import { useModals } from "@/lib/contexts/ModalContext"
 
 interface ChatMessageListProps {
   chat: Chat
@@ -59,6 +60,11 @@ export function ChatMessageList({
   userHasScrolledUp,
   onScrollToBottom,
 }: ChatMessageListProps) {
+  // Read here rather than in MessageBubble: this list only ever renders inside
+  // the app shell, while the bubble also renders on the public share page,
+  // which has no ModalProvider.
+  const { openScheduledJobWithPrompt } = useModals()
+
   return (
     <div className="relative flex-1 flex flex-col min-h-0">
       <div
@@ -93,6 +99,7 @@ export function ChatMessageList({
                     repo={isNewRepo ? undefined : chat.repo}
                     onOpenFile={onOpenFile}
                     onForcePush={git.handleForcePush}
+                    onSchedule={openScheduledJobWithPrompt}
                   />
                 </div>
               </Fragment>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, memo } from "react"
-import { GitMerge, FileText, AlertTriangle } from "lucide-react"
+import { GitMerge, FileText, AlertTriangle, CalendarClock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LoadingState } from "@/components/ui/LoadingState"
 import type { Message } from "@/lib/types"
@@ -22,13 +22,26 @@ interface MessageBubbleProps {
   onOpenFile?: (filePath: string) => void
   /** Called when the user clicks the "force push" link in a push-failure message. */
   onForcePush?: () => void
+  /**
+   * Called to turn this message into a recurring job. A prop rather than the
+   * modal context, because this component also renders on the public share
+   * page and inside a scheduled run's detail view, neither of which is under
+   * ModalProvider - reading the context here threw and blanked both.
+   * Omitted there, so no button appears.
+   */
+  onSchedule?: (prompt: string) => void
 }
 
 // Memoized MessageBubble to prevent re-renders when parent (ChatPanel) re-renders
 // due to input changes. Only re-render when message content actually changes.
-export const MessageBubble = memo(function MessageBubble({ message, isStreaming, isMobile = false, repo, onOpenFile, onForcePush }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, isStreaming, isMobile = false, repo, onOpenFile, onForcePush, onSchedule }: MessageBubbleProps) {
   const isUser = message.role === "user"
   const hasUploadedFiles = isUser && message.uploadedFiles && message.uploadedFiles.length > 0
+
+  // Offered on what the person asked for, not on what the agent replied. The
+  // thing worth repeating every week is the instruction; the answer is the
+  // output of running it once.
+  const canSchedule = isUser && !!onSchedule && !!message.content?.trim()
 
   return (
     <div
@@ -43,13 +56,31 @@ export const MessageBubble = memo(function MessageBubble({ message, isStreaming,
         isUser && (isMobile ? "max-w-[95%]" : "max-w-[90%]")
       )}>
         {isUser ? (
-          <div className="min-w-0">
+          <div className="group min-w-0">
             <div className={cn(
               "inline-block rounded-lg bg-muted text-foreground text-left max-w-full min-w-0",
               isMobile ? "px-3 py-2 text-base" : "px-4 py-2 text-[15px]"
             )}>
               <MarkdownContent text={message.content} isMobile={isMobile} constrainWidth={false} />
             </div>
+            {canSchedule && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => onSchedule!(message.content)}
+                  title="Run this on a schedule"
+                  className={cn(
+                    "mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer",
+                    // Always reachable on touch, where there is no hover to
+                    // reveal it with.
+                    isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  )}
+                >
+                  <CalendarClock className="h-3 w-3" />
+                  Schedule this
+                </button>
+              </div>
+            )}
             {/* Uploaded files display */}
             {hasUploadedFiles && (
               <div className={cn(
@@ -84,7 +115,10 @@ export const MessageBubble = memo(function MessageBubble({ message, isStreaming,
     prevProps.message.contentBlocks === nextProps.message.contentBlocks &&
     prevProps.isStreaming === nextProps.isStreaming &&
     prevProps.isMobile === nextProps.isMobile &&
-    prevProps.repo === nextProps.repo
+    prevProps.repo === nextProps.repo &&
+    // Not a stable callback in every caller - some pass undefined, some pass
+    // a context action - and whether the button renders at all depends on it.
+    prevProps.onSchedule === nextProps.onSchedule
     // Note: onOpenFile and onForcePush are stable callbacks from parent
   )
 })

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { useCopyToClipboard } from "@/lib/hooks/useCopyToClipboard"
 import { type ScheduledJob } from "@/lib/scheduled-jobs/types"
+import { scheduleNameFromPrompt } from "@/lib/scheduled-jobs/prompt-name"
 import { agentModels, getAgentModels, type Agent, NEW_REPOSITORY } from "@/lib/types"
 import { useSettingsQuery } from "@/lib/query/hooks/useSettingsQuery"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
@@ -17,6 +18,12 @@ import {
 interface UseScheduledJobFormArgs {
   open: boolean
   job?: ScheduledJob | null
+  /**
+   * Prompt to open a new job with, when the schedule is being made out of
+   * something that already ran. Ignored when editing - an existing job's own
+   * prompt is the thing being edited.
+   */
+  initialPrompt?: string | null
   onClose: () => void
   onSuccess: (job: ScheduledJob) => void
 }
@@ -26,7 +33,7 @@ interface UseScheduledJobFormArgs {
  * Kept in one place so the component file is pure layout — change the wiring
  * here, change the markup there.
  */
-export function useScheduledJobForm({ open, job, onClose, onSuccess }: UseScheduledJobFormArgs) {
+export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess }: UseScheduledJobFormArgs) {
   const isEditing = !!job
   const { activeWorkspace } = useWorkspace()
 
@@ -36,8 +43,10 @@ export function useScheduledJobForm({ open, job, onClose, onSuccess }: UseSchedu
   const workspaceId = isEditing ? job?.workspaceId ?? null : activeWorkspace?.id ?? null
 
   // Form state
-  const [name, setName] = useState(job?.name ?? "")
-  const [prompt, setPrompt] = useState(job?.prompt ?? "")
+  const [name, setName] = useState(
+    job?.name ?? (initialPrompt ? scheduleNameFromPrompt(initialPrompt) : "")
+  )
+  const [prompt, setPrompt] = useState(job?.prompt ?? initialPrompt ?? "")
   // Empty string means "no repo" in form state; on submit we send NEW_REPOSITORY.
   const [repo, setRepo] = useState(
     job?.repo && job.repo !== NEW_REPOSITORY ? job.repo : ""
@@ -107,8 +116,10 @@ export function useScheduledJobForm({ open, job, onClose, onSuccess }: UseSchedu
     if (open) {
       const initialAgent = (job?.agent as Agent) ?? "opencode"
       const initialModels = agentModels[initialAgent] ?? []
-      setName(job?.name ?? "")
-      setPrompt(job?.prompt ?? "")
+      // Seeded, not forced: the field stays editable, so a bad guess costs a
+      // retype rather than a wrong name in the list forever.
+      setName(job?.name ?? (initialPrompt ? scheduleNameFromPrompt(initialPrompt) : ""))
+      setPrompt(job?.prompt ?? initialPrompt ?? "")
       setRepo(job?.repo && job.repo !== NEW_REPOSITORY ? job.repo : "")
       setBaseBranch(job?.baseBranch ?? "main")
       setAgent(initialAgent)
@@ -128,7 +139,7 @@ export function useScheduledJobForm({ open, job, onClose, onSuccess }: UseSchedu
       setIncomingToken(job?.incomingToken ?? null)
       setRotating(false)
     }
-  }, [open, job])
+  }, [open, job, initialPrompt])
 
   // Update model when agent changes (or endpoints load) — but keep a still-valid
   // selection, including a custom endpoint that belongs to the current agent.

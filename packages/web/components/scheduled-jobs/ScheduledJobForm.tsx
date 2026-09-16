@@ -21,6 +21,8 @@ import { useScheduledJobForm } from "@/lib/hooks/useScheduledJobForm"
 interface ScheduledJobFormProps {
   open: boolean
   job?: ScheduledJob | null
+  /** Seeds the prompt when creating a schedule out of a message that already ran. */
+  initialPrompt?: string | null
   onClose: () => void
   onSuccess: (job: ScheduledJob) => void
   isMobile?: boolean
@@ -30,7 +32,7 @@ interface ScheduledJobFormProps {
 // Component
 // =============================================================================
 
-export function ScheduledJobForm({ open, job, onClose, onSuccess, isMobile = false }: ScheduledJobFormProps) {
+export function ScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess, isMobile = false }: ScheduledJobFormProps) {
   const {
     isEditing,
     jobId,
@@ -89,7 +91,7 @@ export function ScheduledJobForm({ open, job, onClose, onSuccess, isMobile = fal
     handleRotateToken,
     handleAgentChange,
     handleModelChange,
-  } = useScheduledJobForm({ open, job, onClose, onSuccess })
+  } = useScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess })
 
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
