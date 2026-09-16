@@ -365,6 +365,108 @@ check("a job can be unbound from its workspace", r.status === 200 && r.body?.wor
 if (jobId) await prisma.scheduledJob.delete({ where: { id: jobId } }).catch(() => {})
 await prisma.user.delete({ where: { id: jobStranger.id } }).catch(() => {})
 
+// ── 12. the scheduler MCP server ───────────────────────────────
+console.log("\n12. scheduler MCP server")
+
+// lib/mcp/run-token.ts is TypeScript and node cannot import it from here, so
+// the token is minted inline. That is not only a workaround: it proves the
+// signature format the route accepts, rather than testing a helper against
+// itself.
+const crypto = await import("node:crypto")
+const b64url = (b) => Buffer.from(b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+const mint = (claims, ttlMs = 6 * 60 * 60 * 1000) => {
+  const payload = b64url(JSON.stringify({ ...claims, exp: Date.now() + ttlMs }))
+  const sig = b64url(crypto.createHmac("sha256", process.env.NEXTAUTH_SECRET).update(payload).digest())
+  return `${payload}.${sig}`
+}
+
+const mcp = async (token, body) => {
+  const res = await fetch(`${BASE}/api/mcp/scheduler`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+  })
+  const text = await res.text()
+  let parsed; try { parsed = JSON.parse(text) } catch { parsed = text.slice(0, 200) }
+  return { status: res.status, body: parsed }
+}
+
+const runToken = mint({ userId: user.id, workspaceId: ws.id, chatId: null })
+
+let m = await mcp(null, { jsonrpc: "2.0", id: 1, method: "tools/list" })
+check("no bearer token is refused", m.status === 401, `status ${m.status}`)
+
+m = await mcp("garbage.token", { jsonrpc: "2.0", id: 1, method: "tools/list" })
+check("a forged token is refused", m.status === 401, `status ${m.status}`)
+
+m = await mcp(mint({ userId: user.id, workspaceId: ws.id, chatId: null }, -1000), { jsonrpc: "2.0", id: 1, method: "tools/list" })
+check("an expired token is refused", m.status === 401, `status ${m.status}`)
+
+m = await mcp(runToken, { jsonrpc: "2.0", id: 1, method: "initialize", params: {} })
+check("initialize returns a protocol version", !!m.body?.result?.protocolVersion, JSON.stringify(m.body).slice(0, 120))
+check("initialize advertises tools", !!m.body?.result?.capabilities?.tools)
+
+m = await mcp(runToken, { jsonrpc: "2.0", id: 2, method: "tools/list" })
+const tool = m.body?.result?.tools?.[0]
+check("tools/list exposes create_scheduled_job", tool?.name === "create_scheduled_job", String(tool?.name))
+// The description is the only place the model learns it must ask first and
+// that nothing runs without approval, so it is worth asserting.
+check("the tool tells the model not to guess an interval", /do not guess/i.test(tool?.description ?? ""))
+check("the tool tells the model it needs approval", /approval/i.test(tool?.description ?? ""))
+
+m = await mcp(runToken, {
+  jsonrpc: "2.0", id: 3, method: "tools/call",
+  params: { name: "create_scheduled_job", arguments: { name: "Weekly deliverability audit", prompt: "Check bounce rates and report.", intervalMinutes: 10080 } },
+})
+check("tools/call creates the job", m.body?.result?.isError === false, JSON.stringify(m.body).slice(0, 160))
+check("the reply says it is not running yet", /NOT running/i.test(m.body?.result?.content?.[0]?.text ?? ""))
+
+const proposed = await prisma.scheduledJob.findFirst({
+  where: { workspaceId: ws.id, name: "Weekly deliverability audit" },
+  select: { id: true, approvedAt: true, enabled: true, intervalMinutes: true, repo: true, agent: true },
+})
+check("the job exists", !!proposed)
+// The whole point of the gate.
+check("it is unapproved", proposed?.approvedAt === null, String(proposed?.approvedAt))
+check("it is disabled", proposed?.enabled === false, String(proposed?.enabled))
+check("interval persisted", proposed?.intervalMinutes === 10080, String(proposed?.intervalMinutes))
+check("repo denormalised from the workspace", proposed?.repo === ws.repo, String(proposed?.repo))
+
+// An unapproved job must not be startable by any route.
+r = await call(`/api/scheduled-jobs/${proposed.id}/run`, { method: "POST" })
+check("Run Now refuses an unapproved job", r.status === 400, `status ${r.status}`)
+
+m = await mcp(runToken, {
+  jsonrpc: "2.0", id: 4, method: "tools/call",
+  params: { name: "create_scheduled_job", arguments: { name: "Too frequent", prompt: "x", intervalMinutes: 5 } },
+})
+check("an interval below the cron tick is refused", m.body?.result?.isError === true, JSON.stringify(m.body?.result).slice(0, 120))
+
+m = await mcp(runToken, {
+  jsonrpc: "2.0", id: 5, method: "tools/call",
+  params: { name: "create_scheduled_job", arguments: { name: "No prompt", intervalMinutes: 10080 } },
+})
+check("a missing prompt is refused", m.body?.result?.isError === true)
+
+m = await mcp(runToken, { jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "delete_everything", arguments: {} } })
+check("an unknown tool is a protocol error", m.body?.error?.code === -32602, JSON.stringify(m.body).slice(0, 120))
+
+// A token naming a workspace the user is not in must not create anything.
+const strangerToken = mint({ userId: jobStranger?.id ?? "nobody", workspaceId: ws.id, chatId: null })
+m = await mcp(strangerToken, {
+  jsonrpc: "2.0", id: 7, method: "tools/call",
+  params: { name: "create_scheduled_job", arguments: { name: "Sneak", prompt: "x", intervalMinutes: 10080 } },
+})
+check("a non-member's token cannot create a job", m.body?.result?.isError === true, JSON.stringify(m.body?.result).slice(0, 140))
+
+// Approving is what lets it run.
+r = await call(`/api/scheduled-jobs/${proposed.id}`, { method: "PATCH", body: JSON.stringify({ approve: true }) })
+check("approving succeeds", r.status === 200, `status ${r.status}`)
+check("approval is recorded", !!r.body?.approvedAt, String(r.body?.approvedAt))
+check("approval enables the job", r.body?.enabled === true, String(r.body?.enabled))
+
+await prisma.scheduledJob.deleteMany({ where: { workspaceId: ws.id } }).catch(() => {})
+
 // ── 8. unauth ─────────────────────────────────────────────────────────────
 console.log("\n8. auth gate")
 const anon = await fetch(`${BASE}/api/workspaces`).then((x) => x.status)
