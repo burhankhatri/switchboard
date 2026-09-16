@@ -13,14 +13,19 @@ import { finalizeInteractiveChat, markChatError } from "./_lib/interactive"
 // Vercel Pro plan allows up to 5 minutes for cron jobs
 export const maxDuration = 300
 
-// Scheduled every 30 minutes in vercel.json, and that number is a cost control
-// rather than a preference: every tick below queries Postgres, and Neon suspends
-// a compute only after five minutes without one. At the "* * * * *" this used to
-// run, the production database never suspended — it billed around the clock with
-// nobody using the app. Ten minutes is the floor the test enforces, because that
-// is the shortest interval a scheduled job can have; thirty is what we actually
-// run, since a cron only earns its wake if there is work. Raise it toward ten if
-// scheduled jobs start being used and their punctuality matters.
+// Scheduled every minute in vercel.json. That is a deliberate reversal of an
+// earlier decision, and it has a running cost: every tick below queries
+// Postgres, Neon suspends a compute only after five minutes without one, so at
+// this cadence the production database never suspends and bills around the
+// clock whether or not anyone is using the app. That was the reason it was
+// moved to */30 in the first place. It is back at a minute because punctuality
+// won the argument — a job set to run at 9am should run at 9am, not by 9:30.
+// If the bill becomes the problem again, the thing to change is what keeps the
+// compute awake, not this number.
+//
+// One minute is shorter than maxDuration, so ticks overlap. Phase 1 claims each
+// job with a conditional update before creating its run; without that, two
+// overlapping ticks both see the same due job and dispatch it twice.
 //
 // Interactive chats do not depend on this for correctness: the stream route
 // finalizes them (see agent/stream/_lib/persist-snapshot.ts). Phase 3 here is the
@@ -76,27 +81,32 @@ export async function GET(req: Request) {
         // filter that cannot be flipped by anything except an approval.
         approvedAt: { not: null },
         nextRunAt: { lte: now },
-        runs: { none: { status: "running" } },
+        // "pending" counts as outstanding, not just "running". A run that has
+        // been queued but not yet started is still a run, and at a one-minute
+        // cadence the window between the two is several ticks wide.
+        runs: { none: { status: { in: ["pending", "running"] } } },
       },
-      include: {
-        runs: {
-          where: { status: "running" },
-          take: 1,
-        },
-      },
+      select: { id: true, intervalMinutes: true },
     })
 
     for (const job of dueJobs) {
       try {
-        // Create run record
+        // Claim the job before creating anything, with the due condition in
+        // the WHERE. Postgres settles the race: exactly one overlapping tick
+        // gets count 1 and the rest get 0, so a job dispatches once even
+        // though several invocations are in flight at the same moment.
+        //
+        // Claim-then-create, not create-then-claim: if the second step fails
+        // the job skips an interval, which is a great deal better than an
+        // audit that emails the same list twice.
+        const claimed = await prisma.scheduledJob.updateMany({
+          where: { id: job.id, nextRunAt: { lte: now } },
+          data: { nextRunAt: addMinutes(now, job.intervalMinutes) },
+        })
+        if (claimed.count === 0) continue
+
         await prisma.scheduledJobRun.create({
           data: { jobId: job.id, status: "pending" },
-        })
-
-        // Update next run time
-        await prisma.scheduledJob.update({
-          where: { id: job.id },
-          data: { nextRunAt: addMinutes(now, job.intervalMinutes) },
         })
 
         results.dispatchedJobs++
