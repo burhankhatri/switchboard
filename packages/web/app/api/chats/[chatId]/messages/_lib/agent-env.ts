@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db/prisma"
 import { decrypt } from "@/lib/db/encryption"
-import { decryptWorkspaceEnv } from "@/lib/workspace"
-import { restConnectionEnv } from "@/lib/workspace-connections"
+import { workspaceRunEnv } from "@/lib/workspace-run-env"
 import { NEW_REPOSITORY } from "@/lib/types"
 import { getEnvForModel, type CustomEndpoint } from "@switchboard/common"
 import type { Agent } from "@/lib/agent-session"
@@ -61,33 +60,13 @@ export async function buildAgentEnv(params: {
     }
   }
 
-  // Membership is re-checked on EVERY run, not just when the chat was bound.
-  // A chat keeps its workspaceId for life, so without this, leaving a workspace
-  // would revoke nothing — the next turn would still be handed the current
-  // credential, including one rotated in after the person left.
-  let workspaceEnv: Record<string, string> = {}
-  if (chat.workspaceId) {
-    const member = await prisma.workspaceMember.findUnique({
-      where: { workspaceId_userId: { workspaceId: chat.workspaceId, userId } },
-      select: { role: true },
-    })
-    if (!member) {
-      throw new Error(
-        "You are no longer a member of this workspace, so its connections were not loaded."
-      )
-    }
-    // Throws if a value cannot be decrypted, so a broken connection fails at
-    // spin-up rather than mid-task or by sending garbage to the CRM as a key.
-    // REST connections are merged in with the workspace's own variables: both
-    // are workspace-owned, so neither may be shadowed by a user's chat vars.
-    workspaceEnv = {
-      ...decryptWorkspaceEnv(chat.workspace),
-      ...restConnectionEnv(
-        chat.workspace?.connections ?? [],
-        chat.workspace?.slug ?? "workspace"
-      ),
-    }
-  }
+  // Re-checks membership and throws if it has been revoked. Shared with the
+  // scheduled path so the two cannot drift.
+  const workspaceEnv = await workspaceRunEnv({
+    workspaceId: chat.workspaceId,
+    workspace: chat.workspace,
+    userId,
+  })
 
   const shadowed = Object.keys(workspaceEnv).filter((k) => k in userEnv)
   if (shadowed.length > 0) {
