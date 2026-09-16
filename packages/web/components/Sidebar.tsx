@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { WorkspaceRuns } from "@/components/workspaces/WorkspaceRuns"
 import { WorkspaceConnections } from "@/components/workspaces/WorkspaceConnections"
 import { WorkspaceFiles } from "@/components/workspaces/WorkspaceFiles"
+import { WorkspaceSkills } from "@/components/workspaces/WorkspaceSkills"
 import { WorkspaceDropdown } from "@/components/workspaces/WorkspaceDropdown"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { BRAND } from "@/lib/brand"
@@ -408,6 +409,7 @@ export function Sidebar({
           {activeWorkspace && (
             <>
               <div className="mx-6 my-2 border-t border-border" />
+              <WorkspaceSkills />
               <WorkspaceFiles />
               <div className="mx-6 my-2 border-t border-border" />
               <WorkspaceConnections />
@@ -675,6 +677,7 @@ export function Sidebar({
         // of clipping against the pinned footer.
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-auto-hide">
           <div className="mx-4 my-2 border-t border-border" />
+          <WorkspaceSkills />
           <WorkspaceFiles />
           <div className="mx-4 my-2 border-t border-border" />
           <WorkspaceConnections />

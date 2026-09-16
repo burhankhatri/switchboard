@@ -118,10 +118,16 @@ function TreeNode({ node, depth }: { node: Node; depth: number }) {
  * detail; surfacing them as a second `.claude` only invited the question of
  * which one you were editing.)
  *
+ * Collapsed by default. A raw git tree is the honest view of a workspace and
+ * the only way to reach a script or a fixture, but it is not what most people
+ * open a workspace to do — `WorkspaceSkills` is, and a tree of dotfiles above
+ * it buried the thing that mattered.
+ *
  * Anything added here is committed, so the next run clones it.
  */
 export function WorkspaceFiles() {
   const { activeWorkspace } = useWorkspace()
+  const [open, setOpen] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -140,7 +146,9 @@ export function WorkspaceFiles() {
         if (!r.ok) throw new Error(String(r.status))
         return r.json() as Promise<{ workspace: RepoFile[]; shared: RepoFile[] }>
       }),
-    enabled: !!activeWorkspace,
+    // Collapsed means nobody is looking, and the listing is a GitHub round
+    // trip on every workspace switch.
+    enabled: !!activeWorkspace && open,
     retry: false,
   })
 
@@ -248,32 +256,46 @@ export function WorkspaceFiles() {
       onDrop={(e) => {
         e.preventDefault()
         setDragging(false)
+        // Reveal the panel: otherwise the progress line, and any per-file
+        // failure, lands inside a collapsed section nobody can see.
+        setOpen(true)
         void addFiles([...e.dataTransfer.files])
       }}
     >
       <div className="flex items-center gap-0.5 px-2 py-1">
-        <p className="flex-1 text-[11px] uppercase tracking-wide text-muted-foreground">Files</p>
         <button
-          onClick={() => startCreating("file")}
-          title="New file"
-          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex flex-1 items-center gap-1 rounded py-0.5 text-left text-[11px] uppercase tracking-wide text-muted-foreground hover:text-foreground cursor-pointer"
         >
-          <FilePlus className="h-3.5 w-3.5" />
+          <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", open && "rotate-90")} />
+          Files
         </button>
-        <button
-          onClick={() => startCreating("folder")}
-          title="New folder"
-          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
-        >
-          <FolderPlus className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={() => fileInput.current?.click()}
-          title="Add files from your computer"
-          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
-        >
-          <Upload className="h-3.5 w-3.5" />
-        </button>
+        {open && (
+          <>
+            <button
+              onClick={() => startCreating("file")}
+              title="New file"
+              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <FilePlus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => startCreating("folder")}
+              title="New folder"
+              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <FolderPlus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => fileInput.current?.click()}
+              title="Add files from your computer"
+              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <Upload className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
         <input
           ref={fileInput}
           type="file"
@@ -283,71 +305,75 @@ export function WorkspaceFiles() {
         />
       </div>
 
-      {(isLoading || busy || write.isPending) && (
-        <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          {busy ? `Uploading ${busy}…` : isLoading ? "Loading…" : "Committing…"}
-        </div>
-      )}
-      {error && <p className="px-2 py-1.5 text-xs text-muted-foreground">Could not load files.</p>}
-      {(write.error || uploadError) && (
-        <p className="px-2 py-1.5 text-xs text-destructive break-words">
-          {uploadError ?? (write.error as Error).message}
-        </p>
-      )}
+      {open && (
+        <>
+        {(isLoading || busy || write.isPending) && (
+          <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {busy ? `Uploading ${busy}…` : isLoading ? "Loading…" : "Committing…"}
+          </div>
+        )}
+        {error && <p className="px-2 py-1.5 text-xs text-muted-foreground">Could not load files.</p>}
+        {(write.error || uploadError) && (
+          <p className="px-2 py-1.5 text-xs text-destructive break-words">
+            {uploadError ?? (write.error as Error).message}
+          </p>
+        )}
 
-      {/* Inline creator. Replaces window.prompt(), which put a Chrome dialog in
-          front of the app and asked for a path when a name is what is wanted. */}
-      {creating && (
-        <div
-          className="flex items-center gap-1.5 px-2 py-1"
-          style={{ animation: "fade-up 200ms var(--ease-spring) both" }}
-        >
-          {creating === "folder" ? (
-            <Folder className="h-3 w-3 shrink-0 text-muted-foreground" />
-          ) : (
-            <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
-          )}
-          <input
-            ref={nameInput}
-            value={newName}
-            onChange={(e) => {
-              setNewName(e.target.value)
-              setNameError(null)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                submitNew()
-              } else if (e.key === "Escape") {
-                e.preventDefault()
-                setCreating(null)
+        {/* Inline creator. Replaces window.prompt(), which put a Chrome dialog in
+            front of the app and asked for a path when a name is what is wanted. */}
+        {creating && (
+          <div
+            className="flex items-center gap-1.5 px-2 py-1"
+            style={{ animation: "fade-up 200ms var(--ease-spring) both" }}
+          >
+            {creating === "folder" ? (
+              <Folder className="h-3 w-3 shrink-0 text-muted-foreground" />
+            ) : (
+              <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+            )}
+            <input
+              ref={nameInput}
+              value={newName}
+              onChange={(e) => {
+                setNewName(e.target.value)
                 setNameError(null)
-              }
-            }}
-            onBlur={() => {
-              // Blur cancels rather than commits. Creating a file is a commit to
-              // a shared repo; clicking away should not be enough to do that.
-              if (!newName.trim()) setCreating(null)
-            }}
-            placeholder={creating === "folder" ? "folder name" : "name.py"}
-            aria-label={creating === "folder" ? "New folder name" : "New file name"}
-            className="min-w-0 flex-1 rounded-chip border border-line bg-field px-1.5 py-0.5 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
-          />
-        </div>
-      )}
-      {nameError && (
-        <p className="px-2 pb-1 pl-7 text-[11px] text-destructive">{nameError}</p>
-      )}
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  submitNew()
+                } else if (e.key === "Escape") {
+                  e.preventDefault()
+                  setCreating(null)
+                  setNameError(null)
+                }
+              }}
+              onBlur={() => {
+                // Blur cancels rather than commits. Creating a file is a commit to
+                // a shared repo; clicking away should not be enough to do that.
+                if (!newName.trim()) setCreating(null)
+              }}
+              placeholder={creating === "folder" ? "folder name" : "name.py"}
+              aria-label={creating === "folder" ? "New folder name" : "New file name"}
+              className="min-w-0 flex-1 rounded-chip border border-line bg-field px-1.5 py-0.5 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
+            />
+          </div>
+        )}
+        {nameError && (
+          <p className="px-2 pb-1 pl-7 text-[11px] text-destructive">{nameError}</p>
+        )}
 
-      {data && [...toTree(data.workspace).children.values()].map((c) => (
-        <TreeNode key={c.name} node={c} depth={0} />
-      ))}
+        {data && [...toTree(data.workspace).children.values()].map((c) => (
+          <TreeNode key={c.name} node={c} depth={0} />
+        ))}
 
-      {data && data.workspace.length === 0 && !isLoading && (
-        <p className="px-2 py-2 text-xs text-muted-foreground leading-snug">
-          No files yet. Drop text files here — they commit for everyone on the next run.
-        </p>
+        {data && data.workspace.length === 0 && !isLoading && (
+          <p className="px-2 py-2 text-xs text-muted-foreground leading-snug">
+            No files yet. Drop text files here — they commit for everyone on the next run.
+          </p>
+        )}
+        </>
       )}
     </div>
   )

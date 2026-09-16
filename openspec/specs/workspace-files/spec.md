@@ -4,6 +4,9 @@
 Browsing and editing a workspace's files. The repo is the single source of
 truth, so reads and writes go to it rather than to a sandbox.
 
+The tree is a secondary view, reached from a collapsed disclosure — see
+`workspace-skills` for what a workspace leads with.
+
 ## Requirements
 
 ### Requirement: Files are read from the repo, not a sandbox
@@ -48,6 +51,21 @@ shared root.
 - **WHEN** a member requests a path under a different workspace
 - **THEN** the request is rejected with 403, because every workspace shares one
   repo and containment is the only thing separating them
+
+### Requirement: The tree is collapsed until asked for
+The system SHALL keep the file tree collapsed by default and SHALL NOT list
+files until it is opened.
+
+#### Scenario: Opening a workspace
+- **WHEN** a member opens a workspace
+- **THEN** the file tree is collapsed, because a tree of dotfiles above the
+  skills buried the thing most people came for, and the listing is a GitHub
+  round trip nobody asked for
+
+#### Scenario: Dropping files onto a collapsed tree
+- **WHEN** a member drops files while the tree is collapsed
+- **THEN** it expands, so upload progress and any per-file failure are visible
+  rather than reported inside a hidden section
 
 ### Requirement: New folders carry a placeholder
 The system SHALL create a placeholder file when a folder is created.
