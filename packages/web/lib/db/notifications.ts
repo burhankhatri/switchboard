@@ -15,6 +15,7 @@ export type NotificationKind =
   | "workspace_member_added"
   | "workspace_member_removed"
   | "agent_needs_input"
+  | "scheduled_job_proposed"
 
 export interface NotifyInput {
   /** Who receives it. */

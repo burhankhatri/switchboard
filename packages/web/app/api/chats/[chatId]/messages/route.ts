@@ -16,6 +16,7 @@ import { buildUsageMeta } from "@/lib/server/shared-pool"
 import { logActivityAsync } from "@/lib/db/activity-log"
 import { createBackgroundAgentSession, type Agent } from "@/lib/agent-session"
 import { loadMcpConnections } from "@/lib/mcp/agent-servers"
+import { schedulerMcpServer } from "@/lib/mcp/scheduler-server"
 import { resolveCliModel } from "@switchboard/common"
 import { getUserEndpoints } from "@/lib/server/custom-endpoints"
 import {
@@ -201,6 +202,15 @@ export async function POST(
           ...mcpConnectionServers(chat.workspace.connections, chat.workspace.slug),
         ]
       }
+      // Lets the agent propose a recurring job instead of telling the user to
+      // go and build one by hand. It cannot start anything: what it creates
+      // waits for approval.
+      const scheduler = schedulerMcpServer({
+        userId,
+        workspaceId: chat.workspaceId,
+        chatId,
+      })
+      if (scheduler) mcpServers = [...mcpServers, scheduler]
     } catch (err) {
       console.error("[messages] loadMcpConnections failed:", err)
     }
