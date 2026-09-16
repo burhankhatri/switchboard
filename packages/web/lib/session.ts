@@ -74,7 +74,18 @@ The repository is cloned at ${repoPath}.
 
 ## File Operations
 - Use ${workDir} for all file operations.
-- Always check the current state of files before editing them.`
+- Always check the current state of files before editing them.
+
+## This Sandbox Is Disposable
+- It is destroyed when this run ends. Nothing you leave behind here survives:
+  not a crontab, not a background process, not a file outside the repository.
+- Never schedule recurring work with \`cron\`, \`crontab\`, \`at\`, \`systemd\`
+  or a sleep loop. It cannot fire, because this machine will not exist.
+- To make something run on a schedule, use the \`create_scheduled_job\` tool if
+  you have it. If you do not have that tool, say so plainly and tell the user
+  to add the job from the Scheduled tab — do not write a script and describe
+  how they could cron it themselves, and never report scheduled work as done
+  when all you have done is write a file.`
 
   if (workspace) {
     prompt += `
