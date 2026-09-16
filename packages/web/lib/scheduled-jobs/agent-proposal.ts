@@ -9,11 +9,11 @@
 /**
  * Shortest interval an agent may propose.
  *
- * The cron ticks every 30 minutes, so anything below that is a schedule the
- * system cannot honour. The form still offers 10 and 15 for historical
- * reasons; there is no reason to let an agent mint one.
+ * Matches the floor the form enforces. The cron ticks every minute, so ten is
+ * a schedule the system can actually keep rather than a number that rounds up
+ * to the next sweep.
  */
-export const MIN_INTERVAL_MINUTES = 30
+export const MIN_INTERVAL_MINUTES = 10
 
 /** Longest interval — beyond a year the schedule is not really a schedule. */
 export const MAX_INTERVAL_MINUTES = 525_600
@@ -53,8 +53,8 @@ export function normalizeInterval(raw: unknown): IntervalCheck {
     return {
       ok: false,
       reason:
-        `The shortest supported interval is ${MIN_INTERVAL_MINUTES} minutes, because the ` +
-        "scheduler only wakes every 30 minutes. Propose something less frequent.",
+        `The shortest supported interval is ${MIN_INTERVAL_MINUTES} minutes. ` +
+        "Propose something less frequent.",
     }
   }
   if (whole > MAX_INTERVAL_MINUTES) {

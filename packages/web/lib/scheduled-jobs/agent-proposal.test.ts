@@ -9,15 +9,19 @@ describe("normalizeInterval", () => {
   it("accepts the intervals an agent would realistically propose", () => {
     expect(normalizeInterval(1440)).toEqual({ ok: true, minutes: 1440 })
     expect(normalizeInterval(10080)).toEqual({ ok: true, minutes: 10080 })
-    expect(normalizeInterval(MIN_INTERVAL_MINUTES)).toEqual({ ok: true, minutes: 30 })
+    expect(normalizeInterval(MIN_INTERVAL_MINUTES)).toEqual({ ok: true, minutes: 10 })
   })
 
-  it("refuses anything the 30-minute cron cannot honour", () => {
-    // The form still offers 10 and 15 for historical reasons. There is no
-    // reason to let an agent mint a schedule the scheduler cannot keep.
-    const below = normalizeInterval(10)
+  it("refuses anything below the floor the form enforces", () => {
+    const below = normalizeInterval(5)
     expect(below.ok).toBe(false)
-    expect(below.ok === false && below.reason).toMatch(/30 minutes/)
+    expect(below.ok === false && below.reason).toMatch(/10 minutes/)
+  })
+
+  it("accepts the form's own minimum, so the two agree", () => {
+    // These drifted once already: the agent refused a ten-minute job the form
+    // would happily create, which reads as a bug from either side.
+    expect(normalizeInterval(10).ok).toBe(true)
   })
 
   it("refuses a non-number instead of coercing it to a schedule", () => {
