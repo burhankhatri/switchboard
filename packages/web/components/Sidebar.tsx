@@ -13,7 +13,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useSession, signOut } from "next-auth/react"
 import { signInWithGitHub } from "@/lib/auth-utils"
-import { Plus, PanelLeft, X, Loader2, Search, BarChart3, Settings, HelpCircle, LogOut } from "lucide-react"
+import { Plus, PanelLeft, X, Loader2, Search, BarChart3, Settings, HelpCircle, LogOut, Clock } from "lucide-react"
 import { usePalette } from "@/components/search-palette/PaletteProvider"
 import { cn } from "@/lib/utils"
 import { useClickOutside } from "@/lib/hooks/useClickOutside"
@@ -368,6 +368,24 @@ export function Sidebar({
               <span className="text-base text-foreground">Search Chats</span>
             </button>
 
+            {/* Scheduled agents. The view, its list, and create/edit/delete
+                have existed all along — the sidebar took the props for this
+                button and never rendered it, so the only way in was typing
+                /jobs by hand. */}
+            <button
+              onClick={() => {
+                onOpenScheduledJobs?.()
+                if (onMobileClose) onMobileClose()
+              }}
+              className={cn(
+                "flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors touch-target hover:bg-accent/50 active:bg-accent",
+                scheduledJobsActive && "bg-accent"
+              )}
+            >
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              <span className="text-base text-foreground">Scheduled</span>
+            </button>
+
           </div>
 
           {/* Chat List */}
@@ -604,6 +622,20 @@ export function Sidebar({
         >
           <Search className="h-4 w-4 text-muted-foreground" />
           {!collapsed && <span className="text-sm text-foreground">Search Chats</span>}
+        </button>
+
+        {/* Scheduled agents */}
+        <button
+          onClick={() => onOpenScheduledJobs?.()}
+          title="Scheduled agents"
+          className={cn(
+            "flex items-center gap-2 rounded-md transition-colors hover:bg-accent/50 cursor-pointer",
+            collapsed ? "p-1.5" : "w-full px-2 py-[7px]",
+            scheduledJobsActive && "bg-accent"
+          )}
+        >
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          {!collapsed && <span className="text-sm text-foreground">Scheduled</span>}
         </button>
 
       </div>
