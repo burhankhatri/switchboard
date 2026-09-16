@@ -80,21 +80,33 @@ function CommandDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="app-scrim fixed inset-0 z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        {/* Center in the main content column (right of the sidebar) via --app-sidebar-width.
+            pointer-events-none on the flex shell lets outside clicks reach the overlay;
+            zoom animation lives on the panel so it doesn't fight translate centering. */}
         <Dialog.Content
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-background shadow-xl",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+            "group/command-dialog fixed top-0 right-0 bottom-0 z-50 flex items-center justify-center p-4",
+            "left-[var(--app-sidebar-width,0px)] border-0 bg-transparent shadow-none outline-none pointer-events-none",
             className
           )}
         >
           <Dialog.Title className="sr-only">{title}</Dialog.Title>
           <Dialog.Description className="sr-only">{description}</Dialog.Description>
-          <Command
-            ref={commandRef}
-            className="[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3"
+          <div
+            className={cn(
+              "pointer-events-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-background shadow-xl",
+              "group-data-[state=open]/command-dialog:animate-in group-data-[state=closed]/command-dialog:animate-out",
+              "group-data-[state=closed]/command-dialog:fade-out-0 group-data-[state=open]/command-dialog:fade-in-0",
+              "group-data-[state=closed]/command-dialog:zoom-out-95 group-data-[state=open]/command-dialog:zoom-in-95"
+            )}
           >
-            {children}
-          </Command>
+            <Command
+              ref={commandRef}
+              className="[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3"
+            >
+              {children}
+            </Command>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

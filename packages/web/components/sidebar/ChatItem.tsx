@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { MoreHorizontal, Pin, PinOff, Pencil, Trash2, ChevronDown, ChevronRight, Loader2, GitMerge, GitBranch, Archive, ArchiveRestore } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2, ChevronDown, ChevronRight, Loader2, MessageCircleQuestion } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NEW_REPOSITORY } from "@/lib/types"
 import type { Chat } from "@/lib/types"
-import { useClickOutside } from "@/lib/hooks/useClickOutside"
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu"
 import { hasMergedSuccessfully } from "./utils"
 import { MergedChatCheckmark } from "./MergedChatCheckmark"
 
@@ -43,11 +43,11 @@ export interface ChatItemProps {
   onDropRow?: () => void
 }
 
-export function ChatItem({ chat, isActive, collapsed, isDeleting, isUnseen, depth = 0, hasChildren = false, isExpanded = true, onToggleExpanded, onSelect, onDelete, onPin, onBranch, onArchive, onUnarchive, onRename, onMerge, onRebase, isDragSource, isDropTarget, onDragStartRow, onDragEndRow, onDragEnterRow, onDragOverRow, onDragLeaveRow, onDropRow }: ChatItemProps) {
+export function ChatItem({ chat, isActive, collapsed, isDeleting, isUnseen, depth = 0, hasChildren = false, isExpanded = true, onToggleExpanded, onSelect, onDelete, onRename, isDragSource, isDropTarget, onDragStartRow, onDragEndRow, onDragEnterRow, onDragOverRow, onDragLeaveRow, onDropRow }: ChatItemProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState("")
-  const menuRef = useRef<HTMLDivElement>(null)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const displayName = chat.displayName || "Untitled"
 
@@ -76,9 +76,6 @@ export function ChatItem({ chat, isActive, collapsed, isDeleting, isUnseen, dept
       inputRef.current.select()
     }
   }, [isEditing])
-
-  // Close menu when clicking outside
-  useClickOutside(menuRef, () => setMenuOpen(false), menuOpen)
 
   if (isEditing && !collapsed) {
     return (
@@ -167,10 +164,21 @@ export function ChatItem({ chat, isActive, collapsed, isDeleting, isUnseen, dept
             <div className="text-sm truncate">{displayName}</div>
           </div>
 
-          <div className="relative" ref={menuRef}>
+          <div className="relative">
             {chat.status === "running" || chat.status === "creating" || (chat.queuedMessages && chat.queuedMessages.length > 0) ? (
               <div className="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity pointer-events-none">
                 <Loader2 className="h-2.5 w-2.5 animate-spin text-foreground/90" />
+              </div>
+            ) : chat.awaitingInput ? (
+              /* Ranked above isUnseen: "the agent is blocked on you" is
+                 actionable, "you have not read this" is not. Deliberately not
+                 the same grey dot — the bell tells you a question arrived, this
+                 is where you decide what to work on next. */
+              <div
+                className="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity pointer-events-none"
+                title="This chat is waiting on your reply"
+              >
+                <MessageCircleQuestion className="h-2.5 w-2.5 text-primary" />
               </div>
             ) : isUnseen ? (
               <div className="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity pointer-events-none">
@@ -182,6 +190,7 @@ export function ChatItem({ chat, isActive, collapsed, isDeleting, isUnseen, dept
               </div>
             ) : null}
             <button
+              ref={menuTriggerRef}
               onClick={(e) => {
                 e.stopPropagation()
                 setMenuOpen(!menuOpen)
@@ -192,119 +201,37 @@ export function ChatItem({ chat, isActive, collapsed, isDeleting, isUnseen, dept
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
 
-            {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-32 rounded-md border border-border bg-popover shadow-md py-1 z-50">
-                {onPin && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onPin(!chat.pinned)
-                      setMenuOpen(false)
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                  >
-                    {chat.pinned ? (
-                      <>
-                        <PinOff className="h-3.5 w-3.5" />
-                        Unpin
-                      </>
-                    ) : (
-                      <>
-                        <Pin className="h-3.5 w-3.5" />
-                        Pin
-                      </>
-                    )}
-                  </button>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    startEditing()
-                  }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Rename
-                </button>
-                {onBranch && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onBranch()
-                      setMenuOpen(false)
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                  >
-                    <GitBranch className="h-3.5 w-3.5" />
-                    Branch chat
-                  </button>
-                )}
-                {onMerge && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onMerge()
-                      setMenuOpen(false)
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                  >
-                    <GitMerge className="h-3.5 w-3.5" />
-                    Merge
-                  </button>
-                )}
-                {onRebase && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onRebase()
-                      setMenuOpen(false)
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                  >
-                    <GitBranch className="h-3.5 w-3.5" />
-                    Rebase
-                  </button>
-                )}
-                {onArchive && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onArchive()
-                      setMenuOpen(false)
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                  >
-                    <Archive className="h-3.5 w-3.5" />
-                    Archive
-                  </button>
-                )}
-                {onUnarchive && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onUnarchive()
-                      setMenuOpen(false)
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                  >
-                    <ArchiveRestore className="h-3.5 w-3.5" />
-                    Unarchive
-                  </button>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete()
-                    setMenuOpen(false)
-                  }}
-                  disabled={isDeleting}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-destructive cursor-pointer disabled:cursor-not-allowed"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </button>
-              </div>
-            )}
+            <AnchoredMenu
+              anchorRef={menuTriggerRef}
+              open={menuOpen}
+              onClose={() => setMenuOpen(false)}
+              align="right"
+              placement="below"
+              width={128}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  startEditing()
+                }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Rename
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                  setMenuOpen(false)
+                }}
+                disabled={isDeleting}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-destructive cursor-pointer disabled:cursor-not-allowed"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </AnchoredMenu>
           </div>
         </>
       )}

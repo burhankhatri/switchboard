@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { MoreHorizontal, Pin, PinOff, GitBranch, Pencil, Trash2, Loader2, ChevronDown, ChevronRight, Archive, ArchiveRestore } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2, Loader2, ChevronDown, ChevronRight, MessageCircleQuestion } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useClickOutside } from "@/lib/hooks/useClickOutside"
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu"
 import type { Chat } from "@/lib/types"
 import { hasMergedSuccessfully } from "./utils"
 import { MergedChatCheckmark } from "./MergedChatCheckmark"
@@ -30,13 +30,10 @@ export interface MobileChatItemProps {
   onRequestRename: () => void
 }
 
-export function MobileChatItem({ chat, isActive, isDeleting, isUnseen, depth = 0, hasChildren = false, isExpanded = true, onToggleExpanded, onSelect, onDelete, onPin, onBranch, onArchive, onUnarchive, onRequestRename }: MobileChatItemProps) {
+export function MobileChatItem({ chat, isActive, isDeleting, isUnseen, depth = 0, hasChildren = false, isExpanded = true, onToggleExpanded, onSelect, onDelete, onRequestRename }: MobileChatItemProps) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const displayName = chat.displayName || "Untitled"
-
-  // Close menu when clicking outside
-  useClickOutside(menuRef, () => setMenuOpen(false), menuOpen)
 
   // Indent branched chats to mirror the desktop tree (see ChatItem).
   const indentPx = depth * 24
@@ -74,6 +71,13 @@ export function MobileChatItem({ chat, isActive, isDeleting, isUnseen, depth = 0
       </div>
       {chat.status === "running" || chat.status === "creating" || (chat.queuedMessages && chat.queuedMessages.length > 0) ? (
         <Loader2 className="h-2.5 w-2.5 flex-shrink-0 animate-spin text-foreground/90" />
+      ) : chat.awaitingInput ? (
+        /* Above isUnseen for the same reason as the desktop row: blocked on you
+           is actionable, unread is not. */
+        <MessageCircleQuestion
+          className="h-2.5 w-2.5 flex-shrink-0 text-primary"
+          aria-label="Waiting on your reply"
+        />
       ) : isUnseen ? (
         <div className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-muted-foreground/80" />
       ) : hasMergedSuccessfully(chat.messages) ? (
@@ -81,8 +85,9 @@ export function MobileChatItem({ chat, isActive, isDeleting, isUnseen, depth = 0
       ) : null}
 
       {/* Menu button */}
-      <div className="relative" ref={menuRef}>
+      <div className="relative">
         <button
+          ref={menuTriggerRef}
           onClick={(e) => {
             e.stopPropagation()
             setMenuOpen(!menuOpen)
@@ -94,94 +99,38 @@ export function MobileChatItem({ chat, isActive, isDeleting, isUnseen, depth = 0
           <MoreHorizontal className="h-4 w-4" />
         </button>
 
-        {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 w-32 rounded-md border border-border bg-popover shadow-lg py-1 z-50">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setMenuOpen(false)
-                onRequestRename()
-              }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Rename
-            </button>
-            {onPin && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onPin(!chat.pinned)
-                  setMenuOpen(false)
-                }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
-              >
-                {chat.pinned ? (
-                  <>
-                    <PinOff className="h-3.5 w-3.5" />
-                    Unpin
-                  </>
-                ) : (
-                  <>
-                    <Pin className="h-3.5 w-3.5" />
-                    Pin
-                  </>
-                )}
-              </button>
-            )}
-            {onBranch && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onBranch()
-                  setMenuOpen(false)
-                }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
-              >
-                <GitBranch className="h-3.5 w-3.5" />
-                Branch chat
-              </button>
-            )}
-            {onArchive && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onArchive()
-                  setMenuOpen(false)
-                }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
-              >
-                <Archive className="h-3.5 w-3.5" />
-                Archive
-              </button>
-            )}
-            {onUnarchive && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onUnarchive()
-                  setMenuOpen(false)
-                }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
-              >
-                <ArchiveRestore className="h-3.5 w-3.5" />
-                Unarchive
-              </button>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete()
-                setMenuOpen(false)
-              }}
-              disabled={isDeleting}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left text-destructive disabled:cursor-not-allowed"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete
-            </button>
-          </div>
-        )}
+        <AnchoredMenu
+          anchorRef={menuTriggerRef}
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          align="right"
+          placement="below"
+          width={128}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setMenuOpen(false)
+              onRequestRename()
+            }}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left cursor-pointer"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Rename
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+              setMenuOpen(false)
+            }}
+            disabled={isDeleting}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left text-destructive disabled:cursor-not-allowed cursor-pointer"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </AnchoredMenu>
       </div>
     </div>
   )

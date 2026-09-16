@@ -7,6 +7,7 @@ import { Plus, LogIn, Loader2, ArrowRight, Users, FolderGit2 } from "lucide-reac
 import { BRAND } from "@/lib/brand"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
+import { WorkspaceCreatingPanel } from "./WorkspaceCreatingPanel"
 
 export interface WorkspaceSummary {
   id: string
@@ -35,10 +36,17 @@ async function json<T>(res: Response): Promise<T> {
 export function WorkspaceLauncher({
   onOpen,
 }: {
-  onOpen?: (workspace: WorkspaceSummary) => void
+  /**
+   * Required, not optional. HomeView rendered this without a handler and every
+   * card click silently did nothing — and because selecting a workspace is a
+   * localStorage write rather than a fetch, there was no failed request to
+   * notice either. A required prop turns that into a build error.
+   */
+  onOpen: (workspace: WorkspaceSummary) => void
 }) {
   const { status } = useSession()
   const [creating, setCreating] = useState(false)
+  const [createStartedAt, setCreateStartedAt] = useState<number | null>(null)
   const [name, setName] = useState("")
   const [systemPrompt, setSystemPrompt] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -63,11 +71,19 @@ export function WorkspaceLauncher({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }).then(json<{ workspace: WorkspaceSummary }>),
-    onSuccess: () => {
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["workspaces"] })
-      setCreating(false); setName(""); setSystemPrompt(""); setError(null)
+      setCreating(false)
+      setCreateStartedAt(null)
+      setName("")
+      setSystemPrompt("")
+      setError(null)
+      onOpen(res.workspace)
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => {
+      setCreateStartedAt(null)
+      setError(e.message)
+    },
   })
 
   const join = useMutation({
@@ -83,8 +99,8 @@ export function WorkspaceLauncher({
 
   return (
     <div className="w-full max-w-3xl mx-auto px-6 py-10">
-      <header className="mb-8">
-        <div className="flex items-center gap-3 mb-1">
+      <header className="mb-8 text-center">
+        <div className="flex items-center justify-center gap-3 mb-1">
           <Image src="/maloewe-logo.svg" alt={`${BRAND.name} logo`} width={40} height={40} className="dark:invert" />
           <h1 className="font-display text-3xl tracking-tight text-foreground">{BRAND.name}</h1>
         </div>
@@ -113,7 +129,7 @@ export function WorkspaceLauncher({
         <>
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="font-display text-lg text-foreground">{BRAND.launcherHeading}</h2>
-            {!creating && (
+            {!creating && !create.isPending && (
               <button
                 onClick={() => { setCreating(true); setError(null) }}
                 className="inline-flex items-center gap-1.5 text-sm rounded-lg border border-border px-3 py-1.5 hover:bg-accent cursor-pointer"
@@ -124,12 +140,21 @@ export function WorkspaceLauncher({
           </div>
           <p className="text-sm text-muted-foreground mb-5">{BRAND.launcherSubheading}</p>
 
-          {creating && (
+          {create.isPending && (
+            <WorkspaceCreatingPanel
+              name={name.trim()}
+              startedAt={createStartedAt ?? undefined}
+              className="mb-6"
+            />
+          )}
+
+          {creating && !create.isPending && (
             <form
               className="rounded-xl border border-border bg-card p-4 mb-6 space-y-3"
               onSubmit={(e) => {
                 e.preventDefault()
                 if (!name.trim()) return
+                setCreateStartedAt(Date.now())
                 create.mutate({ name: name.trim(), systemPrompt: systemPrompt.trim() || undefined })
               }}
             >
@@ -162,7 +187,6 @@ export function WorkspaceLauncher({
                   disabled={create.isPending || !name.trim()}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 cursor-pointer"
                 >
-                  {create.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   Create workspace
                 </button>
                 <button
@@ -198,7 +222,7 @@ export function WorkspaceLauncher({
             {mine.map((w) => (
               <button
                 key={w.id}
-                onClick={() => onOpen?.(w)}
+                onClick={() => onOpen(w)}
                 className={cn(
                   "group text-left rounded-xl border border-border bg-card p-4",
                   "hover:border-primary/50 hover:bg-accent/40 transition-colors cursor-pointer"

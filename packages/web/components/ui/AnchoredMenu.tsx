@@ -17,6 +17,8 @@ interface AnchoredMenuProps {
   /** Take the anchor's width instead of a fixed one — for menus that belong to
    *  an input and should line up with it. */
   matchWidth?: boolean
+  /** Composer menus hang above; sidebar row menus hang below the trigger. */
+  placement?: "above" | "below"
   className?: string
 }
 
@@ -41,6 +43,7 @@ export function AnchoredMenu({
   align = "left",
   width = 192,
   matchWidth = false,
+  placement = "above",
   className,
 }: AnchoredMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -59,10 +62,18 @@ export function AnchoredMenu({
       const height = menuRef.current?.offsetHeight ?? 0
       const w = matchWidth ? rect.width : width
 
-      // Above the trigger by default — these hang off a composer pinned to the
-      // bottom of the window, so below would run off-screen.
-      let top = rect.top - height - 6
-      if (top < 8) top = rect.bottom + 6
+      // Composer menus hang above (the input is pinned to the bottom of the
+      // window). Sidebar row menus hang below the trigger, flipping if they
+      // would run off-screen — same escape as the workspace dropdown, because
+      // backdrop-filter on the sidebar clips in-place descendants.
+      let top: number
+      if (placement === "below") {
+        top = rect.bottom + 6
+        if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6)
+      } else {
+        top = rect.top - height - 6
+        if (top < 8) top = rect.bottom + 6
+      }
 
       let left = align === "right" ? rect.right - w : rect.left
       // Keep it on screen horizontally whichever edge it was aligned to.
@@ -78,7 +89,7 @@ export function AnchoredMenu({
       window.removeEventListener("scroll", place, true)
       window.removeEventListener("resize", place)
     }
-  }, [open, align, width, matchWidth, anchorRef])
+  }, [open, align, width, matchWidth, placement, anchorRef])
 
   useEffect(() => {
     if (!open) return
