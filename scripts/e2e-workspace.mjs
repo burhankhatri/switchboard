@@ -39,10 +39,37 @@ const api = (cookie) => async (path, init = {}) => {
   return { status: res.status, body }
 }
 
-const user = await prisma.user.findFirst({ select: { id: true, name: true } })
-if (!user) { console.error("no user in db — sign in first"); process.exit(1) }
+// Every repo assertion, and the app's own commits, authenticate as this user.
+// `findFirst` over all users picked whoever signed up first, whose OAuth token
+// is long expired - so the run died at the first create with "Bad credentials"
+// and read as a broken API. Prefer someone with a GitHub account on file;
+// E2E_USER_ID overrides when that picks the wrong person.
+const user = process.env.E2E_USER_ID
+  ? await prisma.user.findUnique({ where: { id: process.env.E2E_USER_ID }, select: { id: true, name: true } })
+  : (await prisma.account.findFirst({
+      where: { provider: "github", NOT: { access_token: null } },
+      select: { user: { select: { id: true, name: true } } },
+    }))?.user ?? (await prisma.user.findFirst({ select: { id: true, name: true } }))
+if (!user) { console.error("no user in db - sign in first"); process.exit(1) }
 console.log(`acting as: ${user.name} (${user.id})\n`)
 const call = api(await cookieFor(user.id))
+
+// The direct GitHub checks below verify what the app committed. `gh` is not
+// installed everywhere, so fall back to the same stored OAuth token the app
+// authenticates its own repo reads and writes with - otherwise every repo
+// assertion fails as a 404 and reads as a bug in the code under test.
+if (!process.env.GH_TOKEN) {
+  const account = await prisma.account.findFirst({
+    where: { userId: user.id, provider: "github" },
+    select: { access_token: true },
+  })
+  if (account?.access_token) {
+    process.env.GH_TOKEN = account.access_token
+    console.log("GH_TOKEN not set - using the signed-in user's stored GitHub token")
+  } else {
+    console.log("WARNING: no GH_TOKEN and no stored GitHub token; repo assertions will fail")
+  }
+}
 
 // Repeatable: drop the row from a previous run. The GitHub folder is left in
 // place on purpose — recreating over it exercises putFile's never-clobber path.
