@@ -580,6 +580,13 @@ model ScheduledJob {
   // final Create submit; DELETEd on Cancel.
   isDraft Boolean @default(false)
 
+  // Null means the job was proposed by an agent and nobody has approved it
+  // yet. Such a job never dispatches, regardless of `enabled`. Jobs created
+  // by a person are approved at creation, so this carries their timestamp.
+  // Separate from `enabled` because "awaiting a human" and "a human switched
+  // it off" are different states that would otherwise be indistinguishable.
+  approvedAt DateTime?
+
   // Failure tracking
   consecutiveFailures Int @default(0)
 
