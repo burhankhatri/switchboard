@@ -5,11 +5,13 @@ import {
   requireAuth,
   isAuthError,
   badRequest,
+  forbidden,
   internalError,
 } from "@/lib/db/api-helpers"
 import { addMinutes, addYears } from "date-fns"
 import { toScheduledJobResponse, UUID_RE } from "@/lib/scheduled-jobs/types"
 import { NEW_REPOSITORY } from "@/lib/types"
+import { WORKSPACE_RUNTIME_SELECT, type WorkspaceRuntime } from "@/lib/workspace"
 
 // =============================================================================
 // Constants
@@ -51,7 +53,13 @@ export async function GET(): Promise<Response> {
 interface CreateScheduledJobBody {
   name: string
   prompt: string
-  repo: string
+  /**
+   * Workspace to run in. Supplies repo, branch, agent and model, so the
+   * client need not send them — and membership is required, because binding
+   * a job to a workspace is what causes its credentials to reach a sandbox.
+   */
+  workspaceId?: string
+  repo?: string
   baseBranch: string
   agent: string
   model?: string
@@ -83,17 +91,44 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!body.prompt?.trim()) {
       return badRequest("prompt is required")
     }
-    if (!body.repo?.trim()) {
+
+    // A workspace denormalizes onto the job the same way it does onto a chat,
+    // so every existing consumer of ScheduledJob.repo keeps working and cron
+    // and on-demand stay one code path.
+    let workspace: WorkspaceRuntime | null = null
+    if (body.workspaceId) {
+      // Membership is REQUIRED. This binding is what causes the workspace's
+      // decrypted connections to be injected into a scheduled sandbox, so it
+      // is an authorization boundary and not a convenience. Re-checked again
+      // at run time, because a job outlives the membership that created it.
+      const member = await prisma.workspaceMember.findUnique({
+        where: { workspaceId_userId: { workspaceId: body.workspaceId, userId } },
+        select: { role: true },
+      })
+      if (!member) return forbidden("Join this workspace first")
+
+      workspace = await prisma.workspace.findFirst({
+        where: { id: body.workspaceId, archived: false },
+        select: WORKSPACE_RUNTIME_SELECT,
+      })
+      if (!workspace) return badRequest("Invalid workspaceId")
+    }
+
+    const repo = body.repo?.trim() || workspace?.repo
+    const baseBranch = body.baseBranch?.trim() || workspace?.baseBranch
+    const agent = body.agent?.trim() || workspace?.agent
+
+    if (!repo) {
       return badRequest("repo is required")
     }
-    if (!body.baseBranch?.trim()) {
+    if (!baseBranch) {
       return badRequest("baseBranch is required")
     }
-    if (!body.agent?.trim()) {
+    if (!agent) {
       return badRequest("agent is required")
     }
 
-    const isRepoLess = body.repo.trim() === NEW_REPOSITORY
+    const isRepoLess = repo === NEW_REPOSITORY
 
     // Validate trigger-specific fields
     if (triggerType === "interval") {
@@ -131,12 +166,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     const job = await prisma.scheduledJob.create({
       data: {
         userId,
+        workspaceId: workspace?.id ?? null,
         name: body.name.trim(),
         prompt: body.prompt.trim(),
-        repo: body.repo.trim(),
-        baseBranch: body.baseBranch.trim(),
-        agent: body.agent.trim(),
-        model: body.model?.trim() ?? null,
+        repo,
+        baseBranch,
+        agent,
+        model: body.model?.trim() ?? workspace?.model ?? null,
         triggerType,
         incomingToken,
         // Interval jobs need intervalMinutes; incoming jobs don't use it but

@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/modals/ConfirmDialog"
 import { JobsList } from "@/components/scheduled-jobs/JobsList"
 import { JobRunDetail } from "@/components/scheduled-jobs/JobRunDetail"
 import { type ScheduledJob, type ScheduledJobRun } from "@/lib/scheduled-jobs/types"
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import type { Message } from "@/lib/types"
 
 // =============================================================================
@@ -30,6 +31,7 @@ interface ScheduledJobsViewProps {
 
 export function ScheduledJobsView({ onOpenForm, refreshKey, urlJobId, onNavigateToJob }: ScheduledJobsViewProps) {
   const { data: session } = useSession()
+  const { activeWorkspace } = useWorkspace()
 
   // The selected job ID - derived directly from URL
   const selectedJobId = urlJobId
@@ -54,6 +56,13 @@ export function ScheduledJobsView({ onOpenForm, refreshKey, urlJobId, onNavigate
   const [runs, setRuns] = useState<ScheduledJobRun[]>([])
   const [selectedRun, setSelectedRun] = useState<ScheduledJobRun | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+
+  // Jobs belong to a workspace the same way chats do, so the list follows the
+  // workspace you are in. Jobs from before workspaces, and jobs with no
+  // workspace, stay visible outside one rather than becoming unreachable.
+  const visibleJobs = activeWorkspace
+    ? jobs.filter((j) => j.workspaceId === activeWorkspace.id)
+    : jobs
 
   // Reset detail state when returning to list view
   // Note: Don't call setSelectedJobId here - URL changes should drive navigation
@@ -259,16 +268,18 @@ export function ScheduledJobsView({ onOpenForm, refreshKey, urlJobId, onNavigate
           </div>
         )}
 
-        {jobs.length === 0 ? (
+        {visibleJobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 pt-24 text-center">
             <Clock className="h-6 w-6 text-muted-foreground/50 mb-4" />
             <p className="text-sm text-muted-foreground mt-1">
-              Create a scheduled job to run agents automatically
+              {activeWorkspace
+                ? `Nothing scheduled in ${activeWorkspace.name} yet`
+                : "Create a scheduled job to run agents automatically"}
             </p>
           </div>
         ) : (
           <JobsList
-            jobs={jobs}
+            jobs={visibleJobs}
             onSelect={setSelectedJobId}
             onEdit={handleEdit}
             onRunNow={handleRunNow}

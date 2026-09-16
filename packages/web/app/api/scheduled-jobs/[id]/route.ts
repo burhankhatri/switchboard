@@ -6,11 +6,13 @@ import {
   isAuthError,
   badRequest,
   notFound,
+  forbidden,
   internalError,
 } from "@/lib/db/api-helpers"
 import { addMinutes, addYears } from "date-fns"
 import { toScheduledJobResponse, UUID_RE } from "@/lib/scheduled-jobs/types"
 import { cleanupSmitheryConnections } from "@/lib/mcp/connections"
+import { WORKSPACE_RUNTIME_SELECT, type WorkspaceRuntime } from "@/lib/workspace"
 
 // =============================================================================
 // Helper: Get job with auth check
@@ -67,6 +69,13 @@ export async function GET(
 interface UpdateScheduledJobBody {
   name?: string
   prompt?: string
+  /**
+   * Rebind the job to a workspace, or null to unbind. Membership is required,
+   * for the same reason it is on create: this is what puts the workspace's
+   * credentials in the sandbox. The draft flow relies on this - a draft is
+   * materialized before the form is finished and gets its workspace here.
+   */
+  workspaceId?: string | null
   repo?: string
   baseBranch?: string
   agent?: string
@@ -112,6 +121,21 @@ export async function PATCH(
       return badRequest("intervalMinutes must be at least 1")
     }
 
+    let workspace: WorkspaceRuntime | null = null
+    if (body.workspaceId) {
+      const member = await prisma.workspaceMember.findUnique({
+        where: { workspaceId_userId: { workspaceId: body.workspaceId, userId } },
+        select: { role: true },
+      })
+      if (!member) return forbidden("Join this workspace first")
+
+      workspace = await prisma.workspace.findFirst({
+        where: { id: body.workspaceId, archived: false },
+        select: WORKSPACE_RUNTIME_SELECT,
+      })
+      if (!workspace) return badRequest("Invalid workspaceId")
+    }
+
     // Build update data
     const updateData: {
       name?: string
@@ -129,8 +153,20 @@ export async function PATCH(
       consecutiveFailures?: number
       isDraft?: boolean
       incomingToken?: string
+      workspaceId?: string | null
     } = {}
 
+    // The workspace decides repo/branch/agent, as it does on create; an
+    // explicit value in the same request still wins, which is what the form
+    // sends when someone overrides one.
+    if (body.workspaceId !== undefined) {
+      updateData.workspaceId = workspace?.id ?? null
+      if (workspace) {
+        updateData.repo = workspace.repo
+        updateData.baseBranch = workspace.baseBranch
+        updateData.agent = workspace.agent
+      }
+    }
     if (body.name !== undefined) updateData.name = body.name.trim()
     if (body.prompt !== undefined) updateData.prompt = body.prompt.trim()
     if (body.repo !== undefined) updateData.repo = body.repo.trim()

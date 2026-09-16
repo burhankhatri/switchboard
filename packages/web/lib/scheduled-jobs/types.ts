@@ -49,6 +49,8 @@ export interface ScheduledJob {
   id: string
   name: string
   prompt: string
+  /** The workspace this job runs in, or null for a plain repo job. */
+  workspaceId: string | null
   repo: string
   baseBranch: string
   agent: string
@@ -116,6 +118,7 @@ export function toScheduledJobResponse(
     id: job.id,
     name: job.name,
     prompt: job.prompt,
+    workspaceId: job.workspaceId,
     repo: job.repo,
     baseBranch: job.baseBranch,
     agent: job.agent,

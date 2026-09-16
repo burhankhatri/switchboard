@@ -5,6 +5,7 @@ import { useCopyToClipboard } from "@/lib/hooks/useCopyToClipboard"
 import { type ScheduledJob } from "@/lib/scheduled-jobs/types"
 import { agentModels, getAgentModels, type Agent, NEW_REPOSITORY } from "@/lib/types"
 import { useSettingsQuery } from "@/lib/query/hooks/useSettingsQuery"
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import {
   UNIT_MINUTES,
   inferIntervalMode,
@@ -27,6 +28,12 @@ interface UseScheduledJobFormArgs {
  */
 export function useScheduledJobForm({ open, job, onClose, onSuccess }: UseScheduledJobFormArgs) {
   const isEditing = !!job
+  const { activeWorkspace } = useWorkspace()
+
+  // A new job runs where the person is: the workspace they are looking at.
+  // Editing keeps whatever the job was bound to, so opening an old job from
+  // inside a different workspace cannot silently move it.
+  const workspaceId = isEditing ? job?.workspaceId ?? null : activeWorkspace?.id ?? null
 
   // Form state
   const [name, setName] = useState(job?.name ?? "")
@@ -172,9 +179,14 @@ export function useScheduledJobForm({ open, job, onClose, onSuccess }: UseSchedu
     return {
       name: name.trim(),
       prompt: prompt.trim(),
-      // Empty form value means repo-less; send the NEW_REPOSITORY sentinel so
-      // the backend can route through its existing no-clone sandbox path.
-      repo: repo || NEW_REPOSITORY,
+      workspaceId,
+      // A workspace supplies the repo, so leave it out and let the server
+      // denormalize. Sending the sentinel instead would win over the
+      // workspace and produce a job that clones nothing - the agent would
+      // start with none of the skills or scripts it was written against.
+      // Empty form value with no workspace means repo-less: send the
+      // NEW_REPOSITORY sentinel so the backend takes its no-clone path.
+      ...(repo ? { repo } : workspaceId ? {} : { repo: NEW_REPOSITORY }),
       baseBranch,
       agent,
       model: model || null,
@@ -216,9 +228,11 @@ export function useScheduledJobForm({ open, job, onClose, onSuccess }: UseSchedu
           // values before flipping isDraft to false.
           name: name.trim() || "(draft)",
           prompt: prompt.trim() || "(draft)",
+          workspaceId,
           // Drafts default to the repo-less sentinel so the row passes the
-          // backend's repo check before the user fills the form in fully.
-          repo: repo || NEW_REPOSITORY,
+          // backend's repo check before the user fills the form in fully. A
+          // workspace answers that check on its own.
+          ...(repo ? { repo } : workspaceId ? {} : { repo: NEW_REPOSITORY }),
           baseBranch: baseBranch || "main",
           agent,
           model: model || null,
@@ -390,6 +404,11 @@ export function useScheduledJobForm({ open, job, onClose, onSuccess }: UseSchedu
     // identity / mode
     isEditing,
     jobId: job?.id,
+    workspaceId,
+    // Named so the form can say where the job will run. A schedule that fires
+    // into a workspace it never mentions is the kind of thing people only
+    // discover from a surprising run.
+    workspaceName: workspaceId === activeWorkspace?.id ? activeWorkspace?.name ?? null : null,
     // values
     name,
     prompt,

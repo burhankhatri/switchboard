@@ -56,3 +56,35 @@ The system SHALL resolve a workspace identically for both trigger types.
 - **WHEN** the cron starts a job with a `workspaceId`
 - **THEN** it resolves the workspace exactly as an interactive chat does,
   differing only in what triggered it
+
+#### Scenario: A scheduled run needs the workspace's credentials
+- **WHEN** a scheduled job bound to a workspace starts
+- **THEN** that workspace's variables and REST connections are injected into
+  the run, last, exactly as for an interactive turn - otherwise a job would
+  start with the workspace's cwd and skills but no key to call the API those
+  skills describe
+
+#### Scenario: The run belongs to the workspace
+- **WHEN** a scheduled run creates its chat
+- **THEN** that chat carries the job's `workspaceId`, so the run appears under
+  the workspace it ran in
+
+### Requirement: Membership is checked when a job is bound and again when it runs
+The system SHALL require workspace membership both to bind a scheduled job to a
+workspace and to execute one.
+
+#### Scenario: Binding a job
+- **WHEN** a user creates or updates a scheduled job naming a workspace
+- **THEN** membership is required, because the binding is what causes that
+  workspace's decrypted connections to reach a sandbox
+
+#### Scenario: The author leaves the workspace
+- **WHEN** a job's owner is removed from the workspace and the job next fires
+- **THEN** the run fails rather than proceeding, because a job outlives the
+  membership that created it and a bind-time check alone would revoke nothing
+
+#### Scenario: A workspace supplies the job's repo
+- **WHEN** a job is created inside a workspace with no repo of its own given
+- **THEN** repo, branch and agent are denormalised from the workspace, so the
+  run clones what the job was written against rather than taking the
+  repo-less path and starting with no skills or scripts

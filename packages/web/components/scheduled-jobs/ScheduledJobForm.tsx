@@ -34,6 +34,7 @@ export function ScheduledJobForm({ open, job, onClose, onSuccess, isMobile = fal
   const {
     isEditing,
     jobId,
+    workspaceName,
     name,
     prompt,
     repo,
@@ -122,6 +123,17 @@ export function ScheduledJobForm({ open, job, onClose, onSuccess, isMobile = fal
               <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {error}
               </div>
+            )}
+
+            {/* Where it runs. The binding is implicit - it comes from the
+                workspace you are in - so it is stated rather than left to be
+                discovered from a run that reached a system you forgot it
+                could reach. */}
+            {workspaceName && (
+              <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                Runs in <span className="text-foreground">{workspaceName}</span>, with its skills,
+                scripts and connections.
+              </p>
             )}
 
             {/* Name */}
