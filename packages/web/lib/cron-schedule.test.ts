@@ -12,35 +12,49 @@ function everyNMinutes(schedule: string): number {
 }
 
 /**
- * A cron schedule is a line item on the database bill.
+ * A cron schedule is a line item on the database bill, so changing one is a
+ * decision rather than a tweak. These tests assert the exact schedules, which
+ * means a change to vercel.json cannot land without someone editing this file
+ * and reading what follows.
  *
- * Neon suspends a compute after five minutes without a query, and every tick of
- * agent-lifecycle queries Postgres. At "* * * * *" the production database
- * never suspended — it billed .25-2 CU around the clock with nobody using the
- * app, which is what a surprise bill for an idle project is made of.
+ * The history, because it will come up again: agent-lifecycle ran at
+ * "* * * * *", and Neon suspends a compute only after five minutes without a
+ * query. Every tick queries Postgres, so the production database never
+ * suspended — it billed .25-2 CU around the clock with nobody using the app.
+ * It was moved to a 30-minute tick for that reason.
  *
- * Ten minutes is the floor because that is also the shortest interval a
- * scheduled job can have (ScheduleFields: "Interval must be at least 10
- * minutes"), so a faster cron cannot make any job more punctual — it can only
- * cost more. If you need a tighter loop, the thing to change is what keeps the
- * compute awake, not this number.
+ * It is back at every minute deliberately. A job set to run at 9am should run
+ * at 9am, and at a 30-minute tick the honest description of "every day at 9" was "some
+ * time in the next half hour". The cost is real and accepted: assume the
+ * compute never suspends. If that becomes the problem again, the fix is to
+ * change what keeps it awake — a cheaper readiness check, or a scheduler that
+ * is not the database — rather than making every job late again.
  */
 describe("cron schedules", () => {
   const config = JSON.parse(
     readFileSync(join(__dirname, "..", "..", "..", "vercel.json"), "utf8")
   ) as { crons?: { path: string; schedule: string }[] }
 
+  const scheduleFor = (path: string) =>
+    config.crons?.find((c) => c.path === path)?.schedule
+
   it("has crons configured", () => {
     expect(config.crons?.length).toBeGreaterThan(0)
   })
 
-  it("never polls the database faster than it can suspend", () => {
-    for (const cron of config.crons ?? []) {
-      expect(
-        everyNMinutes(cron.schedule),
-        `${cron.path} runs every ${everyNMinutes(cron.schedule)}min — under 10 keeps Neon awake 24/7`
-      ).toBeGreaterThanOrEqual(10)
-    }
+  it("runs agent-lifecycle every minute, deliberately", () => {
+    const schedule = scheduleFor("/api/cron/agent-lifecycle")
+    expect(schedule, "agent-lifecycle cron is missing from vercel.json").toBeDefined()
+    expect(
+      everyNMinutes(schedule!),
+      "changing this means the database never suspends — read the note above first"
+    ).toBe(1)
+  })
+
+  it("refreshes Claude credentials hourly", () => {
+    // Nothing about this one needs to be fast; it exists so a token does not
+    // go stale, and an hourly tick is free next to the one above.
+    expect(everyNMinutes(scheduleFor("/api/cron/refresh-claude-creds")!)).toBe(60)
   })
 
   it("parses the expressions it is asked to judge", () => {
