@@ -301,6 +301,54 @@ r = await call4(`/api/workspaces/${ws.id}/skills`, {
 check("a non-member cannot add a skill", r.status === 403, `status ${r.status}`)
 await prisma.user.delete({ where: { id: stranger.id } }).catch(() => {})
 
+// ── 11. scheduled jobs bind to a workspace ────────────────────────────
+console.log("\n11. scheduled jobs in a workspace")
+
+r = await call("/api/scheduled-jobs", {
+  method: "POST",
+  body: JSON.stringify({
+    name: "Weekly campaign audit",
+    prompt: "Run scripts/campaign_audit.mjs and report what changed since last week.",
+    workspaceId: ws.id,
+    intervalMinutes: 10080,
+  }),
+})
+check("a job can be created with only a workspace", r.status === 201, `status ${r.status} ${JSON.stringify(r.body).slice(0,140)}`)
+const jobId = r.body?.id
+check("the job is bound to the workspace", r.body?.workspaceId === ws.id, String(r.body?.workspaceId))
+// Without denormalisation the job would fall to the repo-less path and clone
+// nothing - the agent would start with none of the workspace's skills.
+check("repo denormalised from the workspace", r.body?.repo === ws.repo, String(r.body?.repo))
+check("baseBranch denormalised", r.body?.baseBranch === "main", String(r.body?.baseBranch))
+check("agent denormalised", !!r.body?.agent, String(r.body?.agent))
+
+r = await call("/api/scheduled-jobs")
+check("the job lists with its workspace", r.body.jobs?.find((j) => j.id === jobId)?.workspaceId === ws.id)
+
+// Same boundary as chats: naming a workspace is how its credentials reach a
+// sandbox, so a non-member must not be able to name one.
+const jobStranger = await prisma.user.create({ data: { name: "Job Stranger" } })
+const call5 = api(await cookieFor(jobStranger.id))
+r = await call5("/api/scheduled-jobs", {
+  method: "POST",
+  body: JSON.stringify({
+    name: "Not mine",
+    prompt: "Read the connections.",
+    workspaceId: ws.id,
+    intervalMinutes: 10080,
+  }),
+})
+check("a non-member cannot bind a job to the workspace", r.status === 403, `status ${r.status}`)
+
+r = await call(`/api/scheduled-jobs/${jobId}`, {
+  method: "PATCH",
+  body: JSON.stringify({ workspaceId: null }),
+})
+check("a job can be unbound from its workspace", r.status === 200 && r.body?.workspaceId === null, `status ${r.status} ${String(r.body?.workspaceId)}`)
+
+if (jobId) await prisma.scheduledJob.delete({ where: { id: jobId } }).catch(() => {})
+await prisma.user.delete({ where: { id: jobStranger.id } }).catch(() => {})
+
 // ── 8. unauth ─────────────────────────────────────────────────────────────
 console.log("\n8. auth gate")
 const anon = await fetch(`${BASE}/api/workspaces`).then((x) => x.status)
