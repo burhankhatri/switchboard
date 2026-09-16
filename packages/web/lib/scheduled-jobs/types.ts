@@ -51,6 +51,11 @@ export interface ScheduledJob {
   prompt: string
   /** The workspace this job runs in, or null for a plain repo job. */
   workspaceId: string | null
+  /**
+   * When a person approved this job. Null means an agent proposed it and
+   * nobody has looked yet, and it will not dispatch until they do.
+   */
+  approvedAt: number | null
   repo: string
   baseBranch: string
   agent: string
@@ -119,6 +124,7 @@ export function toScheduledJobResponse(
     name: job.name,
     prompt: job.prompt,
     workspaceId: job.workspaceId,
+    approvedAt: job.approvedAt?.getTime() ?? null,
     repo: job.repo,
     baseBranch: job.baseBranch,
     agent: job.agent,

@@ -71,6 +71,10 @@ export async function GET(req: Request) {
       where: {
         enabled: true,
         isDraft: false,
+        // An agent can propose a job; only a person can let it run. Belt and
+        // braces with `enabled: false` at creation, because this is the one
+        // filter that cannot be flipped by anything except an approval.
+        approvedAt: { not: null },
         nextRunAt: { lte: now },
         runs: { none: { status: "running" } },
       },

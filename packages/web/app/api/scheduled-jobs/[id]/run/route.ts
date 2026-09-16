@@ -43,6 +43,13 @@ export async function POST(
       return badRequest("Job is a draft — finish creating it first")
     }
 
+    // Run Now is the other way a job can start, so the approval gate has to be
+    // here too. Otherwise an agent-proposed job could be fired from the list
+    // without anyone having read what it does.
+    if (!job.approvedAt) {
+      return badRequest("Approve this job before running it")
+    }
+
     // Check if already running
     if (job.runs.length > 0) {
       return badRequest("Job is already running")

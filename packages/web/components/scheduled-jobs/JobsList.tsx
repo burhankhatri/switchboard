@@ -1,11 +1,23 @@
 "use client"
 
 import { useState } from "react"
-import { MoreHorizontal, Play, Pencil, Trash2 } from "lucide-react"
+import { MoreHorizontal, Play, Pencil, Trash2, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { type ScheduledJob } from "@/lib/scheduled-jobs/types"
 import { NEW_REPOSITORY } from "@/lib/types"
 import { getJobStatusIcon, getLastRunText, getTriggerDescription, getRepoLabel } from "./helpers"
+
+/**
+ * A job an agent proposed and nobody has approved. Distinct from "Disabled",
+ * which is a job someone read and switched off: this one has never been seen.
+ */
+function PendingBadge() {
+  return (
+    <span className="text-xs px-1.5 py-0.5 rounded bg-primary/15 text-primary shrink-0 whitespace-nowrap">
+      Needs approval
+    </span>
+  )
+}
 
 interface JobsListProps {
   jobs: ScheduledJob[]
@@ -13,6 +25,7 @@ interface JobsListProps {
   onEdit: (job: ScheduledJob) => void
   onRunNow: (job: ScheduledJob) => void
   onRequestDelete: (job: ScheduledJob) => void
+  onApprove: (job: ScheduledJob) => void
 }
 
 /**
@@ -26,6 +39,7 @@ function JobRowMenu({
   onEdit,
   onRunNow,
   onRequestDelete,
+  onApprove,
 }: {
   job: ScheduledJob
   open: boolean
@@ -33,6 +47,7 @@ function JobRowMenu({
   onEdit: (job: ScheduledJob) => void
   onRunNow: (job: ScheduledJob) => void
   onRequestDelete: (job: ScheduledJob) => void
+  onApprove: (job: ScheduledJob) => void
 }) {
   return (
     <div className="relative inline-block">
@@ -55,7 +70,20 @@ function JobRowMenu({
               onToggle()
             }}
           />
-          <div className="absolute right-0 top-full mt-1 z-50 w-36 rounded-md border border-border bg-popover py-1 shadow-lg">
+          <div className="absolute right-0 top-full mt-1 z-50 w-40 rounded-md border border-border bg-popover py-1 shadow-lg">
+            {!job.approvedAt && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggle()
+                  onApprove(job)
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-primary hover:bg-accent"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Approve
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -66,16 +94,20 @@ function JobRowMenu({
               <Pencil className="h-3.5 w-3.5" />
               Edit
             </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onRunNow(job)
-              }}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent"
-            >
-              <Play className="h-3.5 w-3.5" />
-              Run Now
-            </button>
+            {/* Hidden while pending: the API refuses to run an unapproved
+                job, so offering it would only produce an error. */}
+            {job.approvedAt && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRunNow(job)
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent"
+              >
+                <Play className="h-3.5 w-3.5" />
+                Run Now
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -94,7 +126,7 @@ function JobRowMenu({
   )
 }
 
-export function JobsList({ jobs, onSelect, onEdit, onRunNow, onRequestDelete }: JobsListProps) {
+export function JobsList({ jobs, onSelect, onEdit, onRunNow, onRequestDelete, onApprove }: JobsListProps) {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
 
   const renderMenu = (job: ScheduledJob) => (
@@ -111,6 +143,7 @@ export function JobsList({ jobs, onSelect, onEdit, onRunNow, onRequestDelete }: 
         onRunNow(j)
       }}
       onRequestDelete={onRequestDelete}
+      onApprove={onApprove}
     />
   )
 
@@ -133,11 +166,13 @@ export function JobsList({ jobs, onSelect, onEdit, onRunNow, onRequestDelete }: 
                 )}>
                   {job.name}
                 </span>
-                {!job.enabled && (
+                {!job.approvedAt ? (
+                  <PendingBadge />
+                ) : !job.enabled ? (
                   <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
                     Disabled
                   </span>
-                )}
+                ) : null}
               </div>
               <div className="shrink-0">{renderMenu(job)}</div>
             </div>
@@ -184,11 +219,13 @@ export function JobsList({ jobs, onSelect, onEdit, onRunNow, onRequestDelete }: 
                     )}>
                       {job.name}
                     </span>
-                    {!job.enabled && (
+                    {!job.approvedAt ? (
+                      <PendingBadge />
+                    ) : !job.enabled ? (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                         Disabled
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </td>
                 <td className={cn(

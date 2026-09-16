@@ -90,6 +90,12 @@ interface UpdateScheduledJobBody {
   enabled?: boolean
   /** Flip from true → false when the user clicks Create on a materialized draft. */
   isDraft?: boolean
+  /**
+   * Approve a job an agent proposed. Approving also enables it — the two were
+   * never meaningfully separate for a pending job, and leaving it approved but
+   * off would look identical to not having approved at all.
+   */
+  approve?: boolean
 }
 
 export async function PATCH(
@@ -154,6 +160,7 @@ export async function PATCH(
       isDraft?: boolean
       incomingToken?: string
       workspaceId?: string | null
+      approvedAt?: Date
     } = {}
 
     // The workspace decides repo/branch/agent, as it does on create; an
@@ -166,6 +173,17 @@ export async function PATCH(
         updateData.baseBranch = workspace.baseBranch
         updateData.agent = workspace.agent
       }
+    }
+    // Approving is one-way. There is no un-approve: a job someone has read
+    // and accepted is disabled with the enabled toggle, not returned to a
+    // queue that means "nobody has looked at this".
+    if (body.approve === true && !job.approvedAt) {
+      updateData.approvedAt = new Date()
+      updateData.enabled = true
+      // Pending jobs were parked at creation time. Start the clock from the
+      // approval instead, so the first run is one interval away from now
+      // rather than immediately (or overdue, if it sat in the queue).
+      updateData.nextRunAt = addMinutes(new Date(), body.intervalMinutes ?? job.intervalMinutes)
     }
     if (body.name !== undefined) updateData.name = body.name.trim()
     if (body.prompt !== undefined) updateData.prompt = body.prompt.trim()

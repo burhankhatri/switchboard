@@ -206,6 +206,26 @@ export function ScheduledJobsView({ onOpenForm, refreshKey, urlJobId, onNavigate
     }
   }
 
+  /**
+   * Approve a job an agent proposed. One PATCH: approving also enables it and
+   * restarts the clock, so the first run is an interval from now rather than
+   * whenever the agent happened to propose it.
+   */
+  const handleApprove = async (job: ScheduledJob) => {
+    try {
+      const res = await fetch(`/api/scheduled-jobs/${job.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: true }),
+      })
+      if (!res.ok) throw new Error("Failed to approve job")
+      const updated = await res.json()
+      setJobs((prev) => prev.map((j) => (j.id === job.id ? updated : j)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve job")
+    }
+  }
+
   const handleFormSuccess = (job: ScheduledJob) => {
     setFormOpen(false)
     if (editingJob) {
@@ -284,6 +304,7 @@ export function ScheduledJobsView({ onOpenForm, refreshKey, urlJobId, onNavigate
             onEdit={handleEdit}
             onRunNow={handleRunNow}
             onRequestDelete={setDeleteJob}
+            onApprove={handleApprove}
           />
         )}
       </main>

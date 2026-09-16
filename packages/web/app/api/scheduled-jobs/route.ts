@@ -189,6 +189,10 @@ export async function POST(req: NextRequest): Promise<Response> {
             : addYears(now, 100),
         isDraft: body.isDraft ?? false,
         enabled: body.enabled ?? true,
+        // A person filling in this form IS the approval. Only the agent's MCP
+        // tool creates a job with this null, and only an explicit approval
+        // clears it.
+        approvedAt: now,
       },
     })
 
