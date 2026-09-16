@@ -1,21 +1,26 @@
 import type { AgentMcpServer } from "@switchboard/agent-configuration"
 import { mintRunToken } from "./run-token"
 
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i
+
 /**
  * The app's own origin, as reachable from inside a sandbox.
  *
- * A sandbox is not on this machine, so localhost is never right and a relative
- * URL is meaningless. NEXTAUTH_URL is the value already configured as "where
- * this app lives"; VERCEL_URL covers preview deployments, which do not get one.
+ * A sandbox runs on Daytona, not on this machine, so a localhost origin
+ * resolves to the sandbox itself and a relative URL means nothing.
+ *
+ * SANDBOX_CALLBACK_ORIGIN is checked first and exists to be set to a tunnel in
+ * local development. It is deliberately separate from NEXTAUTH_URL: that one
+ * is also the OAuth callback base, so repointing it at a tunnel breaks GitHub
+ * sign-in, and anyone trying to test this locally would hit that immediately.
  */
 function publicOrigin(): string | null {
+  const explicit = process.env.SANDBOX_CALLBACK_ORIGIN?.trim()
+  if (explicit && !LOCAL_ORIGIN.test(explicit)) return explicit.replace(/\/+$/, "")
+
   const configured = process.env.NEXTAUTH_URL?.trim()
-  if (configured) {
-    // A localhost origin would resolve to the sandbox itself, which is a
-    // confusing failure: the agent's tool call would connect to nothing.
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(configured)) return null
-    return configured.replace(/\/+$/, "")
-  }
+  if (configured && !LOCAL_ORIGIN.test(configured)) return configured.replace(/\/+$/, "")
+
   const vercel = process.env.VERCEL_URL?.trim()
   return vercel ? `https://${vercel.replace(/\/+$/, "")}` : null
 }
@@ -39,7 +44,17 @@ export function schedulerMcpServer(params: {
   if (!params.workspaceId) return null
 
   const origin = publicOrigin()
-  if (!origin) return null
+  if (!origin) {
+    // Loud, because the symptom is silent and misleading: with no tool the
+    // agent improvises, and what it improvises is a crontab inside a sandbox
+    // that is about to be destroyed. Better to see this line in the log than
+    // to debug a schedule that never fires.
+    console.warn(
+      "[mcp/scheduler] no sandbox-reachable origin — the scheduler tool is NOT available " +
+        "to this run. Set SANDBOX_CALLBACK_ORIGIN to a public URL (a tunnel, in local dev)."
+    )
+    return null
+  }
 
   let bearerToken: string
   try {
