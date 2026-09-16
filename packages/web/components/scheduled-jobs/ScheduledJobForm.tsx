@@ -36,6 +36,7 @@ export function ScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess,
   const {
     isEditing,
     jobId,
+    inWorkspace,
     workspaceName,
     name,
     prompt,
@@ -262,9 +263,13 @@ export function ScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess,
                   />
                 </div>
 
-                {/* Bottom bar with selectors. The container wrappers mirror
-                    ChatInput so the inner pickers can reveal labels and counts
-                    at the right widths via container queries. */}
+                {/* Bottom bar with selectors. Hidden entirely inside a
+                    workspace: repo, branch, harness, model and tools all come
+                    from the workspace, so every control here would either
+                    restate it or quietly override it. The container wrappers
+                    mirror ChatInput so the inner pickers can reveal labels and
+                    counts at the right widths via container queries. */}
+                {!inWorkspace && (
                 <div className={cn(
                   "@container flex items-center",
                   isMobile ? "gap-2 px-3 py-2" : "gap-3 px-4 py-2"
@@ -402,6 +407,7 @@ export function ScheduledJobForm({ open, job, initialPrompt, onClose, onSuccess,
                     )}
                   </div>
                 </div>
+                )}
               </div>
             </div>
 

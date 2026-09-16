@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { useCopyToClipboard } from "@/lib/hooks/useCopyToClipboard"
 import { type ScheduledJob } from "@/lib/scheduled-jobs/types"
 import { scheduleNameFromPrompt } from "@/lib/scheduled-jobs/prompt-name"
+import { jobTargetFields } from "@/lib/scheduled-jobs/job-target"
 import { agentModels, getAgentModels, type Agent, NEW_REPOSITORY } from "@/lib/types"
 import { useSettingsQuery } from "@/lib/query/hooks/useSettingsQuery"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
@@ -41,6 +42,14 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
   // Editing keeps whatever the job was bound to, so opening an old job from
   // inside a different workspace cannot silently move it.
   const workspaceId = isEditing ? job?.workspaceId ?? null : activeWorkspace?.id ?? null
+
+  /**
+   * A workspace already decides the repo, the branch, the harness, the model
+   * and the tools - that is what a workspace is. Asking again is not a second
+   * opinion, it is a way to get a job that clones the wrong thing and runs
+   * with none of the skills it was written against.
+   */
+  const inWorkspace = !!workspaceId
 
   // Form state
   const [name, setName] = useState(
@@ -107,8 +116,13 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
   // auto-PR needs a repo to push to. The section header renders only when at
   // least one applies — these same flags gate both the header and the toggles
   // so they can't drift apart.
-  const showContinueOption = triggerType === "interval"
-  const showAutoPROption = !isRepoLess
+  // Neither option belongs to a workspace job. "Include commits from the
+  // previous run" reuses the prior branch, which is the opposite of what a
+  // weekly audit wants, and its repo-less wording would be shown for a job
+  // that does have a repo - the workspace's. Auto-PR would open a pull
+  // request against the workspaces repo on a cron.
+  const showContinueOption = triggerType === "interval" && !inWorkspace
+  const showAutoPROption = !isRepoLess && !inWorkspace
   const hasOptions = showContinueOption || showAutoPROption
 
   // Reset form state when job prop changes or modal opens
@@ -191,23 +205,15 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
       name: name.trim(),
       prompt: prompt.trim(),
       workspaceId,
-      // A workspace supplies the repo, so leave it out and let the server
-      // denormalize. Sending the sentinel instead would win over the
-      // workspace and produce a job that clones nothing - the agent would
-      // start with none of the skills or scripts it was written against.
-      // Empty form value with no workspace means repo-less: send the
-      // NEW_REPOSITORY sentinel so the backend takes its no-clone path.
-      ...(repo ? { repo } : workspaceId ? {} : { repo: NEW_REPOSITORY }),
-      baseBranch,
-      agent,
-      model: model || null,
+      ...jobTargetFields({ inWorkspace, repo, baseBranch, agent, model }),
       triggerType,
       intervalMinutes: triggerType === "interval" ? effectiveIntervalMinutes : undefined,
       runAtHour: triggerType === "interval" && effectiveIntervalMinutes >= 1440 ? runAtHourUtc : undefined,
       runAtDay: triggerType === "interval" && effectiveIntervalMinutes === 10080 ? runAtDay : undefined,
-      // Auto-PR has nothing to push to in repo-less mode.
-      autoPR: isRepoLess ? false : autoPR,
-      continueFromLastRun,
+      // Auto-PR has nothing to push to in repo-less mode, and nothing it
+      // should push to in a workspace.
+      autoPR: isRepoLess || inWorkspace ? false : autoPR,
+      continueFromLastRun: inWorkspace ? false : continueFromLastRun,
     }
   }
 
@@ -240,13 +246,7 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
           name: name.trim() || "(draft)",
           prompt: prompt.trim() || "(draft)",
           workspaceId,
-          // Drafts default to the repo-less sentinel so the row passes the
-          // backend's repo check before the user fills the form in fully. A
-          // workspace answers that check on its own.
-          ...(repo ? { repo } : workspaceId ? {} : { repo: NEW_REPOSITORY }),
-          baseBranch: baseBranch || "main",
-          agent,
-          model: model || null,
+          ...jobTargetFields({ inWorkspace, repo, baseBranch, agent, model }),
           triggerType,
           // Carry the client-minted token (if any) so the persisted URL matches
           // what the panel is already showing. Null on interval drafts — the
@@ -416,6 +416,7 @@ export function useScheduledJobForm({ open, job, initialPrompt, onClose, onSucce
     isEditing,
     jobId: job?.id,
     workspaceId,
+    inWorkspace,
     // Named so the form can say where the job will run. A schedule that fires
     // into a workspace it never mentions is the kind of thing people only
     // discover from a surprising run.

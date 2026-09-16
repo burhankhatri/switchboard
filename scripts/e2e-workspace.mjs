@@ -320,7 +320,23 @@ check("the job is bound to the workspace", r.body?.workspaceId === ws.id, String
 // nothing - the agent would start with none of the workspace's skills.
 check("repo denormalised from the workspace", r.body?.repo === ws.repo, String(r.body?.repo))
 check("baseBranch denormalised", r.body?.baseBranch === "main", String(r.body?.baseBranch))
-check("agent denormalised", !!r.body?.agent, String(r.body?.agent))
+check("agent denormalised", r.body?.agent === ws.agent, `${r.body?.agent} vs workspace ${ws.agent}`)
+
+// Pins the contract the form depends on: an explicit value beats the
+// workspace. That is why the form omits these inside a workspace - sending
+// its own defaults made a workspace job run opencode against "main".
+r = await call("/api/scheduled-jobs", {
+  method: "POST",
+  body: JSON.stringify({
+    name: "Explicit override",
+    prompt: "Check something.",
+    workspaceId: ws.id,
+    agent: "codex",
+    intervalMinutes: 10080,
+  }),
+})
+check("an explicit agent overrides the workspace", r.body?.agent === "codex", String(r.body?.agent))
+if (r.body?.id) await prisma.scheduledJob.delete({ where: { id: r.body.id } }).catch(() => {})
 
 r = await call("/api/scheduled-jobs")
 check("the job lists with its workspace", r.body.jobs?.find((j) => j.id === jobId)?.workspaceId === ws.id)
