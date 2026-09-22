@@ -417,3 +417,127 @@ export async function writeWorkspaceFile(
   invalidateRepoCache()
   return { sha: data.content?.sha ?? "" }
 }
+
+/** A file on its way into the repo. `contentBase64` so binaries survive. */
+export interface FileToCommit {
+  path: string
+  contentBase64: string
+}
+
+/**
+ * How many blob uploads are in flight at once.
+ *
+ * Blobs are independent of each other and of the branch, so they parallelise;
+ * the bound is politeness toward GitHub's secondary rate limits rather than
+ * correctness.
+ */
+const BLOB_CONCURRENCY = 8
+
+async function ghJson<T>(url: string, token: string, init: RequestInit, what: string): Promise<T> {
+  const res = await ghFetch(url, { ...init, headers: headers(token) })
+  if (!res.ok) throw new Error(`${what}: ${res.status} ${await res.text()}`)
+  return (await res.json()) as T
+}
+
+/**
+ * Commit many files as a single commit.
+ *
+ * The Contents API used by writeWorkspaceFile is one commit per file, which for
+ * an imported folder means N commits, N round trips, and a 409 the moment two
+ * of them race for the branch. The Git Data API builds the whole tree first and
+ * moves the branch once, so a folder arrives the way it left: atomically, with
+ * one entry in the history.
+ *
+ * The ref update is deliberately not forced. If someone else committed while
+ * the blobs were uploading, GitHub rejects the fast-forward and the import
+ * fails loudly rather than rewinding their work.
+ */
+export async function commitWorkspaceFiles(
+  token: string,
+  files: FileToCommit[],
+  message: string,
+  branch = "main"
+): Promise<{ commit: string; committed: number }> {
+  if (!files.length) throw new Error("nothing to commit")
+  for (const f of files) {
+    if (f.path.includes("..") || f.path.startsWith("/")) throw new Error(`unsafe path: ${f.path}`)
+  }
+
+  const [owner, repo] = WORKSPACES_REPO.split("/")
+  const auth = repoAuth(token)
+  const api = `${GH}/repos/${owner}/${repo}`
+
+  const ref = await ghJson<{ object: { sha: string } }>(
+    `${api}/git/ref/heads/${encodeURIComponent(branch)}`,
+    auth,
+    { method: "GET" },
+    `Could not read ${branch}`
+  )
+  const parent = ref.object.sha
+
+  const head = await ghJson<{ tree: { sha: string } }>(
+    `${api}/git/commits/${parent}`,
+    auth,
+    { method: "GET" },
+    "Could not read the head commit"
+  )
+
+  // Upload blobs in bounded waves. Each wave settles before the next starts,
+  // which keeps the in-flight count at BLOB_CONCURRENCY without a queue.
+  const shas: string[] = new Array(files.length)
+  for (let i = 0; i < files.length; i += BLOB_CONCURRENCY) {
+    const wave = files.slice(i, i + BLOB_CONCURRENCY)
+    const made = await Promise.all(
+      wave.map((f) =>
+        ghJson<{ sha: string }>(
+          `${api}/git/blobs`,
+          auth,
+          { method: "POST", body: JSON.stringify({ content: f.contentBase64, encoding: "base64" }) },
+          `Could not upload ${f.path}`
+        )
+      )
+    )
+    made.forEach((b, j) => (shas[i + j] = b.sha))
+  }
+
+  const tree = await ghJson<{ sha: string }>(
+    `${api}/git/trees`,
+    auth,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        base_tree: head.tree.sha,
+        tree: files.map((f, i) => ({
+          path: f.path,
+          mode: "100644",
+          type: "blob",
+          sha: shas[i],
+        })),
+      }),
+    },
+    "Could not build the tree"
+  )
+
+  const commit = await ghJson<{ sha: string }>(
+    `${api}/git/commits`,
+    auth,
+    { method: "POST", body: JSON.stringify({ message, tree: tree.sha, parents: [parent] }) },
+    "Could not create the commit"
+  )
+
+  const res = await ghFetch(`${api}/git/refs/heads/${encodeURIComponent(branch)}`, {
+    method: "PATCH",
+    headers: headers(auth),
+    body: JSON.stringify({ sha: commit.sha }),
+  })
+  if (!res.ok) {
+    if (res.status === 422) {
+      throw new Error("Someone else pushed while the import was uploading. Try again.")
+    }
+    throw new Error(`Could not update ${branch}: ${res.status} ${await res.text()}`)
+  }
+
+  // The tree moved, and the cache is keyed by URL rather than by ref.
+  invalidateRepoCache()
+  return { commit: commit.sha, committed: files.length }
+}

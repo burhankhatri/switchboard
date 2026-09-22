@@ -19,14 +19,16 @@
 export const IMPORT_MAX_FILE_BYTES = 256 * 1024
 
 /**
- * How much one import may carry in total.
+ * How much one import may carry in total, counted in raw bytes.
  *
  * The whole folder goes up as one request so it can become one commit, and a
- * serverless request body is capped somewhere around 4.5MB. Staying under that
+ * serverless request body is capped somewhere around 4.5MB. The wire carries
+ * base64, which is 4/3 of raw — so this is 3MB rather than 4MB, landing near
+ * 4MB encoded with room for the path names around it. Staying under the limit
  * turns "your folder is too big" into a message with a number in it rather than
  * a 413 from the platform.
  */
-export const IMPORT_MAX_TOTAL_BYTES = 4 * 1024 * 1024
+export const IMPORT_MAX_TOTAL_BYTES = 3 * 1024 * 1024
 
 /**
  * Ceiling on file count, independent of size.
