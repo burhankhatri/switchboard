@@ -44,12 +44,16 @@ describe("planFolderImport", () => {
       base
     )
     expect(plan.files.map((f) => f.relativePath)).toEqual(["p/keep.py"])
-    expect(plan.skipped.map((s) => s.relativePath)).toEqual([
-      "p/.DS_Store",
-      "p/.git/HEAD",
-      "p/__pycache__/x.pyc",
-      "p/node_modules/lib/index.js",
-    ])
+    // Which ones were dropped is the contract; the order they are reported in
+    // is whatever the sort produced, so compare as a set.
+    expect(plan.skipped.map((s) => s.relativePath).sort()).toEqual(
+      [
+        "p/.DS_Store",
+        "p/.git/HEAD",
+        "p/__pycache__/x.pyc",
+        "p/node_modules/lib/index.js",
+      ].sort()
+    )
   })
 
   it("does not commit a secrets file into a shared repo", () => {
@@ -99,14 +103,20 @@ describe("planFolderImport", () => {
   })
 
   it("stops once the import would exceed what one request can carry", () => {
-    const half = Math.floor(IMPORT_MAX_TOTAL_BYTES / 2)
+    // Each file is exactly at the per-file cap, so only the total can reject
+    // one — otherwise this would be testing the per-file cap by accident.
+    const fits = IMPORT_MAX_TOTAL_BYTES / IMPORT_MAX_FILE_BYTES
     const plan = planFolderImport(
-      [entry("p/a", half), entry("p/b", half), entry("p/c", 1024)],
+      Array.from({ length: fits + 1 }, (_, i) =>
+        entry(`p/f${String(i).padStart(3, "0")}`, IMPORT_MAX_FILE_BYTES)
+      ),
       base
     )
-    expect(plan.files.map((f) => f.relativePath)).toEqual(["p/a", "p/b"])
-    expect(plan.skipped).toEqual([{ relativePath: "p/c", reason: "over the total size limit" }])
-    expect(plan.totalBytes).toBe(half * 2)
+    expect(plan.files).toHaveLength(fits)
+    expect(plan.skipped).toEqual([
+      { relativePath: `p/f${String(fits).padStart(3, "0")}`, reason: "over the total size limit" },
+    ])
+    expect(plan.totalBytes).toBe(IMPORT_MAX_TOTAL_BYTES)
   })
 
   it("counts only what is actually being committed", () => {
