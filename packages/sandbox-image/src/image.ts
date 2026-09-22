@@ -158,6 +158,79 @@ export function agentInstallCommand(pkg: string): string {
 }
 
 /**
+ * Headless browser runtime, for agents and scripts that drive a real browser
+ * (Selenium, Playwright-style scraping, anything that has to log into a site
+ * that offers no API).
+ *
+ * chromium and chromium-driver are installed in ONE apt transaction on
+ * purpose. Selenium refuses to start a session when the driver's major version
+ * does not match the browser — "This version of ChromeDriver only supports
+ * Chrome version N" — and Debian builds both from the same source, so a single
+ * transaction makes the match structural rather than a thing to re-verify.
+ * Two separate layers could resolve against different index states.
+ */
+export const BROWSER_APT_PACKAGES = ["chromium", "chromium-driver"] as const
+
+/**
+ * Bump this date to force the browser layer to rebuild.
+ *
+ * apt cannot be pinned the way npm can: an exact `chromium=153.0.8010.52`
+ * breaks the build the moment that version leaves the mirror, which for
+ * security updates is weeks. So the layer floats, and this token is the
+ * deliberate cache key — changing it changes the command string, which is the
+ * only thing that actually invalidates a cached layer. Without it the browser
+ * would freeze at its first-built version exactly like the agent CLIs did.
+ */
+export const BROWSER_LAYER_PIN = "2026-09-22"
+
+/** Where Debian puts them. Knowing the paths avoids a runtime driver download. */
+export const CHROMIUM_BIN = "/usr/bin/chromium"
+export const CHROMEDRIVER_BIN = "/usr/bin/chromedriver"
+
+/**
+ * Python packages available to sandbox scripts, pinned for the same reason the
+ * agent CLIs are.
+ *
+ * selenium and webdriver-manager are imported at module level by the pricing
+ * bot, so a missing one is an ImportError before any runtime flag can help —
+ * webdriver-manager is present for that import even though the system driver
+ * at CHROMEDRIVER_BIN is what should actually be used. pandas and openpyxl
+ * read the supplier spreadsheets.
+ */
+export const PYTHON_PACKAGES: Record<string, string> = {
+  selenium: "4.49.0",
+  "webdriver-manager": "4.1.2",
+  pandas: "3.0.6",
+  openpyxl: "3.1.5",
+}
+
+/** Install the browser and its matching driver, plus the fonts pages need. */
+export function browserInstallCommand(): string {
+  // The pin token rides as a comment: it changes the command string (busting
+  // the layer) without changing what apt actually does.
+  return (
+    `: browser layer pin ${BROWSER_LAYER_PIN} && ` +
+    "apt-get update && apt-get install -y --no-install-recommends " +
+    `${BROWSER_APT_PACKAGES.join(" ")} ` +
+    // Without a font package chromium renders boxes, which silently corrupts
+    // anything that screenshots or prints to PDF.
+    "fonts-liberation fonts-dejavu-core " +
+    "&& rm -rf /var/lib/apt/lists/*"
+  )
+}
+
+/** Install the pinned Python packages into the system interpreter. */
+export function pythonInstallCommand(): string {
+  const pins = Object.entries(PYTHON_PACKAGES)
+    .map(([name, version]) => `${name}==${version}`)
+    .join(" ")
+  // bookworm ships PEP 668, so pip refuses to touch the system interpreter
+  // without this flag. The sandbox is disposable and single-purpose, so a
+  // virtualenv would only add a path every script has to know about.
+  return `python3 -m pip install --no-cache-dir --break-system-packages ${pins}`
+}
+
+/**
  * Builds the Daytona Image spec with all agent CLIs pre-installed.
  *
  * Pre-installed agents:
@@ -182,8 +255,18 @@ export function getAgentSandboxImage(): Image {
       .runCommands(
         // Install system dependencies (curl for Goose download, git for agents, sudo for user)
         "apt-get update && apt-get install -y --no-install-recommends " +
-          "curl ca-certificates git bzip2 sudo " +
+          // python3-pip: the base node image has python3 but no pip, so
+          // pythonInstallCommand() below has nothing to run without it.
+          "curl ca-certificates git bzip2 sudo python3-pip " +
           "&& rm -rf /var/lib/apt/lists/*"
+      )
+      .runCommands(
+        // Headless browser + matching driver. See browserInstallCommand().
+        browserInstallCommand()
+      )
+      .runCommands(
+        // Python packages for scripts that drive the browser.
+        pythonInstallCommand()
       )
       .runCommands(
         // Install Claude Code CLI
