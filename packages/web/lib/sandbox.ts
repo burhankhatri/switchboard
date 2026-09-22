@@ -201,7 +201,14 @@ export async function createSandboxForChat(
     // that whole time. Six chats in a day is a 30GiB org limit exhausted, which
     // presents as "Total disk limit exceeded" on an unrelated new chat.
     autoArchiveInterval: 60,
-    autoDeleteInterval: 5760, // 4 days - auto-delete after being stopped for four days
+    // Daytona caps the org at six sandboxes, stopped ones included, so a chat
+    // idle past autoStopInterval is deleted outright (0 = delete on stop). The
+    // branch is pushed after every turn and the next message recreates the
+    // sandbox from it; work the agent left uncommitted is lost by design.
+    //
+    // A NEW_REPOSITORY chat has no remote to rebuild from — the sandbox IS the
+    // repository — so it keeps four days before deletion.
+    autoDeleteInterval: isNewRepo ? 5760 : 0,
     public: true,
     labels: {
       [SANDBOX_CONFIG.LABEL_KEY]: "true",
