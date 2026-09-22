@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { claudeCredentialStatus, describeClaudeCredential } from "./claude-credential-status"
+import {
+  checkPoolCredentials,
+  claudeCredentialStatus,
+  describeClaudeCredential,
+} from "./claude-credential-status"
 
 const NOW = 1_787_000_000_000
 const blob = (oauth: Record<string, unknown>) => JSON.stringify({ claudeAiOauth: oauth })
@@ -75,5 +79,42 @@ describe("claudeCredentialStatus", () => {
     const dead = claudeCredentialStatus(blob({ accessToken: "a", refreshToken: "r", expiresAt: NOW - 3_600_000, refreshTokenExpiresAt: NOW - 10 }), NOW)
     expect(describeClaudeCredential(live)).toMatch(/re-copying/i)
     expect(describeClaudeCredential(dead)).toMatch(/sign in to claude code again/i)
+  })
+})
+
+describe("checkPoolCredentials", () => {
+  const good = { accessToken: "a", refreshToken: "r", expiresAt: NOW + 3_600_000 }
+
+  it("stores a valid blob on a single line, every field intact", () => {
+    const pasted = JSON.stringify(
+      { claudeAiOauth: { ...good, scopes: ["user:inference"], subscriptionType: "pro" } },
+      null,
+      2
+    )
+    const c = checkPoolCredentials(pasted, NOW)
+    expect(c.ok).toBe(true)
+    if (!c.ok) return
+    expect(c.value).not.toContain("\n")
+    expect(JSON.parse(c.value)).toEqual(JSON.parse(pasted))
+    expect(c.expiresAt).toBe(good.expiresAt)
+  })
+
+  it("rejects what the refresh cron would not recognise", () => {
+    // Without expiresAt the cron reads the row as malformed and overwrites it.
+    const { expiresAt: _e, ...noExpiry } = good
+    const { refreshToken: _r, ...noRefresh } = good
+    expect(checkPoolCredentials("not json", NOW).ok).toBe(false)
+    expect(checkPoolCredentials(blob(noExpiry), NOW).ok).toBe(false)
+    expect(checkPoolCredentials(blob(noRefresh), NOW).ok).toBe(false)
+  })
+
+  it("accepts an expired access token only while its refresh token still works", () => {
+    const expired = { ...good, expiresAt: NOW - 3_600_000 }
+    expect(
+      checkPoolCredentials(blob({ ...expired, refreshTokenExpiresAt: NOW + 86_400_000 }), NOW).ok
+    ).toBe(true)
+    expect(
+      checkPoolCredentials(blob({ ...expired, refreshTokenExpiresAt: NOW - 1 }), NOW).ok
+    ).toBe(false)
   })
 })

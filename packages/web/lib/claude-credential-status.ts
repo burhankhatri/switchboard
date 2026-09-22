@@ -69,6 +69,50 @@ export function claudeCredentialStatus(
   return { status: "valid", expiresAt, expiresInMs: expiresAt - now }
 }
 
+export type PoolCredentialCheck =
+  | { ok: true; value: string; expiresAt: number }
+  | { ok: false; message: string }
+
+/**
+ * Accepts a hand-pasted credentials.json for the shared-pool row.
+ *
+ * Stricter than "is it JSON": the refresh cron only recognises a row carrying
+ * accessToken, refreshToken and a numeric expiresAt. Anything less and it
+ * treats the row as malformed, skips the cheap refresh-token path and goes
+ * straight to the cookie flow — which overwrites what the admin just pasted.
+ *
+ * An expired access token is fine as long as its refresh token still works: the
+ * next refresh renews it, which is exactly what the admin wants.
+ */
+export function checkPoolCredentials(
+  raw: string,
+  now: number = Date.now()
+): PoolCredentialCheck {
+  const state = claudeCredentialStatus(raw, now)
+  if (state.status === "missing" || state.status === "unparseable") {
+    return { ok: false, message: describeClaudeCredential(state) }
+  }
+  if (state.status === "expired" && !state.refreshUsable) {
+    return { ok: false, message: describeClaudeCredential(state) }
+  }
+
+  const parsed = JSON.parse(raw) as ClaudeBlob
+  if (typeof parsed.claudeAiOauth?.refreshToken !== "string" || !parsed.claudeAiOauth.refreshToken) {
+    return {
+      ok: false,
+      message: "That does not look like a credentials.json — missing claudeAiOauth.refreshToken.",
+    }
+  }
+
+  // Re-stringified rather than stored as pasted: the sandbox writes the file by
+  // echoing this value through a shell command, so it must be a single line.
+  return {
+    ok: true,
+    value: JSON.stringify(parsed),
+    expiresAt: state.status === "valid" ? state.expiresAt : state.expiredAt,
+  }
+}
+
 /** Short human phrasing for the UI and for error messages. */
 export function describeClaudeCredential(state: ClaudeCredentialState): string {
   switch (state.status) {

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin, isAuthError } from "@/lib/db/api-helpers"
-import { setCookies, listCcAuthRuns } from "@/lib/claude-credentials"
+import {
+  setCookies,
+  writeCredentials,
+  listCcAuthRuns,
+} from "@/lib/claude-credentials"
+import { checkPoolCredentials } from "@/lib/claude-credential-status"
 import {
   refreshCredentials,
   refreshResultToResponse,
@@ -65,4 +70,35 @@ export async function POST(request: NextRequest) {
     cookiesUpdated,
   })
   return refreshResultToResponse(result)
+}
+
+/**
+ * PUT /api/admin/refresh-claude-creds
+ *
+ * Stores a credentials blob pasted by hand, for when neither refresh path can
+ * run (expired cookies, ccauth blocked) but a working token is available from
+ * somewhere else — otherwise the only fix is editing the row in the database.
+ * Body: { credentials: string } — the contents of ~/.claude/.credentials.json.
+ *
+ * Once stored, the hourly cron keeps it alive from its refresh token.
+ */
+export async function PUT(request: NextRequest) {
+  const auth = await requireAdmin()
+  if (isAuthError(auth)) return auth
+
+  const body = (await request.json().catch(() => ({}))) as {
+    credentials?: unknown
+  }
+  const raw = typeof body.credentials === "string" ? body.credentials.trim() : ""
+
+  const check = checkPoolCredentials(raw)
+  if (!check.ok) {
+    return NextResponse.json(
+      { error: "INVALID_CREDENTIALS", message: check.message },
+      { status: 400 },
+    )
+  }
+
+  await writeCredentials(check.value)
+  return NextResponse.json({ saved: true, expiresAt: check.expiresAt })
 }
