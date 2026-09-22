@@ -461,7 +461,7 @@ export const agentModels: Record<Agent, ModelOption[]> = {
 /** Default model per agent */
 export const defaultAgentModel: Record<Agent, string> = {
   "claude-code": "default",
-  "opencode": "opencode-go/mimo-v2.5-pro",
+  "opencode": "opencode-go/glm-5.2",
   "codex": "gpt-5.5",
   "copilot": "gpt-5-mini",
   "droid": "claude-sonnet-4-5-20250929", // BYOK default (user's ANTHROPIC_API_KEY)
