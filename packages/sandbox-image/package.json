@@ -10,7 +10,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build:snapshot": "tsx scripts/build-snapshot.ts"
+    "build:snapshot": "tsx scripts/build-snapshot.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@daytonaio/sdk": "^0.170.0"

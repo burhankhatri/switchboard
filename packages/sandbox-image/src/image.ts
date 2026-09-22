@@ -107,6 +107,57 @@ export const AGENT_PACKAGES = {
 export const TOKSCALE_VERSION = "3.1.2"
 
 /**
+ * Pinned version for every agent CLI installed from npm.
+ *
+ * These are pinned for the same reason TOKSCALE_VERSION is, and the reason is
+ * worth stating because an unpinned install *looks* like it keeps the image
+ * current when it does the opposite. `npm install -g <pkg>` is a constant
+ * command string, so the build cache reuses that layer on every rebuild and
+ * never re-resolves `latest`. Each CLI freezes at whatever version it had the
+ * first time its layer was built, and no amount of rebuilding moves it.
+ *
+ * It went unnoticed until a server-side gate made it visible: a snapshot
+ * rebuilt on 2026-08-18 was still serving opencode-ai@1.17.14 (published
+ * 2026-07-06), and OpenCode's free tier refuses anything older than
+ * MIN_OPENCODE_VERSION. Every free-tier run died on a version error that
+ * rebuilding could not clear. Every other CLI was stale too — silently, because
+ * nothing was checking their versions.
+ *
+ * Bumping a version here changes the command string, which is what actually
+ * invalidates the layer. Treat this map as the upgrade mechanism: to move an
+ * agent, edit its version and rebuild.
+ */
+export const AGENT_CLI_VERSIONS: Record<string, string> = {
+  "@anthropic-ai/claude-code": "2.1.280",
+  "@openai/codex": "0.155.1",
+  "@github/copilot": "1.0.87",
+  "@kilocode/cli": "7.7.7",
+  "opencode-ai": "1.18.32",
+  "@google/gemini-cli": "0.60.0",
+  "@mariozechner/pi-coding-agent": "0.73.1",
+}
+
+/**
+ * The oldest OpenCode its free tier will serve. Below this the provider
+ * rejects the run rather than degrading, so it is a build-time constraint
+ * rather than something the app can recover from.
+ */
+export const MIN_OPENCODE_VERSION = "1.18.0"
+
+/**
+ * The install command for one agent CLI, with its version in the string.
+ *
+ * Throws rather than falling back to an unpinned install: a new agent added
+ * without a pin should fail the build loudly, not quietly reintroduce the
+ * freeze this map exists to prevent.
+ */
+export function agentInstallCommand(pkg: string): string {
+  const version = AGENT_CLI_VERSIONS[pkg]
+  if (!version) throw new Error(`No pinned version for ${pkg} — add one to AGENT_CLI_VERSIONS`)
+  return `npm install -g ${pkg}@${version}`
+}
+
+/**
  * Builds the Daytona Image spec with all agent CLIs pre-installed.
  *
  * Pre-installed agents:
@@ -136,31 +187,31 @@ export function getAgentSandboxImage(): Image {
       )
       .runCommands(
         // Install Claude Code CLI
-        "npm install -g @anthropic-ai/claude-code"
+        agentInstallCommand("@anthropic-ai/claude-code")
       )
       .runCommands(
         // Install Codex CLI
-        "npm install -g @openai/codex"
+        agentInstallCommand("@openai/codex")
       )
       .runCommands(
         // Install Gemini CLI
-        "npm install -g @google/gemini-cli"
+        agentInstallCommand("@google/gemini-cli")
       )
       .runCommands(
         // Install OpenCode CLI
-        "npm install -g opencode-ai"
+        agentInstallCommand("opencode-ai")
       )
       .runCommands(
         // Install Pi CLI
-        "npm install -g @mariozechner/pi-coding-agent"
+        agentInstallCommand("@mariozechner/pi-coding-agent")
       )
       .runCommands(
         // Install GitHub Copilot CLI
-        "npm install -g @github/copilot"
+        agentInstallCommand("@github/copilot")
       )
       .runCommands(
         // Install Kilo CLI
-        "npm install -g @kilocode/cli"
+        agentInstallCommand("@kilocode/cli")
       )
       // Create daytona user (non-root) - Claude Code refuses to run as root.
       // Must come before the Kimi install below, which chowns its output to
