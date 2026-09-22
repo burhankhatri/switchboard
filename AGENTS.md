@@ -39,7 +39,8 @@ on case-insensitive filesystems; importing `@/components/sidebar/index`
 explicitly resolved it. If errors reappear there, that is the cause.
 
 ```bash
-cd packages/web && npx vitest run        # 187 tests; run from packages/web, the @/ alias breaks from the repo root
+npm run test                             # 429 tests: 424 web + 5 sandbox-image
+cd packages/web && npx vitest run        # web only; run from packages/web, the @/ alias breaks from the repo root
 ```
 
 ## Verifying real behaviour
