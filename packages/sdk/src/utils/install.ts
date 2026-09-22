@@ -13,7 +13,8 @@ const PROVIDER_PACKAGES: Record<ProviderName, string> = {
   goose: "", // goose uses shell script installer, not npm
   kilo: "@kilocode/cli",
   kimi: "", // kimi uses a shell script installer, not npm
-  opencode: "opencode",
+  // Published as opencode-ai; the bare `opencode` name 404s on npm.
+  opencode: "opencode-ai",
   gemini: "@google/gemini-cli",
   pi: "@mariozechner/pi-coding-agent",
 }
