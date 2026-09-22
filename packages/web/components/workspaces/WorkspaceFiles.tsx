@@ -1,12 +1,13 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  ChevronRight, FilePlus, FileText, FolderPlus, Folder, Loader2, Sparkles, Upload,
+  ChevronRight, FilePlus, FileText, FolderPlus, Folder, FolderUp, Loader2, Sparkles, Upload,
 } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { writeCachedFile } from "@/lib/workspace-file-cache"
+import { planFolderImport, type SkippedFile } from "@/lib/workspace-import"
 import { cn } from "@/lib/utils"
 
 interface RepoFile { path: string; name: string; size: number }
@@ -35,6 +36,26 @@ const MAX_UPLOAD_BYTES = 256 * 1024
 
 /** git has no empty directories, so a new folder is a folder with a .gitkeep. */
 const GITKEEP = ".gitkeep"
+
+/**
+ * A file's bytes as base64.
+ *
+ * readAsDataURL rather than reading text: an imported folder contains images
+ * and fixtures as readily as scripts, and `.text()` would turn every one of
+ * them into replacement characters. Base64 travels through JSON unchanged and
+ * is what the git blob API wants anyway.
+ */
+function toBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}`))
+    reader.onload = () => {
+      const s = String(reader.result)
+      resolve(s.slice(s.indexOf(",") + 1))
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 function TreeNode({ node, depth }: { node: Node; depth: number }) {
   const { activeWorkspace, openFile, requestOpenFile } = useWorkspace()
@@ -131,13 +152,29 @@ export function WorkspaceFiles() {
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  // What an import left behind, shown after it finishes. A folder pick sweeps
+  // in junk by definition, so "committed 12, skipped 4" is the honest result —
+  // reporting only the successes would look like files vanishing.
+  const [skipped, setSkipped] = useState<SkippedFile[]>([])
   // What is being created inline, if anything. null means the row is not shown.
   const [creating, setCreating] = useState<"file" | "folder" | null>(null)
   const [newName, setNewName] = useState("")
   const [nameError, setNameError] = useState<string | null>(null)
   const nameInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const folderInput = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
+
+  // React has no typed prop for these and they must be present as real
+  // attributes for the picker to open in directory mode. `directory` is the
+  // standards-track name; `webkitdirectory` is what every current browser
+  // actually honours.
+  useEffect(() => {
+    const el = folderInput.current
+    if (!el) return
+    el.setAttribute("webkitdirectory", "")
+    el.setAttribute("directory", "")
+  }, [])
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["workspace-files", activeWorkspace?.id],
@@ -206,6 +243,73 @@ export function WorkspaceFiles() {
     }
     setBusy(null)
     setUploadError(failed.length ? failed.join("; ") : null)
+  }
+
+  /**
+   * Import a picked folder: one request, one commit.
+   *
+   * Not addFiles in a loop. That commits per file, loses the nesting because it
+   * only ever sees `f.name`, and puts a folder's worth of commits into the
+   * history of a repo other people read. The whole tree goes up together and
+   * lands as one commit instead.
+   *
+   * The plan is computed here as well as on the server so the skip list can be
+   * shown without a round trip; the server recomputes it and is the authority.
+   */
+  async function importFolder(picked: File[]) {
+    setUploadError(null)
+    setSkipped([])
+    if (!picked.length) return
+
+    // webkitRelativePath is "<picked folder>/<path within it>". It is empty for
+    // a browser that ignored the directory attribute, and then the flat name is
+    // the honest fallback.
+    const entries = picked.map((f) => ({
+      relativePath: f.webkitRelativePath || f.name,
+      size: f.size,
+      file: f,
+    }))
+    const folder = entries[0].relativePath.split("/")[0] || "folder"
+
+    const plan = planFolderImport(
+      entries.map(({ relativePath, size }) => ({ relativePath, size })),
+      base!
+    )
+    if (!plan.files.length) {
+      setUploadError(`Nothing in ${folder} could be imported.`)
+      setSkipped(plan.skipped)
+      return
+    }
+
+    const byPath = new Map(entries.map((e) => [e.relativePath, e.file]))
+    setBusy(`${folder} — reading ${plan.files.length} files`)
+
+    try {
+      const files = await Promise.all(
+        plan.files.map(async (f) => ({
+          relativePath: f.relativePath,
+          contentBase64: await toBase64(byPath.get(f.relativePath)!),
+        }))
+      )
+
+      setBusy(`${folder} — committing ${files.length} files`)
+      const res = await fetch(`/api/workspaces/${activeWorkspace!.id}/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder, files }),
+      })
+      if (!res.ok) {
+        throw new Error((await res.json().catch(() => ({}))).error ?? "Import failed")
+      }
+      const result = (await res.json()) as { committed: number; skipped: SkippedFile[] }
+      setSkipped(result.skipped)
+      await qc.invalidateQueries({ queryKey: ["workspace-files", activeWorkspace!.id] })
+    } catch (e) {
+      setUploadError((e as Error).message)
+      setSkipped(plan.skipped)
+    } finally {
+      setBusy(null)
+    }
   }
 
   /**
@@ -294,6 +398,13 @@ export function WorkspaceFiles() {
             >
               <Upload className="h-3.5 w-3.5" />
             </button>
+            <button
+              onClick={() => folderInput.current?.click()}
+              title="Import a folder — keeps its structure, lands as one commit"
+              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <FolderUp className="h-3.5 w-3.5" />
+            </button>
           </>
         )}
         <input
@@ -302,6 +413,18 @@ export function WorkspaceFiles() {
           multiple
           className="hidden"
           onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = "" }}
+        />
+        {/* Directory mode is set as an attribute in an effect — see above. */}
+        <input
+          ref={folderInput}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            setOpen(true)
+            void importFolder([...(e.target.files ?? [])])
+            e.target.value = ""
+          }}
         />
       </div>
 
@@ -318,6 +441,24 @@ export function WorkspaceFiles() {
           <p className="px-2 py-1.5 text-xs text-destructive break-words">
             {uploadError ?? (write.error as Error).message}
           </p>
+        )}
+
+        {/* An import that dropped things says so. Left until the next action
+            rather than auto-dismissed: "why is my .env not here" is exactly the
+            question this answers. */}
+        {skipped.length > 0 && (
+          <details className="px-2 py-1.5">
+            <summary className="text-xs text-muted-foreground cursor-pointer">
+              Skipped {skipped.length} file{skipped.length === 1 ? "" : "s"}
+            </summary>
+            <ul className="mt-1 space-y-0.5">
+              {skipped.map((s) => (
+                <li key={s.relativePath} className="text-[11px] text-muted-foreground break-all">
+                  <span className="text-ink-3">{s.relativePath}</span> — {s.reason}
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
 
         {/* Inline creator. Replaces window.prompt(), which put a Chrome dialog in
