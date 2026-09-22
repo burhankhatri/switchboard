@@ -74,3 +74,43 @@ The system SHALL create a placeholder file when a folder is created.
 - **WHEN** a member creates a folder
 - **THEN** a `.gitkeep` is committed inside it, because git cannot represent an
   empty directory
+
+### Requirement: A folder is imported as one commit
+The system SHALL commit an imported folder as a single commit that preserves
+the folder's structure, rather than one commit per file.
+
+#### Scenario: Importing a folder of many files
+- **WHEN** a member imports a folder
+- **THEN** its files are committed together in one commit at paths mirroring the
+  folder, because the per-file route is one commit each — fifty files would be
+  fifty commits contending for the same branch, and the second concurrent one
+  is rejected with a 409
+
+#### Scenario: Someone pushes while the import is uploading
+- **WHEN** the branch moves after the import's blobs are written but before its
+  ref update
+- **THEN** the import fails and says so, because the alternative is a forced
+  update that discards the other person's commit
+
+### Requirement: An import excludes what it must not commit
+The system SHALL exclude version-control directories, dependency directories,
+editor and OS artefacts, and files that look like secrets from an import, and
+SHALL report every exclusion rather than dropping it silently.
+
+#### Scenario: A folder containing .git and .env
+- **WHEN** a member imports a project folder
+- **THEN** `.git`, `node_modules` and `.env` are left out while `.env.example`
+  is kept, because a folder pick sweeps in whatever is on disk and a commit to a
+  shared repo is permanent
+
+#### Scenario: A file the caps reject
+- **WHEN** a file exceeds the per-file cap, or the folder exceeds the total size
+  or file-count caps
+- **THEN** it is reported as skipped with the reason, so the result reads as
+  "committed 12, skipped 4" rather than as files silently vanishing
+
+#### Scenario: A path that would escape the workspace
+- **WHEN** an import entry names a path outside the workspace folder
+- **THEN** the import is refused before anything is written, because the request
+  body is hand-editable and containment is all that separates workspaces in one
+  repo

@@ -467,6 +467,85 @@ check("approval enables the job", r.body?.enabled === true, String(r.body?.enabl
 
 await prisma.scheduledJob.deleteMany({ where: { workspaceId: ws.id } }).catch(() => {})
 
+// ── 13. folder import ─────────────────────────────────────────────────────
+console.log("\n13. importing a folder")
+
+const IMPORT_DIR = `${ws.path}/imported-kit`
+const b64 = (t) => Buffer.from(t, "utf8").toString("base64")
+
+if (!canPush) {
+  skipped("import commits the folder", noPush)
+  skipped("nesting is preserved", noPush)
+  skipped("junk and secrets are skipped", noPush)
+  skipped("the whole folder is one commit", noPush)
+} else {
+  // Repeatable: the folder is left in the repo between runs, and a tree write
+  // over an existing path is fine, but the commit-count assertion below only
+  // means something against a known starting point.
+  const before = await fetch(
+    `https://api.github.com/repos/${process.env.WORKSPACES_REPO}/commits?sha=${ws.baseBranch ?? "main"}&per_page=1`,
+    { headers: ghHeaders }
+  ).then((x) => (x.ok ? x.json() : []))
+  const headBefore = before[0]?.sha
+
+  r = await call(`/api/workspaces/${ws.id}/import`, {
+    method: "POST",
+    body: JSON.stringify({
+      folder: "imported-kit",
+      files: [
+        { relativePath: "imported-kit/README.md", contentBase64: b64("# kit\n") },
+        { relativePath: "imported-kit/scripts/run.py", contentBase64: b64("print('hi')\n") },
+        { relativePath: "imported-kit/data/rows.csv", contentBase64: b64("a,b\n1,2\n") },
+        // Everything below must NOT reach the repo.
+        { relativePath: "imported-kit/.git/HEAD", contentBase64: b64("ref: refs/heads/main\n") },
+        { relativePath: "imported-kit/node_modules/x/i.js", contentBase64: b64("module.exports=1\n") },
+        { relativePath: "imported-kit/.DS_Store", contentBase64: b64("junk") },
+        { relativePath: "imported-kit/.env", contentBase64: b64("API_KEY=sk-live-do-not-commit\n") },
+      ],
+    }),
+  })
+  check("POST import returns 200", r.status === 200, `status ${r.status} ${JSON.stringify(r.body).slice(0, 160)}`)
+  check("it committed exactly the three real files", r.body?.committed === 3, String(r.body?.committed))
+  check("it reported four skips", r.body?.skipped?.length === 4, JSON.stringify(r.body?.skipped ?? "").slice(0, 200))
+  check(
+    "the .env was skipped as a secrets file",
+    r.body?.skipped?.some((x) => x.relativePath.endsWith(".env") && x.reason === "looks like a secrets file"),
+    JSON.stringify(r.body?.skipped ?? "").slice(0, 200)
+  )
+
+  // The point of the Git Data API path: nesting survives.
+  check("nested script landed at its own path", (await gh(`${IMPORT_DIR}/scripts/run.py`)) === 200)
+  check("nested data landed at its own path", (await gh(`${IMPORT_DIR}/data/rows.csv`)) === 200)
+  check("top-level file landed", (await gh(`${IMPORT_DIR}/README.md`)) === 200)
+
+  // The junk must be absent, not merely unreported.
+  check("no .git was committed", (await gh(`${IMPORT_DIR}/.git/HEAD`)) === 404)
+  check("no node_modules was committed", (await gh(`${IMPORT_DIR}/node_modules/x/i.js`)) === 404)
+  check("no .env was committed", (await gh(`${IMPORT_DIR}/.env`)) === 404)
+
+  // Three files, one commit — the whole reason this is not the per-file route.
+  const after = await fetch(
+    `https://api.github.com/repos/${process.env.WORKSPACES_REPO}/commits?sha=${ws.baseBranch ?? "main"}&per_page=5`,
+    { headers: ghHeaders }
+  ).then((x) => (x.ok ? x.json() : []))
+  const added = headBefore ? after.findIndex((c) => c.sha === headBefore) : -1
+  check("the folder arrived as a single commit", added === 1, `commits added: ${added}`)
+  check("the returned sha is that commit", after[0]?.sha === r.body?.commit, String(r.body?.commit).slice(0, 12))
+}
+
+// Containment does not depend on push access — it is refused before any write.
+r = await call(`/api/workspaces/${ws.id}/import`, {
+  method: "POST",
+  body: JSON.stringify({
+    folder: "evil",
+    files: [{ relativePath: "../../../etc/passwd", contentBase64: b64("root\n") }],
+  }),
+})
+check("a traversal path is refused", r.status === 400, `status ${r.status} ${JSON.stringify(r.body).slice(0, 140)}`)
+
+r = await call(`/api/workspaces/${ws.id}/import`, { method: "POST", body: JSON.stringify({ files: [] }) })
+check("an empty import is refused", r.status === 400, `status ${r.status}`)
+
 // ── 8. unauth ─────────────────────────────────────────────────────────────
 console.log("\n8. auth gate")
 const anon = await fetch(`${BASE}/api/workspaces`).then((x) => x.status)
