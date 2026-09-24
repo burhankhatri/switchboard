@@ -54,6 +54,11 @@ other repo.
   404. Any member can therefore merge into the shared base branch; members are
   one team, so review is a matter of process rather than enforced here
 
+#### Scenario: Commit authorship
+- **WHEN** a workspace run clones with the service credential
+- **THEN** the sandbox's git identity is still looked up with the member's own
+  token, so commits are authored as the member rather than the service account
+
 ### Requirement: The agent runs inside the workspace folder
 The system SHALL set the agent's working directory to the workspace folder
 within the clone.

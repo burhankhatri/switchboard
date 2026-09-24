@@ -152,6 +152,7 @@ export async function POST(
       chatId,
       payload,
       githubToken,
+      identityToken: resolved.githubToken,
       userId,
       state,
     })

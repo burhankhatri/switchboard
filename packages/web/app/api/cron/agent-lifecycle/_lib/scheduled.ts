@@ -150,6 +150,7 @@ export async function startJobExecution(
     baseBranch: effectiveBaseBranch,
     newBranch: branch,
     githubToken: gitToken ?? undefined,
+    identityToken: account?.access_token ?? undefined,
     userId: job.userId,
   })
 

@@ -60,10 +60,12 @@ export async function ensureSandboxForChat(params: {
   chatId: string
   payload: MessagePayload
   githubToken: string | null
+  /** The user's own token, for commit authorship; see createSandboxForChat. */
+  identityToken?: string | null
   userId: string
   state: SandboxState
 }): Promise<EnsuredSandbox | Response> {
-  const { daytona, chat, chatId, payload, githubToken, userId, state } = params
+  const { daytona, chat, chatId, payload, githubToken, identityToken, userId, state } = params
 
   let sandboxId = state.sandboxId
   let branch = state.branch
@@ -116,6 +118,7 @@ export async function ensureSandboxForChat(params: {
       baseBranch: chat.baseBranch ?? "main",
       newBranch,
       githubToken: githubToken ?? undefined,
+      identityToken: identityToken ?? undefined,
       userId,
       restoreExistingBranch,
     })

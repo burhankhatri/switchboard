@@ -133,6 +133,13 @@ export interface CreateSandboxOptions {
   newBranch: string
   /** Required for non-NEW_REPOSITORY repos. Used for clone + push. */
   githubToken?: string
+  /**
+   * The user's own GitHub token, used only to look up who commits are authored
+   * as. Differs from `githubToken` when a workspace run clones with the shared
+   * service token — without it every member's commits would carry the service
+   * account's name.
+   */
+  identityToken?: string
   /** First 8 chars are used in the sandbox name for traceability. */
   userId?: string
   /**
@@ -170,7 +177,7 @@ function generateSandboxName(userId?: string): string {
 export async function createSandboxForChat(
   options: CreateSandboxOptions
 ): Promise<CreatedSandbox> {
-  const { daytona, repo, baseBranch, newBranch, githubToken, userId, restoreExistingBranch } = options
+  const { daytona, repo, baseBranch, newBranch, githubToken, identityToken, userId, restoreExistingBranch } = options
   const isNewRepo = repo === NEW_REPOSITORY || repo === "__new__"
   const repoName = "project"
   let branchRestored: boolean | undefined
@@ -250,7 +257,7 @@ export async function createSandboxForChat(
     // below.
     const identity = fetch("https://api.github.com/user", {
       headers: {
-        Authorization: `Bearer ${githubToken}`,
+        Authorization: `Bearer ${identityToken ?? githubToken}`,
         Accept: "application/vnd.github.v3+json",
       },
     })
