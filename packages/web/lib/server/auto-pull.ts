@@ -15,7 +15,7 @@
  * `app/api/agent/stream/route.ts`.
  */
 
-import { createSandboxGit, esc, type SandboxLike } from "@switchboard/sandbox-git"
+import { createSandboxGit, esc, withAuth, type SandboxLike } from "@switchboard/sandbox-git"
 
 export type AutoPullResult =
   /** Nothing to do — branch already matches origin. */
@@ -139,7 +139,8 @@ async function mergeRemote(
   sandbox: SandboxLike,
   repoPath: string,
   branch: string,
-  behind: number
+  behind: number,
+  token: string
 ): Promise<AutoPullResult> {
   const dirty = await dirtyStatus(sandbox, repoPath)
   if (dirty) {
@@ -155,8 +156,10 @@ async function mergeRemote(
   }
 
   const before = await head(sandbox, repoPath)
+  // The merge carries the token because a sparse (partial) clone downloads the
+  // merged files' contents lazily, and that download needs credentials.
   const mergeRes = await sandbox.process.executeCommand(
-    `cd ${esc(repoPath)} && git merge --no-edit origin/${esc(branch)} 2>&1`
+    `cd ${esc(repoPath)} && ${withAuth(token, `merge --no-edit origin/${esc(branch)} 2>&1`)}`
   )
   const after = await head(sandbox, repoPath)
 
@@ -222,5 +225,5 @@ export async function autoPullBeforeRun(
     return { status: "up-to-date" }
   }
 
-  return mergeRemote(sandbox, repoPath, branch, behind)
+  return mergeRemote(sandbox, repoPath, branch, behind, token)
 }

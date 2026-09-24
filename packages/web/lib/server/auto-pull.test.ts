@@ -52,7 +52,7 @@ function ffResponder(opts: {
     if (cmd.includes("git status --porcelain")) return ok(opts.dirty ?? "")
     if (cmd.includes("MERGE_HEAD")) return ok(merged && opts.conflicts ? "yes" : "no")
     if (cmd.includes("--diff-filter=U")) return ok(merged ? (opts.conflicts ?? "") : "")
-    if (cmd.includes("git merge")) {
+    if (cmd.includes("merge --no-edit")) {
       merged = true
       return { result: opts.mergeOutput ?? "", exitCode: opts.mergeExit ?? 0 }
     }
@@ -70,7 +70,7 @@ describe("autoPullBeforeRun", () => {
     const res = await autoPullBeforeRun(sandbox, REPO, BRANCH, TOKEN)
 
     expect(res).toEqual({ status: "up-to-date" })
-    expect(commands.some((c) => c.includes("git merge"))).toBe(false)
+    expect(commands.some((c) => c.includes("merge --no-edit"))).toBe(false)
   })
 
   it("merges cleanly (HEAD advances) and reports the number of pulled commits", async () => {
@@ -80,11 +80,20 @@ describe("autoPullBeforeRun", () => {
 
     expect(res).toEqual({ status: "pulled", commits: 3 })
     // Plain merge (no --autostash) on a clean tree; no WIP commit needed.
-    expect(commands.some((c) => c.includes("git merge --no-edit origin/"))).toBe(true)
+    expect(commands.some((c) => c.includes("merge --no-edit origin/"))).toBe(true)
     expect(commands.some((c) => c.includes("git merge --no-edit --autostash"))).toBe(false)
     expect(commands.some((c) => c.includes("git add -A && git commit"))).toBe(false)
     // Installs the pre-commit hook that blocks committing conflict markers.
     expect(commands.some((c) => c.includes(".git/hooks/pre-commit") && c.includes("git diff --cached --check"))).toBe(true)
+  })
+
+  it("sends the token with the merge, which a sparse clone needs to download file contents", async () => {
+    const { sandbox, commands } = makeSandbox(ffResponder({ behind: "1\t0" }))
+
+    await autoPullBeforeRun(sandbox, REPO, BRANCH, TOKEN)
+
+    const merge = commands.find((c) => c.includes("merge --no-edit origin/"))
+    expect(merge).toContain("http.extraHeader")
   })
 
   it("commits the WIP before merging when the working tree is dirty", async () => {
@@ -97,7 +106,7 @@ describe("autoPullBeforeRun", () => {
     expect(res).toEqual({ status: "pulled", commits: 1 })
     // WIP is committed first so the pull is a real, abortable merge.
     expect(commands.some((c) => c.includes("git add -A && git commit"))).toBe(true)
-    expect(commands.some((c) => c.includes("git merge --no-edit origin/"))).toBe(true)
+    expect(commands.some((c) => c.includes("merge --no-edit origin/"))).toBe(true)
     expect(commands.some((c) => c.includes("--autostash"))).toBe(false)
   })
 
@@ -152,6 +161,6 @@ describe("autoPullBeforeRun", () => {
       alreadyInProgress: true,
     })
     expect(commands.some((c) => c.includes("fetch"))).toBe(false)
-    expect(commands.some((c) => c.includes("git merge --no-edit"))).toBe(false)
+    expect(commands.some((c) => c.includes("merge --no-edit"))).toBe(false)
   })
 })

@@ -1,5 +1,5 @@
 import { Daytona } from "@daytonaio/sdk"
-import { createSandboxGit } from "@switchboard/sandbox-git"
+import { createSandboxGit, withAuth } from "@switchboard/sandbox-git"
 import { ensureSandboxStarted } from "@/lib/sandbox"
 import { isSafeRepoPath, isSafeBranchName, isSafeRepoSegment } from "@/lib/git/ref-validation"
 import { clearPushFailureMessages, createGitOperationMessage } from "@/lib/db/git-messages"
@@ -228,7 +228,8 @@ export async function POST(req: Request) {
             }
 
             const mergeLocal = await sandbox.process.executeCommand(
-              `cd ${repoPath} && git merge origin/${currentBranch} 2>&1`
+              // Token for the lazy blob download of a sparse clone; see auto-pull.
+              `cd ${repoPath} && ${withAuth(githubToken, `merge origin/${currentBranch} 2>&1`)}`
             )
 
             const mergeHeadCheck = await sandbox.process.executeCommand(
@@ -338,7 +339,7 @@ export async function POST(req: Request) {
         // We use origin/${targetBranch} directly instead of checking out the local
         // branch and pulling, as the fetch already updated origin/${targetBranch}
         const rebaseResult = await sandbox.process.executeCommand(
-          `cd ${repoPath} && git rebase origin/${targetBranch} 2>&1`
+          `cd ${repoPath} && ${withAuth(githubToken, `rebase origin/${targetBranch} 2>&1`)}`
         )
         if (rebaseResult.exitCode) {
           const isConflict = rebaseResult.result.includes("CONFLICT") ||

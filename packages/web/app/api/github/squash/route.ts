@@ -1,6 +1,6 @@
 import { compareBranches, githubFetch, isGitHubApiError } from "@switchboard/common"
 import { Daytona } from "@daytonaio/sdk"
-import { createSandboxGit } from "@switchboard/sandbox-git"
+import { createSandboxGit, withAuth } from "@switchboard/sandbox-git"
 import { PATHS } from "@/lib/constants"
 import { createGitOperationMessage } from "@/lib/db/git-messages"
 import { requireGitHubAuth, isGitHubAuthError, verifySandboxOwnership, forbidden } from "@/lib/db/api-helpers"
@@ -189,12 +189,12 @@ export async function POST(req: Request) {
 
         // Ensure we're on the correct branch before resetting
         await sandbox.process.executeCommand(
-          `cd ${repoPath} && git checkout ${head} 2>&1`
+          `cd ${repoPath} && ${withAuth(githubToken, `checkout ${head} 2>&1`)}`
         )
 
         // Reset local branch to match the squashed remote
         await sandbox.process.executeCommand(
-          `cd ${repoPath} && git reset --hard origin/${head} 2>&1`
+          `cd ${repoPath} && ${withAuth(githubToken, `reset --hard origin/${head} 2>&1`)}`
         )
       } catch (sandboxErr) {
         // Squash succeeded on GitHub, but sandbox sync failed
