@@ -5,6 +5,7 @@ import { PATHS } from "@/lib/constants"
 import { createGitOperationMessage } from "@/lib/db/git-messages"
 import { requireGitHubAuth, isGitHubAuthError, verifySandboxOwnership, forbidden } from "@/lib/db/api-helpers"
 import { gitTokenForRepo } from "@/lib/git/repo-token"
+import { prisma } from "@/lib/db/prisma"
 
 // Squash operation timeout - 60 seconds
 export const maxDuration = 60
@@ -46,7 +47,18 @@ export async function POST(req: Request) {
   // Ownership gate: the sandbox-sync step runs `git checkout` + `git reset --hard`
   // inside sandboxId, so a caller who doesn't own it could wipe another user's
   // uncommitted work.
-  if (!(await verifySandboxOwnership(userId, sandboxId))) {
+  //
+  // With a chat, its sandbox comes from the chat row rather than the body, since
+  // a recreated sandbox has a new id the client may not have seen yet.
+  let liveSandboxId: string = sandboxId
+  if (chatId) {
+    const owned = await prisma.chat.findFirst({
+      where: { id: chatId, userId },
+      select: { sandboxId: true },
+    })
+    if (!owned) return forbidden()
+    liveSandboxId = owned.sandboxId ?? sandboxId
+  } else if (!(await verifySandboxOwnership(userId, sandboxId))) {
     return forbidden()
   }
 
@@ -180,7 +192,7 @@ export async function POST(req: Request) {
       // Step 5: Sync sandbox with the new squashed state
       try {
         const daytona = new Daytona({ apiKey: daytonaApiKey })
-        const sandbox = await daytona.get(sandboxId)
+        const sandbox = await daytona.get(liveSandboxId)
         const repoPath = `${PATHS.SANDBOX_HOME}/project`
 
         // Fetch the latest from origin (token passed via -c http.extraHeader, not stored)
