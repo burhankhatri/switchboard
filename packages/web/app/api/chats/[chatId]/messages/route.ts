@@ -27,6 +27,7 @@ import {
 import type { SuccessResponse } from "./_lib/types"
 import { parseMessageRequest } from "./_lib/parse-request"
 import { resolveSendCredentials } from "./_lib/resolve-credentials"
+import { gitTokenForRun } from "@/lib/git/repo-token"
 import { ensureSandboxForChat, type SandboxState } from "./_lib/ensure-sandbox"
 import { runPreRunPull } from "./_lib/pre-run-pull"
 import { buildAgentHistory } from "./_lib/history"
@@ -117,7 +118,16 @@ export async function POST(
   // Resolve GitHub token + agent credentials and enforce the shared-pool budget.
   const resolved = await resolveSendCredentials(userId, payload)
   if (resolved instanceof Response) return resolved
-  const { credentials, githubToken, useSharedClaude } = resolved
+  const { credentials, useSharedClaude } = resolved
+
+  // Clone and pre-run pull. A workspace chat's repo is the shared private one,
+  // which the member's own token usually cannot see.
+  const githubToken = await gitTokenForRun({
+    userId,
+    repo: chat.repo,
+    workspaceId: chat.workspaceId,
+    userToken: resolved.githubToken,
+  })
 
   // The user's custom endpoints — used to resolve an `endpoint:<id>` model into
   // the right env vars and --model arg.

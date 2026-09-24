@@ -34,7 +34,7 @@ The system SHALL persist an edit as a commit rather than to any other store.
 The system SHALL authenticate workspaces-repo reads and writes with a shared
 service credential when one is configured, so a member's own GitHub push access
 to the private repo is not required. Server-side membership and path-containment
-checks remain the access boundary.
+checks remain the access boundary. Runs follow the same rule; see agent-runs.
 
 #### Scenario: A member without push access saves a file
 - **WHEN** a member who is not a GitHub collaborator on the workspaces repo saves

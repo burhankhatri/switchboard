@@ -1,6 +1,7 @@
 import { createSandboxGit, type SandboxLike } from "@switchboard/sandbox-git"
 import { prisma } from "@/lib/db/prisma"
 import { getUserPushOptions } from "@/lib/git/push-options"
+import { gitTokenForRun } from "@/lib/git/repo-token"
 import { isInConflictState } from "@/lib/git/sandbox-git-ops"
 import {
   clearPushFailureMessages,
@@ -53,11 +54,25 @@ export async function autoPushChat(params: {
     // Skip while a merge/rebase is unresolved — HEAD isn't a pushable snapshot.
     if (await isInConflictState(sandbox, repoPath)) return null
 
-    const account = await prisma.account.findFirst({
-      where: { userId, provider: "github" },
-      select: { access_token: true },
-    })
-    if (!account?.access_token) return null
+    const [account, chat] = await Promise.all([
+      prisma.account.findFirst({
+        where: { userId, provider: "github" },
+        select: { access_token: true },
+      }),
+      prisma.chat.findUnique({
+        where: { id: chatId },
+        select: { repo: true, workspaceId: true },
+      }),
+    ])
+    const token = chat
+      ? await gitTokenForRun({
+          userId,
+          repo: chat.repo,
+          workspaceId: chat.workspaceId,
+          userToken: account?.access_token ?? null,
+        })
+      : account?.access_token ?? null
+    if (!token) return null
 
     const git = createSandboxGit(sandbox)
     const pushOptions = await getUserPushOptions(userId)
@@ -65,7 +80,7 @@ export async function autoPushChat(params: {
     let result
     try {
       // `--porcelain` tells us whether the remote ref actually advanced.
-      result = await git.push(repoPath, account.access_token, pushOptions)
+      result = await git.push(repoPath, token, pushOptions)
     } catch (err) {
       // Deduped so concurrent finalizers don't spam identical failures.
       await createPushFailedMessage(

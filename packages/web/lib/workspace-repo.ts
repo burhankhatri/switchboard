@@ -32,6 +32,35 @@ function repoAuth(userToken: string): string {
   return WORKSPACES_REPO_TOKEN || userToken
 }
 
+/** GitHub treats owner/name case-insensitively, so the comparison must too. */
+export function isWorkspacesRepo(repo: string, workspacesRepo = WORKSPACES_REPO): boolean {
+  return !!workspacesRepo && repo.toLowerCase() === workspacesRepo.toLowerCase()
+}
+
+/**
+ * The token a run's clone, pull and push should use for `repo`.
+ *
+ * The same membership-not-collaborator problem as the file routes above: a
+ * member's own token cannot see the private workspaces repo, so the sandbox
+ * clone fails with "Repository not found". The service token is handed out only
+ * to a member of the workspace the run belongs to — it can read every
+ * workspace's folder, so a chat that merely names the repo must not get it.
+ * Every other repo keeps the user's own token.
+ */
+export function chooseGitToken(params: {
+  repo: string
+  isWorkspaceMember: boolean
+  userToken: string | null
+  serviceToken?: string
+  workspacesRepo?: string
+}): string | null {
+  const serviceToken = params.serviceToken ?? WORKSPACES_REPO_TOKEN
+  if (serviceToken && params.isWorkspaceMember && isWorkspacesRepo(params.repo, params.workspacesRepo)) {
+    return serviceToken
+  }
+  return params.userToken
+}
+
 /**
  * GitHub call with bounded retry on transient failures.
  *

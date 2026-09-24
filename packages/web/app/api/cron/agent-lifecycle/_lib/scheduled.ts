@@ -24,6 +24,7 @@ import { stripNullBytes, stripNullBytesDeep } from "@/lib/db/pg-sanitize"
 import { loadMcpConnections } from "@/lib/mcp/agent-servers"
 
 import { getUserPushOptions } from "@/lib/git/push-options"
+import { gitTokenForRun } from "@/lib/git/repo-token"
 import type { ScheduledJobRunWithJob } from "./types"
 import {
   workspaceSessionOptions,
@@ -55,6 +56,14 @@ export async function startJobExecution(
   if (!isRepoLess && !account?.access_token) {
     throw new Error("GitHub account not linked")
   }
+
+  // A workspace job's repo is the shared private one; see gitTokenForRun.
+  const gitToken = await gitTokenForRun({
+    userId: job.userId,
+    repo: job.repo,
+    workspaceId: job.workspaceId,
+    userToken: account?.access_token ?? null,
+  })
 
   // 2. Create chat for this run
   const chat = await prisma.chat.create({
@@ -109,7 +118,7 @@ export async function startJobExecution(
             `https://api.github.com/repos/${owner}/${repoName}/pulls/${lastSuccessfulRun.prNumber}`,
             {
               headers: {
-                Authorization: `Bearer ${account!.access_token}`,
+                Authorization: `Bearer ${gitToken}`,
                 Accept: "application/vnd.github.v3+json",
               },
             }
@@ -140,7 +149,7 @@ export async function startJobExecution(
     repo: job.repo,
     baseBranch: effectiveBaseBranch,
     newBranch: branch,
-    githubToken: account?.access_token ?? undefined,
+    githubToken: gitToken ?? undefined,
     userId: job.userId,
   })
 
@@ -481,12 +490,18 @@ export async function finalizeScheduledRun(
           where: { userId: job.userId, provider: "github" },
           select: { access_token: true },
         })
+        const gitToken = await gitTokenForRun({
+          userId: job.userId,
+          repo: job.repo,
+          workspaceId: job.workspaceId,
+          userToken: account?.access_token ?? null,
+        })
 
-        if (account?.access_token) {
+        if (gitToken) {
           // Push branch
           const git = createSandboxGit(sandbox)
           const pushOptions = await getUserPushOptions(job.userId)
-          await git.push(repoPath, account.access_token, pushOptions)
+          await git.push(repoPath, gitToken, pushOptions)
 
           // Create PR via GitHub API
           const [owner, repoName] = job.repo.split("/")
@@ -497,7 +512,7 @@ export async function finalizeScheduledRun(
             {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${account.access_token}`,
+                Authorization: `Bearer ${gitToken}`,
                 Accept: "application/vnd.github.v3+json",
                 "Content-Type": "application/json",
               },
@@ -527,11 +542,17 @@ export async function finalizeScheduledRun(
           where: { userId: job.userId, provider: "github" },
           select: { access_token: true },
         })
+        const gitToken = await gitTokenForRun({
+          userId: job.userId,
+          repo: job.repo,
+          workspaceId: job.workspaceId,
+          userToken: account?.access_token ?? null,
+        })
 
-        if (account?.access_token) {
+        if (gitToken) {
           const git = createSandboxGit(sandbox)
           const pushOptions = await getUserPushOptions(job.userId)
-          await git.push(repoPath, account.access_token, pushOptions)
+          await git.push(repoPath, gitToken, pushOptions)
         }
       }
       } // end !isRepoLess

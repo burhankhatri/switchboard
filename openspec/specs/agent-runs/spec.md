@@ -26,6 +26,30 @@ and nothing else.
 - **THEN** it is given the same credentials as the clone, because materialising
   those paths is a network fetch from the promisor remote
 
+### Requirement: A workspace run's git access follows membership
+The system SHALL clone, pull and push a run on the workspaces repo with the
+shared service credential when the run's user is a member of the run's
+workspace, and SHALL use the user's own GitHub token for every other repo.
+
+#### Scenario: A member who is not a GitHub collaborator runs a workspace
+- **WHEN** a member without access to the private workspaces repo sends a
+  message in a workspace chat, or their scheduled workspace job fires
+- **THEN** the clone, pre-run pull, auto-push and scheduled-job PR use the
+  service credential — otherwise GitHub answers the clone with "Repository not
+  found"
+
+#### Scenario: A chat that only names the workspaces repo
+- **WHEN** a chat's repo is the workspaces repo but its user is not a member of
+  its workspace (or it has none)
+- **THEN** the user's own token is used, because the service credential can
+  read every workspace's folder and naming the repo must not grant that
+
+#### Scenario: Manual branch actions
+- **WHEN** a member merges, rebases, force-pushes, deletes a branch or opens a
+  PR by hand
+- **THEN** those routes still use the member's own token, so a member cannot
+  rewrite or delete the shared repo's branches through the service credential
+
 ### Requirement: The agent runs inside the workspace folder
 The system SHALL set the agent's working directory to the workspace folder
 within the clone.
