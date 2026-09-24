@@ -75,6 +75,9 @@ export function PRDialog({ open, onClose, gitDialogs, chat, isMobile = false }: 
                 onSubmit={handleCreatePRAndClose}
                 defaultValue={gitDialogs.baseBranch}
               />
+              {gitDialogs.branchesError && (
+                <div className="text-sm text-destructive pt-2">{gitDialogs.branchesError}</div>
+              )}
             </div>
 
             {/* Description type selector */}

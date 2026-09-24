@@ -58,6 +58,7 @@ export function useGitDialogs({ chat, chats, updateChatById, refetchMessages, se
   const [remoteBranches, setRemoteBranches] = useState<string[]>([])
   const [selectedBranch, setSelectedBranchState] = useState("")
   const [branchesLoading, setBranchesLoading] = useState(false)
+  const [branchesError, setBranchesError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
   // Track pre-selected branch from drag-and-drop. This ref is set when
@@ -105,11 +106,20 @@ export function useGitDialogs({ chat, chats, updateChatById, refetchMessages, se
     }
 
     setBranchesLoading(true)
+    setBranchesError(null)
     try {
       const res = await fetch(
         `/api/github/branches?owner=${encodeURIComponent(repoOwner)}&repo=${encodeURIComponent(repoApiName)}`
       )
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      // Surfaced rather than rendered as an empty list: a failed fetch (e.g.
+      // GitHub hiding a private repo behind a 404) looked exactly like a repo
+      // with no other branches, which sent debugging the wrong way.
+      if (!res.ok) {
+        setRemoteBranches([])
+        setBranchesError(data.error || `Could not load branches (${res.status})`)
+        return
+      }
       const branches = (data.branches || [])
         .map((b: { name: string }) => b.name)
         .filter((name: string) => name !== branchName)
@@ -125,6 +135,7 @@ export function useGitDialogs({ chat, chats, updateChatById, refetchMessages, se
       setSelectedBranchState(defaultBranch)
     } catch {
       setRemoteBranches([])
+      setBranchesError("Could not load branches")
     } finally {
       setBranchesLoading(false)
     }
@@ -421,6 +432,7 @@ export function useGitDialogs({ chat, chats, updateChatById, refetchMessages, se
     selectedBranch,
     setSelectedBranch,
     branchesLoading,
+    branchesError,
     actionLoading,
     squashMerge,
     setSquashMerge,

@@ -95,6 +95,9 @@ export function GitBranchDialog({
             onSubmit={handleActionAndClose}
             defaultValue={gitDialogs.baseBranch}
           />
+          {gitDialogs.branchesError && (
+            <div className="text-sm text-destructive pt-2">{gitDialogs.branchesError}</div>
+          )}
         </div>
 
         {config.additionalContent}

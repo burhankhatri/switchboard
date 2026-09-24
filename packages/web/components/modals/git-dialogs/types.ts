@@ -56,6 +56,8 @@ export interface UseGitDialogsResult {
   selectedBranch: string
   setSelectedBranch: (branch: string) => void
   branchesLoading: boolean
+  /** Why the branch list could not be loaded; null when it loaded (even if empty). */
+  branchesError: string | null
   actionLoading: boolean
 
   // Merge-specific state
