@@ -59,7 +59,7 @@ export async function ensureSandboxForChat(params: {
   daytona: Daytona
   chat: ChatRecord
   chatId: string
-  payload: MessagePayload
+  payload: Pick<MessagePayload, "newBranch">
   githubToken: string | null
   /** The user's own token, for commit authorship; see createSandboxForChat. */
   identityToken?: string | null

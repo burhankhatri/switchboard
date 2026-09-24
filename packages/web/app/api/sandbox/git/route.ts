@@ -4,6 +4,8 @@ import { ensureSandboxStarted } from "@/lib/sandbox"
 import { isSafeRepoPath, isSafeBranchName, isSafeRepoSegment } from "@/lib/git/ref-validation"
 import { clearPushFailureMessages, createGitOperationMessage } from "@/lib/db/git-messages"
 import { requireGitHubAuth, isGitHubAuthError, verifySandboxOwnership, forbidden } from "@/lib/db/api-helpers"
+import { prisma } from "@/lib/db/prisma"
+import { recreateChatSandbox } from "@/lib/server/recreate-chat-sandbox"
 import { gitTokenForRepo, gitTokenForSandbox } from "@/lib/git/repo-token"
 import {
   getConflictedFiles,
@@ -79,7 +81,19 @@ export async function POST(req: Request) {
   // requireGitHubAuth only proves the caller is signed in; it does not tie them
   // to this sandbox. Verify ownership so a logged-in user can't run git actions
   // against another user's sandbox/repo.
-  if (!(await verifySandboxOwnership(userId, sandboxId))) {
+  //
+  // With a chat, its sandbox is read from the chat row instead of trusted from
+  // the body: sandboxes are recreated under a new id, and the client's copy of
+  // the old one would otherwise fail this check until the page reloads.
+  let liveSandboxId: string = sandboxId
+  if (chatId) {
+    const owned = await prisma.chat.findFirst({
+      where: { id: chatId, userId },
+      select: { sandboxId: true },
+    })
+    if (!owned) return forbidden()
+    liveSandboxId = owned.sandboxId ?? sandboxId
+  } else if (!(await verifySandboxOwnership(userId, sandboxId))) {
     return forbidden()
   }
 
@@ -111,7 +125,7 @@ export async function POST(req: Request) {
   const githubToken =
     repoOwner && repoApiName
       ? await gitTokenForRepo({ userId, repo: `${repoOwner}/${repoApiName}`, userToken: ghAuth.token })
-      : await gitTokenForSandbox({ userId, sandboxId, userToken: ghAuth.token })
+      : await gitTokenForSandbox({ userId, sandboxId: liveSandboxId, userToken: ghAuth.token })
 
   const daytonaApiKey = process.env.DAYTONA_API_KEY
   if (!daytonaApiKey) {
@@ -120,13 +134,35 @@ export async function POST(req: Request) {
 
   try {
     const daytona = new Daytona({ apiKey: daytonaApiKey })
-    const sandbox = await daytona.get(sandboxId)
-    const git = createSandboxGit(sandbox)
+    // A chat's sandbox is deleted once it stops, so a missing one is normal.
+    let live = await daytona.get(liveSandboxId).catch(() => null)
 
-    // Working-tree actions need the sandbox running; boot it if stopped.
     if (WORKING_TREE_ACTIONS.has(action)) {
-      await ensureSandboxStarted(sandbox)
+      if (!live) {
+        if (!chatId) {
+          return Response.json({ error: "Sandbox not found" }, { status: 410 })
+        }
+        const recreated = await recreateChatSandbox({ daytona, chatId, userId, userToken: ghAuth.token })
+        if (recreated instanceof Response) return recreated
+        live = recreated
+      }
+      // Working-tree actions need the sandbox running; boot it if stopped.
+      await ensureSandboxStarted(live)
+    } else if (!live) {
+      // Nothing is in progress in a sandbox that no longer exists.
+      if (action === "check-rebase-status") {
+        return Response.json({ inRebase: false, inMerge: false, conflictedFiles: [] })
+      }
+      if (action === "abort-merge" || action === "abort-rebase") {
+        return Response.json({ success: true })
+      }
     }
+
+    // Past this point only merge and delete-remote-branch can run without a
+    // sandbox, and both touch it only behind `sandboxStarted` (merge) or not at
+    // all (delete) — so these casts are never dereferenced while null.
+    const sandbox = live as NonNullable<typeof live>
+    const git = live ? createSandboxGit(live) : (null as unknown as ReturnType<typeof createSandboxGit>)
 
     switch (action) {
       case "list-branches": {
@@ -163,7 +199,7 @@ export async function POST(req: Request) {
         // and let auto-pull-before-run sync it when it next wakes. This keeps
         // merge working while the sandbox is stopped instead of failing on the
         // up-front `git.status` ("failed to resolve container IP").
-        const sandboxStarted = sandbox.state === "started"
+        const sandboxStarted = live?.state === "started"
         let isMergingIntoActiveBranch = false
         if (sandboxStarted) {
           const currentStatus = await git.status(repoPath)
