@@ -4,6 +4,7 @@ import { createSandboxGit } from "@switchboard/sandbox-git"
 import { PATHS } from "@/lib/constants"
 import { createGitOperationMessage } from "@/lib/db/git-messages"
 import { requireGitHubAuth, isGitHubAuthError, verifySandboxOwnership, forbidden } from "@/lib/db/api-helpers"
+import { gitTokenForRepo } from "@/lib/git/repo-token"
 
 // Squash operation timeout - 60 seconds
 export const maxDuration = 60
@@ -33,7 +34,6 @@ interface SquashRequestBody {
 export async function POST(req: Request) {
   const ghAuth = await requireGitHubAuth()
   if (isGitHubAuthError(ghAuth)) return ghAuth
-  const githubToken = ghAuth.token
   const userId = ghAuth.userId
 
   const body: SquashRequestBody = await req.json()
@@ -49,6 +49,8 @@ export async function POST(req: Request) {
   if (!(await verifySandboxOwnership(userId, sandboxId))) {
     return forbidden()
   }
+
+  const githubToken = await gitTokenForRepo({ userId, repo: `${owner}/${repo}`, userToken: ghAuth.token })
 
   const daytonaApiKey = process.env.DAYTONA_API_KEY
   if (!daytonaApiKey) {

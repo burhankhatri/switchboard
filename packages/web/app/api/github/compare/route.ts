@@ -1,5 +1,6 @@
 import { compareBranches, isGitHubApiError } from "@switchboard/common"
 import { requireGitHubAuth, isGitHubAuthError, internalError, badRequest } from "@/lib/db/api-helpers"
+import { gitTokenForRepo } from "@/lib/git/repo-token"
 
 export async function POST(req: Request) {
   const ghAuth = await requireGitHubAuth()
@@ -13,7 +14,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const compareData = await compareBranches(ghAuth.token, owner, repo, base, head)
+    const token = await gitTokenForRepo({ userId: ghAuth.userId, repo: `${owner}/${repo}`, userToken: ghAuth.token })
+    const compareData = await compareBranches(token, owner, repo, base, head)
     return Response.json({
       ahead_by: compareData.ahead_by,
       behind_by: compareData.behind_by,

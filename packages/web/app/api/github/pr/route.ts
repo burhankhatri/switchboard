@@ -6,6 +6,7 @@ import {
   formatPRBodyFromCommits,
 } from "@switchboard/common"
 import { requireGitHubAuth, isGitHubAuthError } from "@/lib/db/api-helpers"
+import { gitTokenForRepo } from "@/lib/git/repo-token"
 import { createGitOperationMessage } from "@/lib/db/git-messages"
 import { generateWithOpenRouter } from "@/lib/llm/openrouter"
 
@@ -65,7 +66,6 @@ async function generatePRBodyByType(commits: string[], descriptionType: PRDescri
 export async function POST(req: Request) {
   const ghAuth = await requireGitHubAuth()
   if (isGitHubAuthError(ghAuth)) return ghAuth
-  const githubToken = ghAuth.token
 
   const body = await req.json()
   const { owner, repo, head, base, descriptionType = "short", chatId } = body
@@ -73,6 +73,12 @@ export async function POST(req: Request) {
   if (!owner || !repo || !head || !base) {
     return Response.json({ error: "Missing required fields: owner, repo, head, base" }, { status: 400 })
   }
+
+  const githubToken = await gitTokenForRepo({
+    userId: ghAuth.userId,
+    repo: `${owner}/${repo}`,
+    userToken: ghAuth.token,
+  })
 
   try {
     // Get commits between base and head for PR body

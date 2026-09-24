@@ -27,9 +27,11 @@ and nothing else.
   those paths is a network fetch from the promisor remote
 
 ### Requirement: A workspace run's git access follows membership
-The system SHALL clone, pull and push a run on the workspaces repo with the
-shared service credential when the run's user is a member of the run's
-workspace, and SHALL use the user's own GitHub token for every other repo.
+The system SHALL perform git and GitHub operations on the workspaces repo with
+the shared service credential for members — runs when the user is a member of
+the run's workspace, manual branch actions when the user is a member of any
+workspace in the repo — and SHALL use the user's own GitHub token for every
+other repo.
 
 #### Scenario: A member who is not a GitHub collaborator runs a workspace
 - **WHEN** a member without access to the private workspaces repo sends a
@@ -45,10 +47,12 @@ workspace, and SHALL use the user's own GitHub token for every other repo.
   read every workspace's folder and naming the repo must not grant that
 
 #### Scenario: Manual branch actions
-- **WHEN** a member merges, rebases, force-pushes, deletes a branch or opens a
-  PR by hand
-- **THEN** those routes still use the member's own token, so a member cannot
-  rewrite or delete the shared repo's branches through the service credential
+- **WHEN** a member lists branches, compares, merges, rebases, squashes,
+  force-pushes, deletes a branch or opens a PR by hand on the workspaces repo
+- **THEN** those routes use the service credential too, gated on membership of
+  any workspace in that repo — otherwise every one of them fails with a GitHub
+  404. Any member can therefore merge into the shared base branch; members are
+  one team, so review is a matter of process rather than enforced here
 
 ### Requirement: The agent runs inside the workspace folder
 The system SHALL set the agent's working directory to the workspace folder

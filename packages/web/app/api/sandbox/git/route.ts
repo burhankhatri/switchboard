@@ -4,6 +4,7 @@ import { ensureSandboxStarted } from "@/lib/sandbox"
 import { isSafeRepoPath, isSafeBranchName, isSafeRepoSegment } from "@/lib/git/ref-validation"
 import { clearPushFailureMessages, createGitOperationMessage } from "@/lib/db/git-messages"
 import { requireGitHubAuth, isGitHubAuthError, verifySandboxOwnership, forbidden } from "@/lib/db/api-helpers"
+import { gitTokenForRepo, gitTokenForSandbox } from "@/lib/git/repo-token"
 import {
   getConflictedFiles,
   pushViaTemporaryBranch,
@@ -66,7 +67,6 @@ function tempBranchPushError(
 export async function POST(req: Request) {
   const ghAuth = await requireGitHubAuth()
   if (isGitHubAuthError(ghAuth)) return ghAuth
-  const githubToken = ghAuth.token
   const userId = ghAuth.userId
 
   const body = await req.json()
@@ -104,6 +104,14 @@ export async function POST(req: Request) {
       return Response.json({ error: `Invalid ${name}` }, { status: 400 })
     }
   }
+
+  // The GitHub API calls below target the repo named in the body, so that is
+  // what the token is chosen for; list-branches names none and works on the
+  // sandbox's own clone.
+  const githubToken =
+    repoOwner && repoApiName
+      ? await gitTokenForRepo({ userId, repo: `${repoOwner}/${repoApiName}`, userToken: ghAuth.token })
+      : await gitTokenForSandbox({ userId, sandboxId, userToken: ghAuth.token })
 
   const daytonaApiKey = process.env.DAYTONA_API_KEY
   if (!daytonaApiKey) {

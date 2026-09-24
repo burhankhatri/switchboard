@@ -47,13 +47,13 @@ export function isWorkspacesRepo(repo: string, workspacesRepo = WORKSPACES_REPO)
  * workspace's folder, so a chat that merely names the repo must not get it.
  * Every other repo keeps the user's own token.
  */
-export function chooseGitToken(params: {
+export function chooseGitToken<T extends string | null>(params: {
   repo: string
   isWorkspaceMember: boolean
-  userToken: string | null
+  userToken: T
   serviceToken?: string
   workspacesRepo?: string
-}): string | null {
+}): string | T {
   const serviceToken = params.serviceToken ?? WORKSPACES_REPO_TOKEN
   if (serviceToken && params.isWorkspaceMember && isWorkspacesRepo(params.repo, params.workspacesRepo)) {
     return serviceToken

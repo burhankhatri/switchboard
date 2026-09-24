@@ -1,5 +1,6 @@
 import { getRepoBranches } from "@switchboard/common"
 import { requireGitHubAuth, isGitHubAuthError, internalError, badRequest } from "@/lib/db/api-helpers"
+import { gitTokenForRepo } from "@/lib/git/repo-token"
 
 export async function GET(req: Request) {
   const ghAuth = await requireGitHubAuth()
@@ -14,7 +15,8 @@ export async function GET(req: Request) {
   }
 
   try {
-    const branches = await getRepoBranches(ghAuth.token, owner, repo)
+    const token = await gitTokenForRepo({ userId: ghAuth.userId, repo: `${owner}/${repo}`, userToken: ghAuth.token })
+    const branches = await getRepoBranches(token, owner, repo)
     return Response.json({ branches })
   } catch (error: unknown) {
     console.error("[github/branches] Error:", error)

@@ -3,6 +3,7 @@ import { createSandboxGit } from "@switchboard/sandbox-git"
 import { PATHS } from "@/lib/constants"
 import { requireGitHubAuth, isGitHubAuthError, internalError, badRequest, verifySandboxOwnership, forbidden } from "@/lib/db/api-helpers"
 import { getUserPushOptions } from "@/lib/git/push-options"
+import { gitTokenForRepo } from "@/lib/git/repo-token"
 
 /**
  * Sets up a GitHub remote for an existing local repo in a sandbox and pushes to it.
@@ -25,7 +26,6 @@ export async function POST(req: Request) {
       { status: 401 }
     )
   }
-  const githubToken = ghAuth.token
   const userId = ghAuth.userId
 
   // Ownership gate: signing in isn't enough — the caller must own this sandbox,
@@ -34,6 +34,8 @@ export async function POST(req: Request) {
   if (!(await verifySandboxOwnership(userId, sandboxId))) {
     return forbidden()
   }
+
+  const githubToken = await gitTokenForRepo({ userId, repo: repoFullName, userToken: ghAuth.token })
 
   // 3. Get Daytona API key
   const daytonaApiKey = process.env.DAYTONA_API_KEY

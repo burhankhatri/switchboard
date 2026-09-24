@@ -3,6 +3,7 @@ import { createSandboxGit } from "@switchboard/sandbox-git"
 import { PATHS } from "@/lib/constants"
 import { requireGitHubAuth, isGitHubAuthError, requireAuth, isAuthError, internalError, badRequest, verifySandboxOwnership, forbidden } from "@/lib/db/api-helpers"
 import { getUserPushOptions } from "@/lib/git/push-options"
+import { gitTokenForSandbox } from "@/lib/git/repo-token"
 
 export async function POST(req: Request) {
   // 1. Parse request body
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
     if (isGitHubAuthError(ghAuth)) {
       return Response.json({ error: "Unauthorized - provide githubToken in body or link GitHub" }, { status: 401 })
     }
-    githubToken = ghAuth.token
+    githubToken = await gitTokenForSandbox({ userId, sandboxId, userToken: ghAuth.token })
   }
 
   // 3. Get Daytona API key
