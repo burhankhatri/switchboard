@@ -8,7 +8,7 @@
 
 import type { Daytona, Sandbox } from "@daytonaio/sdk"
 import { randomUUID } from "crypto"
-import { createSandboxGit } from "@switchboard/sandbox-git"
+import { createSandboxGit, withAuth } from "@switchboard/sandbox-git"
 import { installSkills, discoverInstalledSkills } from "@switchboard/sandbox-skills/sandbox"
 import { TOKSCALE_VERSION, getActiveSnapshotName } from "@switchboard/sandbox-image"
 import { PATHS, SANDBOX_CONFIG } from "@/lib/constants"
@@ -293,27 +293,39 @@ export async function createSandboxForChat(
       gitEmail = `${ghUser.login}@users.noreply.github.com`
     }
 
-    // Branch setup: either restore existing branch from remote or create new
+    // Branch setup: either restore existing branch from remote or create new.
+    //
+    // Both checkouts are checked, not fire-and-forget: executeCommand does not
+    // throw on a non-zero exit, and auto-push pushes `origin HEAD`. A checkout
+    // that failed silently left HEAD on the base branch, so the agent's next
+    // commits would have been pushed straight to it.
+    const setAuthor = `git config user.email "${gitEmail}" && git config user.name "${gitName}"`
+    const checkout = async (cmd: string) => {
+      const res = await sandbox.process.executeCommand(`cd ${repoPath} && ${setAuthor} && ${cmd}`)
+      if (res.exitCode !== 0) {
+        throw new Error(`Could not check out ${newBranch}: ${res.result.trim()}`)
+      }
+    }
+
+    let remoteBranchExists = false
     if (restoreExistingBranch) {
       try {
         await git.fetchBranch(repoPath, newBranch, githubToken!)
-        // One exec for identity + checkout. Each executeCommand is a round trip
-        // to the sandbox plus a process spawn, and these were four of them.
-        await sandbox.process.executeCommand(
-          `cd ${repoPath} && git config user.email "${gitEmail}" && git config user.name "${gitName}" && git checkout ${newBranch}`
-        )
-        branchRestored = true
+        remoteBranchExists = true
       } catch {
-        // Branch doesn't exist on remote, create fresh from baseBranch
-        await sandbox.process.executeCommand(
-          `cd ${repoPath} && git config user.email "${gitEmail}" && git config user.name "${gitName}" && git checkout -b ${newBranch}`
-        )
-        branchRestored = false
+        // Branch doesn't exist on remote; create it fresh from baseBranch below.
       }
+    }
+
+    if (remoteBranchExists) {
+      // The checkout carries the token: in a sparse (partial) clone the
+      // branch's file contents are downloaded lazily on checkout, and that
+      // download needs credentials.
+      await checkout(withAuth(githubToken!, `checkout ${newBranch} 2>&1`))
+      branchRestored = true
     } else {
-      await sandbox.process.executeCommand(
-        `cd ${repoPath} && git config user.email "${gitEmail}" && git config user.name "${gitName}" && git checkout -b ${newBranch}`
-      )
+      await checkout(`git checkout -b ${newBranch} 2>&1`)
+      if (restoreExistingBranch) branchRestored = false
     }
   }
 
