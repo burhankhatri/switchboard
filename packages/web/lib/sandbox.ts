@@ -320,8 +320,11 @@ export async function createSandboxForChat(
     if (remoteBranchExists) {
       // The checkout carries the token: in a sparse (partial) clone the
       // branch's file contents are downloaded lazily on checkout, and that
-      // download needs credentials.
-      await checkout(withAuth(githubToken!, `checkout ${newBranch} 2>&1`))
+      // download needs credentials. The start point is named explicitly: the
+      // clone is --single-branch, so git's "checkout <name> guesses the remote
+      // branch" shortcut does not apply and a bare name fails with "pathspec
+      // did not match".
+      await checkout(withAuth(githubToken!, `checkout -B ${newBranch} origin/${newBranch} 2>&1`))
       branchRestored = true
     } else {
       await checkout(`git checkout -b ${newBranch} 2>&1`)
