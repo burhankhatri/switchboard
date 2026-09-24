@@ -86,6 +86,23 @@ export function resolveRunRepo(
 }
 
 /**
+ * The paths a run should check out: its own workspace folder and the repo-root
+ * `.claude` (shared skills), or undefined for a full clone.
+ *
+ * Every workspace lives in one repo, so a full clone put every other
+ * workspace's files on disk in each sandbox, where any agent could read them.
+ * A chat whose repo is not its workspace's (a pre-workspace chat, or one pointed
+ * elsewhere) still gets a full clone, since the folder would not be there.
+ */
+export function workspaceSparsePaths(
+  workspace: Pick<WorkspaceRuntime, "repo" | "path"> | null | undefined,
+  repo: string
+): string[] | undefined {
+  if (!workspace || workspace.repo.toLowerCase() !== repo.toLowerCase()) return undefined
+  return [workspace.path, ".claude"]
+}
+
+/**
  * Decrypt a workspace's connection values for injection into a sandbox.
  *
  * Throws if any value fails to decrypt: a workspace that cannot supply its

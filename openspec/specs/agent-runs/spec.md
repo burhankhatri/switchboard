@@ -15,6 +15,11 @@ and nothing else.
 - **THEN** only `workspaces/lead-gen` and `.claude` are checked out, and sibling
   workspaces are absent from the sandbox filesystem
 
+#### Scenario: A chat outside the workspaces repo
+- **WHEN** a chat has no workspace, or its repo is not its workspace's repo
+- **THEN** the repo is cloned in full, because there is no workspace folder in
+  it to narrow to
+
 #### Scenario: Sparse patterns are anchored
 - **WHEN** sparse paths are applied
 - **THEN** each is anchored to the repo root, because `--no-cone` patterns are

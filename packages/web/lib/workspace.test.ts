@@ -7,6 +7,7 @@ import {
   isValidEnvName,
   workspaceSessionOptions,
   resolveRunRepo,
+  workspaceSparsePaths,
 } from "./workspace"
 
 const ws = (environmentVariables: unknown, slug = "lead-gen") =>
@@ -134,5 +135,28 @@ describe("resolveRunRepo", () => {
       .toEqual({ repo: "o/ws", baseBranch: "main" })
     expect(resolveRunRepo(null, { repo: "o/legacy", baseBranch: "dev" }))
       .toEqual({ repo: "o/legacy", baseBranch: "dev" })
+  })
+})
+
+describe("workspaceSparsePaths", () => {
+  const workspace = { repo: "acme/agent-workspaces", path: "workspaces/lead-gen" }
+
+  it("checks out only the workspace folder and the shared skills", () => {
+    expect(workspaceSparsePaths(workspace, "acme/agent-workspaces")).toEqual([
+      "workspaces/lead-gen",
+      ".claude",
+    ])
+  })
+
+  it("matches the repo regardless of case, as GitHub does", () => {
+    expect(workspaceSparsePaths(workspace, "Acme/Agent-Workspaces")).toHaveLength(2)
+  })
+
+  it("falls back to a full clone without a workspace", () => {
+    expect(workspaceSparsePaths(null, "acme/app")).toBeUndefined()
+  })
+
+  it("falls back to a full clone when the chat's repo is not the workspace's", () => {
+    expect(workspaceSparsePaths(workspace, "acme/app")).toBeUndefined()
   })
 })

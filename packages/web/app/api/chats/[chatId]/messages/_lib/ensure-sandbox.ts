@@ -2,6 +2,7 @@ import { Daytona } from "@daytonaio/sdk"
 import { randomUUID } from "crypto"
 import { NEW_REPOSITORY } from "@/lib/types"
 import { prisma } from "@/lib/db/prisma"
+import { workspaceSparsePaths } from "@/lib/workspace"
 import {
   createSandboxForChat,
   ensureSandboxStarted,
@@ -119,6 +120,7 @@ export async function ensureSandboxForChat(params: {
       newBranch,
       githubToken: githubToken ?? undefined,
       identityToken: identityToken ?? undefined,
+      sparsePaths: workspaceSparsePaths(chat.workspace, chat.repo),
       userId,
       restoreExistingBranch,
     })

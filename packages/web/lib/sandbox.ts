@@ -140,6 +140,11 @@ export interface CreateSandboxOptions {
    * account's name.
    */
   identityToken?: string
+  /**
+   * Repo-relative paths to check out instead of the whole repo; see
+   * workspaceSparsePaths. Omitted means a full clone.
+   */
+  sparsePaths?: string[]
   /** First 8 chars are used in the sandbox name for traceability. */
   userId?: string
   /**
@@ -177,7 +182,17 @@ function generateSandboxName(userId?: string): string {
 export async function createSandboxForChat(
   options: CreateSandboxOptions
 ): Promise<CreatedSandbox> {
-  const { daytona, repo, baseBranch, newBranch, githubToken, identityToken, userId, restoreExistingBranch } = options
+  const {
+    daytona,
+    repo,
+    baseBranch,
+    newBranch,
+    githubToken,
+    identityToken,
+    sparsePaths,
+    userId,
+    restoreExistingBranch,
+  } = options
   const isNewRepo = repo === NEW_REPOSITORY || repo === "__new__"
   const repoName = "project"
   let branchRestored: boolean | undefined
@@ -264,7 +279,11 @@ export async function createSandboxForChat(
       .then(async (res) => (res.ok ? await res.json() : null))
       .catch(() => null)
 
-    await git.clone(cloneUrl, repoPath, baseBranch, undefined, githubToken!)
+    if (sparsePaths?.length) {
+      await git.cloneSparse(cloneUrl, repoPath, sparsePaths, baseBranch, githubToken!)
+    } else {
+      await git.clone(cloneUrl, repoPath, baseBranch, undefined, githubToken!)
+    }
 
     let gitName = "Simple Chat Agent"
     let gitEmail = "noreply@example.com"

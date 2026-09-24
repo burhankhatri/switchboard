@@ -28,6 +28,7 @@ import { gitTokenForRun } from "@/lib/git/repo-token"
 import type { ScheduledJobRunWithJob } from "./types"
 import {
   workspaceSessionOptions,
+  workspaceSparsePaths,
   type WorkspaceRuntime,
 } from "@/lib/workspace"
 import { workspaceRunEnv } from "@/lib/workspace-run-env"
@@ -151,6 +152,7 @@ export async function startJobExecution(
     newBranch: branch,
     githubToken: gitToken ?? undefined,
     identityToken: account?.access_token ?? undefined,
+    sparsePaths: workspaceSparsePaths(job.workspace, job.repo),
     userId: job.userId,
   })
 
