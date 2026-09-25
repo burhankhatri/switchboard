@@ -27,6 +27,7 @@ export type AgentErrorCategory =
   | "balance"
   | "model_unavailable"
   | "rate_limit"
+  | "provider_timeout"
   | "network"
   | "unknown"
 
@@ -134,6 +135,14 @@ const RULES: { category: AgentErrorCategory; test: RegExp; hint: string }[] = [
     category: "rate_limit",
     test: /rate[\s_-]?limit|\b429\b|too\s+many\s+requests|overloaded/i,
     hint: "wait a moment and retry",
+  },
+  {
+    // Above "network": the provider accepted the request and then went quiet,
+    // which the user's connection has nothing to do with. Matches both OpenCode's
+    // log form (class-name prefix) and its JSON error form (message only).
+    category: "provider_timeout",
+    test: /Provider(HeaderTimeout|ResponseStream)Error|response headers timed out|SSE read timed out/i,
+    hint: "the model provider stopped responding — retry, or pick a different model",
   },
   {
     category: "network",
