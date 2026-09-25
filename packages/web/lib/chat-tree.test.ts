@@ -3,6 +3,7 @@ import { ALL_REPOSITORIES, NO_REPOSITORY, ARCHIVED_CHATS } from "@/lib/contexts"
 import { NEW_REPOSITORY, type Chat } from "@/lib/types"
 import {
   buildTreeOrderedChatIds,
+  compareChatsForSidebar,
   getChatIdForRepoFilter,
   getNextChatIdAfterDeletion,
   isChatVisibleForFilter,
@@ -210,5 +211,26 @@ describe("workspace scoping", () => {
   it("defaults to unscoped so existing callers are unaffected", () => {
     expect(isChatVisibleForFilter(otherWs, ALL_REPOSITORIES)).toBe(true)
     expect(buildTreeOrderedChatIds([inWs, otherWs], ALL_REPOSITORIES)).toHaveLength(2)
+  })
+})
+
+describe("sidebar order", () => {
+  const old = makeChat({ id: "old", lastActiveAt: 1 })
+  const recent = makeChat({ id: "recent", lastActiveAt: 3 })
+  const pinned = makeChat({ id: "pinned", pinned: true, lastActiveAt: 2 })
+  const waiting = makeChat({ id: "waiting", awaitingInput: true, lastActiveAt: 0 })
+
+  it("puts chats waiting on you first, then pinned, then most recent", () => {
+    const sorted = [old, recent, pinned, waiting].sort(compareChatsForSidebar)
+    expect(sorted.map((c) => c.id)).toEqual(["waiting", "pinned", "recent", "old"])
+  })
+
+  it("walks keyboard navigation in the order the sidebar draws", () => {
+    expect(buildTreeOrderedChatIds([old, recent, pinned, waiting], ALL_REPOSITORIES)).toEqual([
+      "waiting",
+      "pinned",
+      "recent",
+      "old",
+    ])
   })
 })
