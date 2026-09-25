@@ -37,6 +37,14 @@ describe("workspace file cache", () => {
     vi.unstubAllGlobals()
   })
 
+  it("stamps when a cached file was fetched, so its age can be judged later", () => {
+    installStorage()
+    vi.useFakeTimers({ now: 1_790_000_000_000 })
+    writeCachedFile(WS, PATH, { content: "x", sha: "s", truncated: false })
+    expect(readCachedFile(WS, PATH)?.fetchedAt).toBe(1_790_000_000_000)
+    vi.useRealTimers()
+  })
+
   it("round-trips a cached file", () => {
     installStorage()
     writeCachedFile(WS, PATH, { content: "hello", sha: "abc", truncated: false })
