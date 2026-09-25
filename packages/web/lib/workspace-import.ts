@@ -12,23 +12,31 @@
  * here, so they can be tested without a GitHub round trip.
  */
 
-/**
- * Per-file cap, matching the single-file upload. Anything bigger is data that
- * belongs somewhere a git repo is the wrong home for.
- */
-export const IMPORT_MAX_FILE_BYTES = 256 * 1024
+import { formatBytes } from "./format-bytes"
 
 /**
- * How much one import may carry in total, counted in raw bytes.
+ * How much one import request may carry, counted in raw bytes.
  *
- * The whole folder goes up as one request so it can become one commit, and a
- * serverless request body is capped somewhere around 4.5MB. The wire carries
- * base64, which is 4/3 of raw — so this is 3MB rather than 4MB, landing near
- * 4MB encoded with room for the path names around it. Staying under the limit
- * turns "your folder is too big" into a message with a number in it rather than
- * a 413 from the platform.
+ * A Vercel function accepts a request body of about 4.5MB, and the wire
+ * carries base64, which is 4/3 of raw — so this is 3MB rather than 4MB, landing
+ * near 4MB encoded with room for the path names around it. Staying under the
+ * limit turns "too big" into a message with a number in it rather than a 413
+ * from the platform.
  */
-export const IMPORT_MAX_TOTAL_BYTES = 3 * 1024 * 1024
+export const IMPORT_MAX_REQUEST_BYTES = 3 * 1024 * 1024
+
+/**
+ * Per-file cap: a file cannot be split across requests, so one file is as big
+ * as one request can carry. This used to be 256KB, a guess that refused
+ * ordinary lead lists and PDFs for no limit anything actually imposed.
+ */
+export const IMPORT_MAX_FILE_BYTES = IMPORT_MAX_REQUEST_BYTES
+
+/**
+ * How much one upload — a drop or a pick — may carry across all its requests.
+ * The backstop for dragging in a folder of video by accident.
+ */
+export const IMPORT_MAX_TOTAL_BYTES = 25 * 1024 * 1024
 
 /**
  * Ceiling on file count, independent of size.
@@ -117,7 +125,11 @@ function isIgnored(relativePath: string): boolean {
  * limit takes the same files every time rather than whatever order the file
  * picker happened to produce.
  */
-export function planFolderImport(entries: ImportEntry[], base: string): ImportPlan {
+export function planFolderImport(
+  entries: ImportEntry[],
+  base: string,
+  maxTotalBytes: number = IMPORT_MAX_TOTAL_BYTES
+): ImportPlan {
   const sorted = [...entries].sort((a, b) => a.relativePath.localeCompare(b.relativePath))
 
   const files: PlannedFile[] = []
@@ -140,14 +152,14 @@ export function planFolderImport(entries: ImportEntry[], base: string): ImportPl
       continue
     }
     if (e.size > IMPORT_MAX_FILE_BYTES) {
-      skip(`larger than ${IMPORT_MAX_FILE_BYTES / 1024}KB`)
+      skip(`larger than ${formatBytes(IMPORT_MAX_FILE_BYTES)}`)
       continue
     }
     if (files.length >= IMPORT_MAX_FILES) {
       skip(`over the ${IMPORT_MAX_FILES} file limit`)
       continue
     }
-    if (totalBytes + e.size > IMPORT_MAX_TOTAL_BYTES) {
+    if (totalBytes + e.size > maxTotalBytes) {
       skip("over the total size limit")
       continue
     }
@@ -161,4 +173,30 @@ export function planFolderImport(entries: ImportEntry[], base: string): ImportPl
   }
 
   return { files, skipped, totalBytes }
+}
+
+/**
+ * Split planned files into request-sized batches, in order.
+ *
+ * Each batch becomes one request and one commit, so a small upload is still a
+ * single commit and only an upload no request could carry is split.
+ */
+export function batchForRequests<T extends { size: number }>(
+  files: T[],
+  maxBytes: number = IMPORT_MAX_REQUEST_BYTES
+): T[][] {
+  const batches: T[][] = []
+  let current: T[] = []
+  let bytes = 0
+  for (const f of files) {
+    if (current.length && bytes + f.size > maxBytes) {
+      batches.push(current)
+      current = []
+      bytes = 0
+    }
+    current.push(f)
+    bytes += f.size
+  }
+  if (current.length) batches.push(current)
+  return batches
 }

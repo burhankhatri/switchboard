@@ -9,7 +9,7 @@ import {
   internalError,
 } from "@/lib/db/api-helpers"
 import { commitWorkspaceFiles } from "@/lib/workspace-repo"
-import { planFolderImport, IMPORT_MAX_FILES } from "@/lib/workspace-import"
+import { planFolderImport, IMPORT_MAX_FILES, IMPORT_MAX_REQUEST_BYTES } from "@/lib/workspace-import"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -20,11 +20,14 @@ interface ImportBody {
 }
 
 /**
- * POST /api/workspaces/:id/import — commit a whole folder in one commit.
+ * POST /api/workspaces/:id/import — commit uploaded files in one commit.
  *
- * Distinct from PUT /files, which is one commit per file. A folder of fifty
- * files through that route is fifty commits racing for the same branch; here
- * the tree is assembled first and the branch moves once.
+ * Every upload comes through here — picked files, a picked folder, a drop —
+ * because it is the binary-safe path: content travels as base64 and becomes a
+ * git blob byte for byte. The editor's PUT /files is text. A folder of fifty
+ * files through that route would also be fifty commits racing for the same
+ * branch; here the tree is assembled first and the branch moves once. An upload
+ * bigger than one request can carry arrives as several requests, one commit each.
  *
  * The client plans the import too, so it can show what will be skipped before
  * anything is sent — but that preview is not trusted. The plan is recomputed
@@ -83,7 +86,9 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
       })
     }
 
-    const plan = planFolderImport(entries, workspace.path)
+    // Held to what one request can carry: the client batches to this, and a
+    // request that ignores it is refused here rather than by a 413 halfway in.
+    const plan = planFolderImport(entries, workspace.path, IMPORT_MAX_REQUEST_BYTES)
     if (plan.files.length === 0) {
       return badRequest(
         `Nothing in that folder could be imported. ${plan.skipped.length} file(s) were skipped.`
