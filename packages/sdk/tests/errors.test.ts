@@ -120,3 +120,30 @@ describe("resolveAgentError", () => {
     spy.mockRestore()
   })
 })
+
+describe("provider stalls", () => {
+  it("names a provider stall as the provider's, not the user's connectivity", () => {
+    const out = classifyAgentError("ProviderHeaderTimeoutError: Provider response headers timed out after 300000ms")
+    expect(out.category).toBe("provider_timeout")
+    expect(out.message).not.toContain("check connectivity")
+  })
+
+  it("recognises OpenCode's JSON error form of the same stall", () => {
+    const out = resolveAgentError(
+      {
+        name: "APIError",
+        data: {
+          message: "Provider response headers timed out after 300000ms",
+          isRetryable: true,
+          metadata: { code: "ProviderHeaderTimeoutError" },
+        },
+      },
+      "opencode"
+    )
+    expect(out).toContain("model provider stopped responding")
+  })
+
+  it("still treats a real network failure as network", () => {
+    expect(classifyAgentError("connect ETIMEDOUT 1.2.3.4:443").category).toBe("network")
+  })
+})
