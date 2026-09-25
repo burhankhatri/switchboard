@@ -112,10 +112,30 @@ async function writeOpencodeConfig(
  * 1. Custom endpoint — when CUSTOM_OPENCODE_BASE_URL is set, merge a custom
  *    OpenAI-compatible `provider` into the file. Auth lives in the headers blob
  *    (promoted to the provider apiKey).
- * 2. Standard — drop any `provider` left over from a previous custom run in this
- *    sandbox, so a custom→standard switch stops using the old provider, while
+ * 2. Standard — replace any `provider` left over from a previous custom run in
+ *    this sandbox with per-attempt timeouts for OpenCode's own Zen and Go
+ *    providers, so a custom→standard switch stops using the old provider, while
  *    keeping any MCP config in place.
  */
+/**
+ * Per-attempt limits for OpenCode's own providers (Zen = `opencode`, Go =
+ * `opencode-go`). OpenCode's default is 300s to first headers and 300s between
+ * stream chunks, and it makes up to 6 attempts a step: a stalled provider could
+ * hold a turn for ~31 minutes, past Switchboard's 20/25 minute hard timeouts,
+ * before OpenCode gave up. At these values the worst case is ~10-13 minutes,
+ * and a real response starts well inside them (headers usually in 1-10s).
+ * Positive milliseconds or `false` only: 0 fails OpenCode's config validation
+ * and breaks every run.
+ */
+export const OPENCODE_PROVIDER_TIMEOUTS = { headerTimeout: 90_000, chunkTimeout: 120_000 } as const
+
+function standardProviders(): Record<string, unknown> {
+  return {
+    opencode: { options: { ...OPENCODE_PROVIDER_TIMEOUTS } },
+    "opencode-go": { options: { ...OPENCODE_PROVIDER_TIMEOUTS } },
+  }
+}
+
 async function opencodeSetup(
   sandbox: CodeAgentSandbox,
   env: Record<string, string>
@@ -134,10 +154,14 @@ async function opencodeSetup(
       apiKeyEnv: env.CUSTOM_OPENCODE_API_KEY ? "CUSTOM_OPENCODE_API_KEY" : undefined,
     })
     dirty = true
-  } else if (config.provider !== undefined) {
-    // Standard path: strip a leftover custom provider from a previous run.
-    delete config.provider
-    dirty = true
+  } else {
+    // Standard path: pin the timeouts, which also drops a leftover custom
+    // provider from a previous run.
+    const provider = standardProviders()
+    if (JSON.stringify(config.provider) !== JSON.stringify(provider)) {
+      config.provider = provider
+      dirty = true
+    }
   }
 
   if (dirty) await writeOpencodeConfig(sandbox, config)

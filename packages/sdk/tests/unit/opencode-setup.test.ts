@@ -54,6 +54,11 @@ async function runSetup(
   await opencodeAgent.capabilities!.setup!(fs.sandbox, env)
 }
 
+const PINNED_PROVIDERS = {
+  opencode: { options: { headerTimeout: 90_000, chunkTimeout: 120_000 } },
+  "opencode-go": { options: { headerTimeout: 90_000, chunkTimeout: 120_000 } },
+}
+
 const mcp = (name: string) => ({
   [name]: { type: "remote", url: `https://${name}`, enabled: true },
 })
@@ -88,22 +93,24 @@ describe("opencodeSetup — legacy project-root relocation", () => {
     expect(global.mcp).toEqual(mcp("current"))
   })
 
-  it("deletes a junk project-root file without touching the global config", async () => {
+  it("deletes a junk project-root file without carrying any of it into the global config", async () => {
     const fs = fakeSandbox({ [PROJECT_PATH]: "not json {{{" })
 
     await runSetup(fs)
 
     expect(fs.removed).toContain(PROJECT_PATH)
-    expect(GLOBAL_PATH in fs.files).toBe(false)
+    // Only the pinned provider timeouts are written; nothing from the junk file.
+    expect(JSON.parse(fs.files[GLOBAL_PATH])).toEqual({ provider: PINNED_PROVIDERS })
   })
 
-  it("is a no-op when there is no project-root file and nothing to strip", async () => {
-    const fs = fakeSandbox()
+  it("leaves a config that already carries the timeouts byte-for-byte untouched", async () => {
+    const existing = JSON.stringify({ provider: PINNED_PROVIDERS, mcp: mcp("github") })
+    const fs = fakeSandbox({ [GLOBAL_PATH]: existing })
 
     await runSetup(fs)
 
     expect(fs.removed).toHaveLength(0)
-    expect(GLOBAL_PATH in fs.files).toBe(false)
+    expect(fs.files[GLOBAL_PATH]).toBe(existing)
   })
 })
 
