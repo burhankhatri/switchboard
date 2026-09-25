@@ -38,7 +38,9 @@ function observe(cached: CachedFile | null) {
 }
 
 describe("workspace file query", () => {
-  afterEach(() => vi.useRealTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
   it("revalidates a cached copy older than staleTime, while still painting it first", async () => {
     vi.useFakeTimers({ now: NOW })

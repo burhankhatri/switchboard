@@ -29,6 +29,12 @@ export interface CachedFile {
   content: string
   sha: string
   truncated: boolean
+  /**
+   * When this copy came from the server (epoch ms). The editor needs it to
+   * judge whether the copy is still fresh; without it any copy looks new.
+   * Absent on entries written before it existed, which count as stale.
+   */
+  fetchedAt?: number
 }
 
 function key(prefix: string, workspaceId: string, path: string): string {
@@ -94,7 +100,7 @@ export function readCachedFile(workspaceId: string, path: string): CachedFile | 
 
 export function writeCachedFile(workspaceId: string, path: string, file: CachedFile): void {
   if (file.content.length > MAX_ENTRY_BYTES) return
-  write(key(CACHE_PREFIX, workspaceId, path), file)
+  write(key(CACHE_PREFIX, workspaceId, path), { ...file, fetchedAt: Date.now() })
 }
 
 export interface Draft {

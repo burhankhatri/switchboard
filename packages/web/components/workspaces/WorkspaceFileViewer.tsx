@@ -12,12 +12,12 @@ import {
   writeDraft,
 } from "@/lib/workspace-file-cache"
 import { cursorPosition, lineCount } from "@/lib/editor-position"
+import { workspaceFileQueryOptions, type FilePayload } from "@/lib/workspace-file-query"
 import { isBinaryFile } from "@/lib/file-kind"
 import { SelectionActions } from "./SelectionActions"
 import { FileIcon } from "./files/FileIcon"
 import { cn } from "@/lib/utils"
 
-interface FilePayload { path: string; content: string; truncated: boolean; sha: string }
 
 const LANGUAGE: Record<string, string> = {
   md: "Markdown", mdx: "MDX", py: "Python", ts: "TypeScript", tsx: "TypeScript JSX",
@@ -66,35 +66,24 @@ export function WorkspaceFileViewer() {
     () => (wsId && openFile ? readCachedFile(wsId, openFile) : null),
     [wsId, openFile]
   )
-  // Captured with the cache read, not on every render — a fresh Date.now() each
-  // render would keep pushing the staleness deadline out and the query would
-  // never revalidate.
-  const cachedAt = useMemo(() => (cached ? Date.now() : 0), [cached])
-
-  const { data, isPending, isFetching, error } = useQuery({
-    queryKey: ["workspace-file", wsId, openFile],
-    queryFn: async () => {
-      const r = await fetch(`/api/workspaces/${wsId}/files?path=${encodeURIComponent(openFile!)}`)
-      if (!r.ok) throw new Error(String(r.status))
-      const file = (await r.json()) as FilePayload
-      writeCachedFile(wsId, openFile!, {
-        content: file.content,
-        sha: file.sha,
-        truncated: file.truncated,
-      })
-      return file
-    },
-    enabled: !!wsId && !!openFile,
-    retry: false,
-    initialData: cached && openFile ? { path: openFile, ...cached } : undefined,
-    // Seeded data counts as fetched-now, so a warm cache paints AND skips the
-    // refetch inside staleTime. This was 0 (= infinitely stale), which meant
-    // every open still waited on the network and the local cache bought
-    // nothing. Staleness is bounded by staleTime, and the server revalidates
-    // against GitHub with an ETag, so a genuinely changed file still lands.
-    initialDataUpdatedAt: cachedAt,
-    staleTime: 30 * 1000,
-  })
+  const { data, isPending, isFetching, error } = useQuery(
+    workspaceFileQueryOptions({
+      wsId,
+      path: openFile,
+      cached,
+      fetchFile: async () => {
+        const r = await fetch(`/api/workspaces/${wsId}/files?path=${encodeURIComponent(openFile!)}`)
+        if (!r.ok) throw new Error(String(r.status))
+        const file = (await r.json()) as FilePayload
+        writeCachedFile(wsId, openFile!, {
+          content: file.content,
+          sha: file.sha,
+          truncated: file.truncated,
+        })
+        return file
+      },
+    })
+  )
 
   // Restore whatever was being typed when this file was last open. Keyed on the
   // file alone — reacting to the sha as well would discard an in-flight edit the

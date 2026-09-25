@@ -52,6 +52,7 @@ describe("workspace file cache", () => {
       content: "hello",
       sha: "abc",
       truncated: false,
+      fetchedAt: expect.any(Number),
     })
   })
 
