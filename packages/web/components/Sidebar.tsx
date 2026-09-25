@@ -21,7 +21,7 @@ import { useElectron } from "@/lib/hooks/useElectron"
 import { useGitHubUserQuery } from "@/lib/query"
 import { useModals, ALL_REPOSITORIES, NO_REPOSITORY, ARCHIVED_CHATS, MIN_WIDTH, MAX_WIDTH, COLLAPSED_WIDTH, COLLAPSE_THRESHOLD } from "@/lib/contexts"
 import { clearAllStorage } from "@/lib/storage"
-import { isChatVisibleForFilter } from "@/lib/chat-tree"
+import { compareChatsForSidebar, isChatVisibleForFilter } from "@/lib/chat-tree"
 import type { Chat } from "@/lib/types"
 import { NEW_REPOSITORY } from "@/lib/types"
 import { clearActiveWorkspace } from "@/lib/contexts/WorkspaceContext"
@@ -140,17 +140,12 @@ export function Sidebar({
   const [internalRepoFilter, setInternalRepoFilter] = useState<string>(ALL_REPOSITORIES)
   const repoFilter = controlledRepoFilter ?? internalRepoFilter
   const setRepoFilter = onRepoFilterChange ?? setInternalRepoFilter
-  // Filter chats by selected repository. Pinned chats sort to the top; within
-  // each group, newest-first by last activity. Visibility is delegated to the
-  // shared isChatVisibleForFilter predicate so the rendered list can never drift
-  // from what keyboard navigation reaches.
+  // Visibility and order are both delegated to chat-tree so the rendered list
+  // can never drift from what keyboard navigation reaches.
   const filteredChats = useMemo(() => {
     return chats
       .filter((chat) => isChatVisibleForFilter(chat, repoFilter, activeWorkspace?.id ?? null))
-      .sort((a, b) => {
-        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1
-        return (b.lastActiveAt ?? b.createdAt) - (a.lastActiveAt ?? a.createdAt)
-      })
+      .sort(compareChatsForSidebar)
   }, [chats, repoFilter, activeWorkspace])
 
   // Whether the archived view is currently active — archived rows expose

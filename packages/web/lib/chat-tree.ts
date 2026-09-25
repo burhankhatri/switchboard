@@ -43,6 +43,19 @@ export function isChatVisibleForFilter(
 }
 
 /**
+ * The one order the sidebar lists chats in, and keyboard navigation walks.
+ *
+ * A chat waiting on you outranks a pinned one: a pin is a bookmark, but an
+ * agent blocked on your answer is work stopped until you look. Recency breaks
+ * every tie.
+ */
+export function compareChatsForSidebar(a: Chat, b: Chat): number {
+  if (!!a.awaitingInput !== !!b.awaitingInput) return a.awaitingInput ? -1 : 1
+  if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1
+  return (b.lastActiveAt ?? b.createdAt) - (a.lastActiveAt ?? a.createdAt)
+}
+
+/**
  * Build the full tree-ordered id list matching the sidebar, ignoring collapsed
  * state — so keyboard navigation (Alt+Up/Down) can reach every chat, expanding
  * collapsed ancestors along the way.
@@ -58,7 +71,7 @@ export function buildTreeOrderedChatIds(
 ): string[] {
   const visible = chats.filter((c) => isChatVisibleForFilter(c, repoFilter, workspaceId))
 
-  visible.sort((a, b) => (b.lastActiveAt ?? b.createdAt) - (a.lastActiveAt ?? a.createdAt))
+  visible.sort(compareChatsForSidebar)
 
   const visibleIds = new Set(visible.map((c) => c.id))
   const kids = new Map<string, Chat[]>()
