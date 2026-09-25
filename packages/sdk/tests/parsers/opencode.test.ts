@@ -207,6 +207,49 @@ describe("parseOpencodeLine", () => {
     })
   })
 
+  // The line OpenCode 1.18.32 wrote in the failing gtm-lead-engine run
+  // (2026-09-25). OpenCode retries this error itself (RETRY_MAX_RETRIES=5, so
+  // up to 6 attempts per step); ending the turn on it killed a run whose next
+  // attempt, in a replay of the same turn, answered 2.6s later.
+  const headerTimeout =
+    'timestamp=2026-09-25T22:25:49.231Z level=ERROR run=1fa1a6fe message="stream error" ' +
+    "providerID=opencode modelID=big-pickle session.id=ses_x small=false agent=build mode=primary " +
+    'error.error="ProviderHeaderTimeoutError: Provider response headers timed out after 300000ms"'
+
+  it("does not end the turn on a retryable provider stall; OpenCode's retry finishes it", () => {
+    const ctx = createContext()
+    expect(parseOpencodeLine(headerTimeout, mappings, ctx)).toBeNull()
+    const finish = JSON.stringify({ type: "step_finish", sessionID: "ses_x", part: { reason: "stop" } })
+    expect(parseOpencodeLine(finish, mappings, ctx)).toEqual({ type: "end" })
+  })
+
+  it("ends the turn once OpenCode has spent its retries on one step (6 stalls)", () => {
+    const ctx = createContext()
+    for (let i = 0; i < 5; i++) expect(parseOpencodeLine(headerTimeout, mappings, ctx)).toBeNull()
+    const last = parseOpencodeLine(headerTimeout, mappings, ctx) as { type: string; error?: string }
+    expect(last.type).toBe("end")
+    expect(last.error).toContain("Provider response headers timed out after 300000ms")
+  })
+
+  it("counts stalls per step: progress in between resets the budget", () => {
+    const ctx = createContext()
+    const text = JSON.stringify({ type: "text", sessionID: "ses_x", part: { type: "text", text: "working" } })
+    for (let i = 0; i < 5; i++) expect(parseOpencodeLine(headerTimeout, mappings, ctx)).toBeNull()
+    parseOpencodeLine(text, mappings, ctx)
+    for (let i = 0; i < 5; i++) expect(parseOpencodeLine(headerTimeout, mappings, ctx)).toBeNull()
+  })
+
+  it("treats a stalled SSE stream and a 5xx the same way (retryable)", () => {
+    const ctx = createContext()
+    const sse = headerTimeout.replace(
+      /error\.error="[^"]*"/,
+      'error.error="ResponseStreamError: SSE read timed out after 300000ms"'
+    )
+    const overloaded = headerTimeout.replace(/error\.error="[^"]*"/, 'error.error="AI_APICallError: 503 Service Unavailable"')
+    expect(parseOpencodeLine(sse, mappings, ctx)).toBeNull()
+    expect(parseOpencodeLine(overloaded, mappings, ctx)).toBeNull()
+  })
+
   it("ignores a logfmt 'stream error' from the title sidecar (agent=title/small=true)", () => {
     const ctx = createContext()
     const titleError =
