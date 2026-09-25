@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest"
 import {
+  batchForRequests,
   planFolderImport,
   IMPORT_MAX_FILE_BYTES,
   IMPORT_MAX_FILES,
+  IMPORT_MAX_REQUEST_BYTES,
   IMPORT_MAX_TOTAL_BYTES,
 } from "./workspace-import"
+import { formatBytes } from "./format-bytes"
 
 const base = "workspaces/gtm"
 const entry = (relativePath: string, size = 10) => ({ relativePath, size })
@@ -77,8 +80,20 @@ describe("planFolderImport", () => {
     )
     expect(plan.files.map((f) => f.relativePath)).toEqual(["p/ok.csv"])
     expect(plan.skipped).toEqual([
-      { relativePath: "p/big.csv", reason: `larger than ${IMPORT_MAX_FILE_BYTES / 1024}KB` },
+      { relativePath: "p/big.csv", reason: `larger than ${formatBytes(IMPORT_MAX_FILE_BYTES)}` },
     ])
+  })
+
+  it("takes a lead list far bigger than the old 256KB cap", () => {
+    // 256KB was a policy guess, not a limit anything imposed: a 1MB CSV of
+    // leads is exactly what a GTM workspace is for, and it was refused.
+    const plan = planFolderImport([entry("leads.csv", 1024 * 1024)], base)
+    expect(plan.files.map((f) => f.relativePath)).toEqual(["leads.csv"])
+    expect(plan.skipped).toEqual([])
+  })
+
+  it("lets one file be as large as one request can carry", () => {
+    expect(IMPORT_MAX_FILE_BYTES).toBe(IMPORT_MAX_REQUEST_BYTES)
   })
 
   it("refuses a path that would escape the workspace", () => {
@@ -102,10 +117,10 @@ describe("planFolderImport", () => {
     expect(plan.skipped.every((s) => s.reason === `over the ${IMPORT_MAX_FILES} file limit`)).toBe(true)
   })
 
-  it("stops once the import would exceed what one request can carry", () => {
+  it("stops once the upload would exceed its total", () => {
     // Each file is exactly at the per-file cap, so only the total can reject
     // one — otherwise this would be testing the per-file cap by accident.
-    const fits = IMPORT_MAX_TOTAL_BYTES / IMPORT_MAX_FILE_BYTES
+    const fits = Math.floor(IMPORT_MAX_TOTAL_BYTES / IMPORT_MAX_FILE_BYTES)
     const plan = planFolderImport(
       Array.from({ length: fits + 1 }, (_, i) =>
         entry(`p/f${String(i).padStart(3, "0")}`, IMPORT_MAX_FILE_BYTES)
@@ -116,11 +131,49 @@ describe("planFolderImport", () => {
     expect(plan.skipped).toEqual([
       { relativePath: `p/f${String(fits).padStart(3, "0")}`, reason: "over the total size limit" },
     ])
-    expect(plan.totalBytes).toBe(IMPORT_MAX_TOTAL_BYTES)
+    expect(plan.totalBytes).toBe(fits * IMPORT_MAX_FILE_BYTES)
+  })
+
+  it("lets the server hold one request to what one request can carry", () => {
+    const plan = planFolderImport(
+      [entry("p/a", IMPORT_MAX_REQUEST_BYTES), entry("p/b", 1)],
+      base,
+      IMPORT_MAX_REQUEST_BYTES
+    )
+    expect(plan.files.map((f) => f.relativePath)).toEqual(["p/a"])
+    expect(plan.skipped).toEqual([{ relativePath: "p/b", reason: "over the total size limit" }])
   })
 
   it("counts only what is actually being committed", () => {
     const plan = planFolderImport([entry("p/a", 100), entry("p/.DS_Store", 6000)], base)
     expect(plan.totalBytes).toBe(100)
+  })
+})
+
+describe("batchForRequests", () => {
+  const planned = (relativePath: string, size: number) => ({ relativePath, path: `${base}/${relativePath}`, size })
+
+  it("sends a small upload as one request, so it lands as one commit", () => {
+    const files = [planned("a", 10), planned("b", 20)]
+    expect(batchForRequests(files)).toEqual([files])
+  })
+
+  it("splits an upload no single request could carry, keeping its order", () => {
+    const half = IMPORT_MAX_REQUEST_BYTES / 2
+    const files = [planned("a", half), planned("b", half), planned("c", half)]
+    expect(batchForRequests(files).map((b) => b.map((f) => f.relativePath))).toEqual([["a", "b"], ["c"]])
+  })
+
+  it("gives a file at the cap a request of its own", () => {
+    const files = [planned("small", 1), planned("big", IMPORT_MAX_REQUEST_BYTES), planned("tail", 1)]
+    expect(batchForRequests(files).map((b) => b.map((f) => f.relativePath))).toEqual([
+      ["small"],
+      ["big"],
+      ["tail"],
+    ])
+  })
+
+  it("has nothing to send for nothing", () => {
+    expect(batchForRequests([])).toEqual([])
   })
 })
