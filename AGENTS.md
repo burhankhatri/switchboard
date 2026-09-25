@@ -39,7 +39,7 @@ on case-insensitive filesystems; importing `@/components/sidebar/index`
 explicitly resolved it. If errors reappear there, that is the cause.
 
 ```bash
-npm run test                             # 429 tests: 424 web + 5 sandbox-image
+npm run test                             # 451 tests: 440 web + 11 sandbox-image
 cd packages/web && npx vitest run        # web only; run from packages/web, the @/ alias breaks from the repo root
 ```
 
@@ -58,8 +58,11 @@ cd packages/web && GH_TOKEN=$(gh auth token) npx dotenv -e .env.local -- node ..
 
 ## Things that will bite you
 
-- **Two sidebars.** `components/Sidebar.tsx` renders separate mobile and desktop
-  trees. A change to one is invisible on the other.
+- **The sidebar is a rail plus one panel.** `components/Sidebar.tsx` composes
+  `sidebar/SidebarRail` with the panel for the selected category (see
+  `openspec/specs/app-navigation`); desktop and the mobile drawer share that one
+  tree. A new sidebar section is a new category, not another block stacked in
+  a panel — stacking is what used to cut sections off.
 - **Migrations need `DIRECT_URL`.** Neon's pgbouncer pooler cannot take the
   advisory locks `prisma migrate` requires.
 - **`repoPath` means the clone root, everywhere.** The agent's cwd is a

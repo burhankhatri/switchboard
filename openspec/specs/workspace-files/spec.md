@@ -52,20 +52,19 @@ shared root.
 - **THEN** the request is rejected with 403, because every workspace shares one
   repo and containment is the only thing separating them
 
-### Requirement: The tree is collapsed until asked for
-The system SHALL keep the file tree collapsed by default and SHALL NOT list
-files until it is opened.
+### Requirement: Files are listed only when asked for
+The system SHALL NOT list a workspace's files until the member opens the Files
+panel.
 
 #### Scenario: Opening a workspace
 - **WHEN** a member opens a workspace
-- **THEN** the file tree is collapsed, because a tree of dotfiles above the
-  skills buried the thing most people came for, and the listing is a GitHub
-  round trip nobody asked for
+- **THEN** no file listing is requested, because the listing is a GitHub round
+  trip and most people open a workspace for its chats and skills
 
-#### Scenario: Dropping files onto a collapsed tree
-- **WHEN** a member drops files while the tree is collapsed
-- **THEN** it expands, so upload progress and any per-file failure are visible
-  rather than reported inside a hidden section
+#### Scenario: Dropping files onto the Files panel
+- **WHEN** a member drops files onto the Files panel
+- **THEN** they are committed, with upload progress and any per-file failure
+  shown in that panel
 
 ### Requirement: New folders carry a placeholder
 The system SHALL create a placeholder file when a folder is created.

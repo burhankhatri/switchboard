@@ -1,55 +1,30 @@
 "use client"
 
-import { MessageSquare, FileText, Plug, CalendarClock } from "lucide-react"
-import { cn } from "@/lib/utils"
-
-interface SidebarWorkspaceEmptyStateProps {
-  isMobile?: boolean
-}
-
-const SECTIONS = [
-  { icon: MessageSquare, label: "Chats" },
-  { icon: FileText, label: "Files" },
-  { icon: Plug, label: "Connections" },
-  { icon: CalendarClock, label: "Runs" },
-] as const
+import { SIDEBAR_CATEGORIES } from "@/lib/sidebar-category"
+import { CATEGORY_META } from "./categories"
 
 /**
- * Shown in the sidebar before a workspace is selected so the empty column
- * reads as intentional — not broken — and people know what lands here.
+ * Shown in the sidebar panel before a workspace is selected, so the empty
+ * column reads as intentional — not broken — and people know what lands here.
  */
-export function SidebarWorkspaceEmptyState({ isMobile = false }: SidebarWorkspaceEmptyStateProps) {
+export function SidebarWorkspaceEmptyState() {
   return (
-    <div
-      className={cn(
-        "flex-1 min-h-0 flex flex-col",
-        isMobile ? "px-6 py-8" : "px-4 py-6"
-      )}
-    >
-      <p
-        className={cn(
-          "font-medium text-foreground/80",
-          isMobile ? "text-base" : "text-sm"
-        )}
-      >
-        Your workspace lives here
+    <div className="flex min-h-0 flex-1 flex-col px-4 py-6">
+      <p className="text-sm font-medium text-foreground/80">Your workspace lives here</p>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+        Pick a workspace from the main screen, or from the tile at the top of the
+        rail. Then each of these opens its own panel:
       </p>
-      <p
-        className={cn(
-          "mt-1.5 text-muted-foreground leading-relaxed",
-          isMobile ? "text-sm" : "text-xs"
-        )}
-      >
-        Pick a workspace from the main screen, or use the menu above. Then this
-        sidebar shows:
-      </p>
-      <ul className={cn("mt-4 space-y-2.5", isMobile ? "text-sm" : "text-xs")}>
-        {SECTIONS.map(({ icon: Icon, label }) => (
-          <li key={label} className="flex items-center gap-2.5 text-muted-foreground">
-            <Icon className={cn("shrink-0 opacity-70", isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />
-            <span>{label}</span>
-          </li>
-        ))}
+      <ul className="mt-4 space-y-2.5 text-xs">
+        {SIDEBAR_CATEGORIES.map((id) => {
+          const { label, icon: Icon } = CATEGORY_META[id]
+          return (
+            <li key={id} className="flex items-center gap-2.5 text-muted-foreground">
+              <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
+              <span>{label}</span>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

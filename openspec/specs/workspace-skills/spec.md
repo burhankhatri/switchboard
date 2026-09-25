@@ -9,18 +9,19 @@ author's.
 ## Requirements
 
 ### Requirement: Skills are the workspace's primary view
-The system SHALL present a workspace's skills as a named list, above and
-separate from its file tree.
+The system SHALL present a workspace's skills as a named list in their own
+sidebar panel, separate from the file tree.
 
-#### Scenario: Opening a workspace
-- **WHEN** a member opens a workspace
-- **THEN** its skills are listed by name and description, because a skill is
-  what the workspace is for and a file is an implementation detail of one
+#### Scenario: Opening the Skills panel
+- **WHEN** a member picks Skills on the sidebar rail
+- **THEN** the workspace's skills are listed by name and description, because a
+  skill is what the workspace is for and a file is an implementation detail of
+  one
 
 #### Scenario: Reaching the files
 - **WHEN** a member needs a script, a fixture or the workspace config
-- **THEN** the full file tree is available under a collapsed disclosure, so
-  nothing is unreachable — it is just no longer the first thing in the panel
+- **THEN** the full file tree is in the Files panel, so nothing is unreachable —
+  it just no longer sits between people and the skills
 
 ### Requirement: The system places a new skill
 The system SHALL derive a new skill's path from its name, server-side.

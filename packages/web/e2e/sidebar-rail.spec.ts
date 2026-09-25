@@ -67,7 +67,10 @@ test.describe("sidebar rail @no-sandbox", () => {
       const tab = page.getByRole("tab", { name })
       await tab.click()
       await expect(tab).toHaveAttribute("aria-selected", "true")
-      await expect(page.getByRole("tabpanel", { name }).getByRole("heading", { name })).toBeVisible()
+      // Exact: the Runs panel also has a "Recent runs" section heading.
+      await expect(
+        page.getByRole("tabpanel", { name }).getByRole("heading", { name, exact: true })
+      ).toBeVisible()
     }
 
     // One category at a time: the chat rows leave with the Chats panel.

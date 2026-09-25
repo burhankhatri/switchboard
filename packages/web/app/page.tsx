@@ -41,7 +41,7 @@ import {
   GitProvider,
   SidebarProvider,
   useSidebar,
-  COLLAPSED_WIDTH,
+  RAIL_WIDTH,
   type ChatContextValue,
   type GitContextValue,
 } from "@/lib/contexts"
@@ -265,7 +265,7 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
       root.style.removeProperty("--app-sidebar-width")
       return
     }
-    const sidebarWidth = sidebar.collapsed ? COLLAPSED_WIDTH : sidebar.width
+    const sidebarWidth = RAIL_WIDTH + (sidebar.collapsed ? 0 : sidebar.width)
     root.style.setProperty("--app-sidebar-width", `${sidebarWidth}px`)
     return () => {
       root.style.removeProperty("--app-sidebar-width")
@@ -637,7 +637,6 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
         mobileOpen={isMobile ? sidebar.mobileSidebarOpen : undefined}
         onMobileClose={isMobile ? () => sidebar.setMobileSidebarOpen(false) : undefined}
         repoFilter={sidebar.repoFilter}
-        onRepoFilterChange={handleRepoFilterChange}
         collapsedChatIds={sidebar.collapsedChatIds}
         onToggleChatCollapsed={sidebar.toggleChatCollapsed}
         onRequestMergeChats={handleRequestMergeChats}
@@ -651,7 +650,6 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
             : handleOpenScheduledJobs
         }
         scheduledJobsActive={sidebar.viewMode === "scheduled-jobs"}
-        selectedScheduledJob={sidebar.viewMode === "scheduled-jobs" ? sidebar.selectedScheduledJob : null}
         isLoadingChats={!isHydrated || (isLoading && displayChats.length === 0)}
       />
 

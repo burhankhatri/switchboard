@@ -33,7 +33,7 @@ failure looked like.
 
 ```bash
 cd packages/web && npx tsc --noEmit -p tsconfig.json   # must be ZERO errors
-npm run test                                           # 429 tests (web + sandbox-image)
+npm run test                                           # 451 tests (web + sandbox-image)
 ```
 
 Do not commit with type errors or failing tests. The suite is green and the

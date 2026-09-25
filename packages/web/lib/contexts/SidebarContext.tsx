@@ -1,18 +1,30 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react"
+import {
+  DEFAULT_SIDEBAR_CATEGORY,
+  SIDEBAR_CATEGORY_KEY,
+  SIDEBAR_COLLAPSED_KEY,
+  parseSidebarCategory,
+  parseSidebarCollapsed,
+  type SidebarCategory,
+} from "@/lib/sidebar-category"
 
 // =============================================================================
 // SidebarContext - Provides sidebar UI state to avoid prop drilling
 // =============================================================================
 
 export interface SidebarContextValue {
-  // Sidebar collapse state
+  // Collapsed leaves only the rail; the panel beside it is hidden.
   collapsed: boolean
   setCollapsed: (collapsed: boolean) => void
   toggleCollapse: () => void
 
-  // Sidebar width
+  // Which category the rail has open in the panel
+  category: SidebarCategory
+  setCategory: (category: SidebarCategory) => void
+
+  // Panel width, not counting the rail
   width: number
   setWidth: (width: number) => void
 
@@ -47,18 +59,51 @@ const SidebarContext = createContext<SidebarContextValue | null>(null)
 export const ALL_REPOSITORIES = "__all__"
 export const NO_REPOSITORY = "__none__"
 export const ARCHIVED_CHATS = "__archived__"
-export const MIN_WIDTH = 140
+export const RAIL_WIDTH = 64
+export const MIN_WIDTH = 180
 export const MAX_WIDTH = 400
-export const COLLAPSED_WIDTH = 64
+/** Dragging the panel narrower than this collapses it to the rail. */
 export const COLLAPSE_THRESHOLD = 100
 
-export function SidebarProvider({ children }: SidebarProviderProps) {
-  // Sidebar collapse state
-  const [collapsed, setCollapsed] = useState(false)
-  const toggleCollapse = useCallback(() => setCollapsed((c) => !c), [])
+function readStorage(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
 
-  // Sidebar width
-  const [width, setWidth] = useState(260)
+function writeStorage(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    // Private mode or a full quota: the choice lasts this session, which is fine.
+  }
+}
+
+export function SidebarProvider({ children }: SidebarProviderProps) {
+  const [collapsed, setCollapsedState] = useState(false)
+  const [category, setCategoryState] = useState<SidebarCategory>(DEFAULT_SIDEBAR_CATEGORY)
+
+  // Restored after mount rather than in the initialiser: the server render has
+  // no localStorage, and reading it during render would mismatch hydration.
+  useEffect(() => {
+    setCollapsedState(parseSidebarCollapsed(readStorage(SIDEBAR_COLLAPSED_KEY)))
+    setCategoryState(parseSidebarCategory(readStorage(SIDEBAR_CATEGORY_KEY)))
+  }, [])
+
+  const setCollapsed = useCallback((next: boolean) => {
+    setCollapsedState(next)
+    writeStorage(SIDEBAR_COLLAPSED_KEY, String(next))
+  }, [])
+  const toggleCollapse = useCallback(() => setCollapsed(!collapsed), [collapsed, setCollapsed])
+
+  const setCategory = useCallback((next: SidebarCategory) => {
+    setCategoryState(next)
+    writeStorage(SIDEBAR_CATEGORY_KEY, next)
+  }, [])
+
+  const [width, setWidth] = useState(240)
 
   // Mobile sidebar state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -102,6 +147,8 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
     collapsed,
     setCollapsed,
     toggleCollapse,
+    category,
+    setCategory,
     width,
     setWidth,
     mobileSidebarOpen,

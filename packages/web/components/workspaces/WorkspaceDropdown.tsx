@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Boxes,
   Check,
-  ChevronDown,
   LogIn,
   Loader2,
   Plus,
@@ -14,6 +13,7 @@ import {
   Users,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { workspaceInitials } from "@/lib/workspace-initials"
 import { useWorkspace, type ActiveWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { WorkspaceCreatingPanel } from "./WorkspaceCreatingPanel"
 import { WorkspaceMembersDialog } from "./WorkspaceMembers"
@@ -36,22 +36,14 @@ async function json<T>(res: Response): Promise<T> {
   return res.json()
 }
 
-interface WorkspaceDropdownProps {
-  /** When collapsed, show only the icon. */
-  collapsed?: boolean
-  /** Extra class names for the wrapper. */
-  className?: string
-}
-
 /**
- * Inline sidebar workspace selector.
+ * The workspace tile at the top of the sidebar rail.
  *
- * Always visible at the top of the sidebar. Shows the active workspace name
- * (or a placeholder) and opens a popover to switch, join, or create workspaces.
- * People live here too — membership is a property of the workspace, not another
- * scrolling sidebar section.
+ * Shows the active workspace's initials and opens a popover to switch, join, or
+ * create workspaces. People live here too — membership is a property of the
+ * workspace, not another sidebar section.
  */
-export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDropdownProps) {
+export function WorkspaceDropdown() {
   const { activeWorkspace, setActiveWorkspace } = useWorkspace()
   const [open, setOpen] = useState(false)
   const [peopleOpen, setPeopleOpen] = useState(false)
@@ -144,98 +136,31 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
     <WorkspaceMembersDialog open={peopleOpen} onClose={() => setPeopleOpen(false)} />
   )
 
-  // ── Collapsed state: just a Boxes icon ──────────────────────────────────
-  if (collapsed) {
-    return (
-      <div ref={wrapperRef} className={cn("relative flex justify-center", className)}>
-        <button
-          ref={triggerRef as React.RefObject<HTMLButtonElement>}
-          onClick={() => {
-            if (create.isPending) return
-            setOpen((v) => !v)
-          }}
-          className={cn(
-            "p-1.5 rounded-md transition-colors cursor-pointer",
-            activeWorkspace
-              ? "text-primary hover:bg-accent"
-              : "text-muted-foreground hover:bg-accent hover:text-foreground"
-          )}
-          title={activeWorkspace ? activeWorkspace.name : "Select workspace"}
-          aria-label="Workspaces"
-          aria-expanded={open}
-        >
-          <Boxes className="h-4 w-4" />
-        </button>
+  // Named for the workspace rather than "Workspaces": it is how people (and
+  // tests) find which workspace is open, now that the rail shows only initials.
+  const label = activeWorkspace ? activeWorkspace.name : "Select workspace"
 
-        {open && <DropdownPanel
-          mode={mode} setMode={setMode}
-          name={name} setName={setName}
-          systemPrompt={systemPrompt} setSystemPrompt={setSystemPrompt}
-          error={error} setError={setError}
-          isLoading={isLoading} loadError={loadError}
-          mine={mine} others={others}
-          activeWorkspace={activeWorkspace}
-          create={create} join={join}
-          createStartedAt={createStartedAt}
-          setCreateStartedAt={setCreateStartedAt}
-          selectWorkspace={selectWorkspace}
-          onOpenPeople={openPeople}
-          side="left"
-          anchorRef={triggerRef}
-          panelRef={panelRef}
-        />}
-        {peopleDialog}
-      </div>
-    )
-  }
-
-  // ── Expanded state: full-width trigger ──────────────────────────────────
   return (
-    <div ref={wrapperRef} className={cn("relative", className)}>
-      <div className="flex items-center gap-0.5">
-        <button
-          ref={triggerRef as React.RefObject<HTMLButtonElement>}
-          onClick={() => {
-            if (create.isPending) return
-            setOpen((v) => !v)
-          }}
-          aria-expanded={open}
-          aria-haspopup="listbox"
-          className={cn(
-            "min-w-0 flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer group",
-            "hover:bg-accent/60",
-            open && "bg-accent/40"
-          )}
-        >
-          <Boxes className={cn(
-            "h-4 w-4 shrink-0 transition-colors",
-            activeWorkspace ? "text-primary" : "text-muted-foreground"
-          )} />
-          <span className="min-w-0 flex-1 text-left">
-            {activeWorkspace ? (
-              <span className="block text-sm font-medium truncate">{activeWorkspace.name}</span>
-            ) : (
-              <span className="block text-sm text-muted-foreground">Select workspace</span>
-            )}
-          </span>
-          <ChevronDown className={cn(
-            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
-            open && "rotate-180"
-          )} />
-        </button>
-        {activeWorkspace && (
-          // Members belong to the workspace, not the file tree.
-          <button
-            type="button"
-            onClick={openPeople}
-            title="People"
-            aria-label="People in this workspace"
-            className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:bg-accent/60 hover:text-foreground transition-colors cursor-pointer"
-          >
-            <Users className="h-4 w-4" />
-          </button>
+    <div ref={wrapperRef} className="relative flex justify-center">
+      <button
+        ref={triggerRef as React.RefObject<HTMLButtonElement>}
+        onClick={() => {
+          if (create.isPending) return
+          setOpen((v) => !v)
+        }}
+        className={cn(
+          "flex h-9 w-9 items-center justify-center rounded-lg text-[13px] font-semibold transition-colors cursor-pointer",
+          activeWorkspace
+            ? "bg-primary/10 text-primary hover:bg-primary/15"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground"
         )}
-      </div>
+        title={label}
+        aria-label={label}
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        {activeWorkspace ? workspaceInitials(activeWorkspace.name) : <Boxes className="h-4 w-4" />}
+      </button>
 
       {open && <DropdownPanel
         mode={mode} setMode={setMode}
@@ -250,8 +175,7 @@ export function WorkspaceDropdown({ collapsed = false, className }: WorkspaceDro
         setCreateStartedAt={setCreateStartedAt}
         selectWorkspace={selectWorkspace}
         onOpenPeople={openPeople}
-        side="bottom"
-        anchorRef={wrapperRef}
+        anchorRef={triggerRef}
         panelRef={panelRef}
       />}
       {peopleDialog}
@@ -281,7 +205,6 @@ interface PanelProps {
   setCreateStartedAt: (t: number | null) => void
   selectWorkspace: (w: WorkspaceSummary) => void
   onOpenPeople: () => void
-  side: "bottom" | "left"
   anchorRef: React.RefObject<HTMLElement | null>
   panelRef: React.RefObject<HTMLDivElement | null>
 }
@@ -290,7 +213,7 @@ function DropdownPanel({
   mode, setMode, name, setName, systemPrompt, setSystemPrompt,
   error, setError, isLoading, loadError, mine, others,
   activeWorkspace, create, join, createStartedAt, setCreateStartedAt,
-  selectWorkspace, onOpenPeople, side, anchorRef, panelRef,
+  selectWorkspace, onOpenPeople, anchorRef, panelRef,
 }: PanelProps) {
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
@@ -300,17 +223,16 @@ function DropdownPanel({
   // The sidebar carries backdrop-filter for the glass effect, and an element
   // with a backdrop-filter clips its descendants to its own bounds — so an
   // in-sidebar absolute panel was cut off mid-word. Escaping the sidebar is the
-  // only fix that keeps both the glass and the full panel. Width follows the
-  // trigger in the expanded sidebar so the menu does not spill into the main
-  // pane; collapsed mode still opens a full-width panel to the right of the icon.
+  // only fix that keeps both the glass and the full panel. It opens to the right
+  // of the rail tile, over the sidebar panel.
   useLayoutEffect(() => {
     const el = anchorRef.current
     if (!el) return
     const update = () => {
       const r = el.getBoundingClientRect()
-      const width = side === "bottom" ? r.width : 288
-      const top = side === "bottom" ? r.bottom + 4 : r.top
-      const left = side === "bottom" ? r.left : r.right + 4
+      const width = 288
+      const top = r.top
+      const left = r.right + 4
       setPos({
         top: Math.min(top, window.innerHeight - 120),
         // Keep it on screen if the trigger sits near the right edge.
@@ -325,7 +247,7 @@ function DropdownPanel({
       window.removeEventListener("resize", update)
       window.removeEventListener("scroll", update, true)
     }
-  }, [anchorRef, side])
+  }, [anchorRef])
 
   if (!pos) return null
 

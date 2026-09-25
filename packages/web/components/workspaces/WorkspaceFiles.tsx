@@ -9,6 +9,7 @@ import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { writeCachedFile } from "@/lib/workspace-file-cache"
 import { planFolderImport, type SkippedFile } from "@/lib/workspace-import"
 import { cn } from "@/lib/utils"
+import { PanelAction, PanelBody, PanelHeader } from "@/components/sidebar/Panel"
 
 interface RepoFile { path: string; name: string; size: number }
 
@@ -97,14 +98,14 @@ function TreeNode({ node, depth }: { node: Node; depth: number }) {
         onFocus={() => prefetch(node.path!)}
         style={pad}
         className={cn(
-          "flex items-center gap-1.5 w-full py-1 pr-2 rounded text-left text-xs cursor-pointer",
+          "flex items-center gap-1.5 w-full py-1 pr-2 rounded-md text-left text-[13px] cursor-pointer",
           active ? "bg-accent text-foreground" : "hover:bg-accent/50 text-muted-foreground"
         )}
       >
         {node.name === "SKILL.md" ? (
-          <Sparkles className="h-3 w-3 shrink-0 text-primary" />
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />
         ) : (
-          <FileText className="h-3 w-3 shrink-0" />
+          <FileText className="h-3.5 w-3.5 shrink-0" />
         )}
         <span className="truncate">{node.name}</span>
       </button>
@@ -116,10 +117,10 @@ function TreeNode({ node, depth }: { node: Node; depth: number }) {
       <button
         onClick={() => setOpen((v) => !v)}
         style={pad}
-        className="flex items-center gap-1 w-full py-1 pr-2 rounded text-left text-xs text-muted-foreground hover:bg-accent/50 cursor-pointer"
+        className="flex items-center gap-1 w-full py-1 pr-2 rounded-md text-left text-[13px] text-muted-foreground hover:bg-accent/50 cursor-pointer"
       >
-        <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", open && "rotate-90")} />
-        <Folder className="h-3 w-3 shrink-0" />
+        <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 transition-transform", open && "rotate-90")} />
+        <Folder className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate">{node.name}</span>
       </button>
       {open &&
@@ -139,16 +140,15 @@ function TreeNode({ node, depth }: { node: Node; depth: number }) {
  * detail; surfacing them as a second `.claude` only invited the question of
  * which one you were editing.)
  *
- * Collapsed by default. A raw git tree is the honest view of a workspace and
- * the only way to reach a script or a fixture, but it is not what most people
- * open a workspace to do — `WorkspaceSkills` is, and a tree of dotfiles above
- * it buried the thing that mattered.
+ * Its own panel, behind Skills rather than above them. A raw git tree is the
+ * honest view of a workspace and the only way to reach a script or a fixture,
+ * but it is not what most people open a workspace to do, and a tree of
+ * dotfiles above the skills buried the thing that mattered.
  *
  * Anything added here is committed, so the next run clones it.
  */
 export function WorkspaceFiles() {
   const { activeWorkspace } = useWorkspace()
-  const [open, setOpen] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -183,9 +183,9 @@ export function WorkspaceFiles() {
         if (!r.ok) throw new Error(String(r.status))
         return r.json() as Promise<{ workspace: RepoFile[]; shared: RepoFile[] }>
       }),
-    // Collapsed means nobody is looking, and the listing is a GitHub round
-    // trip on every workspace switch.
-    enabled: !!activeWorkspace && open,
+    // Only mounted while the Files panel is open, so the listing — a GitHub
+    // round trip — never runs for someone who did not ask for it.
+    enabled: !!activeWorkspace,
     retry: false,
   })
 
@@ -216,11 +216,12 @@ export function WorkspaceFiles() {
   const base = activeWorkspace.path
   if (!base) {
     return (
-      <div className="px-2 pb-2">
-        <p className="px-2 py-2 text-xs text-destructive">
-          This workspace is missing its path. Re-pick it from the dropdown.
+      <>
+        <PanelHeader title="Files" />
+        <p className="px-4 py-2 text-xs text-destructive">
+          This workspace is missing its path. Re-pick it from the workspace menu.
         </p>
-      </div>
+      </>
     )
   }
 
@@ -354,168 +355,142 @@ export function WorkspaceFiles() {
 
   return (
     <div
-      className={cn("px-2 pb-2 rounded-lg", dragging && "ring-2 ring-primary/60 bg-primary/5")}
+      className={cn(
+        "flex min-h-0 flex-1 flex-col rounded-lg",
+        dragging && "ring-2 ring-inset ring-primary/60 bg-primary/5"
+      )}
       onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => {
         e.preventDefault()
         setDragging(false)
-        // Reveal the panel: otherwise the progress line, and any per-file
-        // failure, lands inside a collapsed section nobody can see.
-        setOpen(true)
         void addFiles([...e.dataTransfer.files])
       }}
     >
-      <div className="flex items-center gap-0.5 px-2 py-1">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex flex-1 items-center gap-1 rounded py-0.5 text-left text-[11px] uppercase tracking-wide text-muted-foreground hover:text-foreground cursor-pointer"
+      <PanelHeader title="Files">
+        <PanelAction label="New file" onClick={() => startCreating("file")}>
+          <FilePlus className="h-4 w-4" />
+        </PanelAction>
+        <PanelAction label="New folder" onClick={() => startCreating("folder")}>
+          <FolderPlus className="h-4 w-4" />
+        </PanelAction>
+        <PanelAction label="Add files from your computer" onClick={() => fileInput.current?.click()}>
+          <Upload className="h-4 w-4" />
+        </PanelAction>
+        <PanelAction
+          label="Import a folder — keeps its structure, lands as one commit"
+          onClick={() => folderInput.current?.click()}
         >
-          <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", open && "rotate-90")} />
-          Files
-        </button>
-        {open && (
-          <>
-            <button
-              onClick={() => startCreating("file")}
-              title="New file"
-              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
-            >
-              <FilePlus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => startCreating("folder")}
-              title="New folder"
-              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
-            >
-              <FolderPlus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => fileInput.current?.click()}
-              title="Add files from your computer"
-              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
-            >
-              <Upload className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => folderInput.current?.click()}
-              title="Import a folder — keeps its structure, lands as one commit"
-              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
-            >
-              <FolderUp className="h-3.5 w-3.5" />
-            </button>
-          </>
-        )}
-        <input
-          ref={fileInput}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = "" }}
-        />
-        {/* Directory mode is set as an attribute in an effect — see above. */}
-        <input
-          ref={folderInput}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            setOpen(true)
-            void importFolder([...(e.target.files ?? [])])
-            e.target.value = ""
-          }}
-        />
-      </div>
+          <FolderUp className="h-4 w-4" />
+        </PanelAction>
+      </PanelHeader>
+      <input
+        ref={fileInput}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = "" }}
+      />
+      {/* Directory mode is set as an attribute in an effect — see above. */}
+      <input
+        ref={folderInput}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          void importFolder([...(e.target.files ?? [])])
+          e.target.value = ""
+        }}
+      />
 
-      {open && (
-        <>
-        {(isLoading || busy || write.isPending) && (
-          <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            {busy ? `Uploading ${busy}…` : isLoading ? "Loading…" : "Committing…"}
-          </div>
-        )}
-        {error && <p className="px-2 py-1.5 text-xs text-muted-foreground">Could not load files.</p>}
-        {(write.error || uploadError) && (
-          <p className="px-2 py-1.5 text-xs text-destructive break-words">
-            {uploadError ?? (write.error as Error).message}
-          </p>
-        )}
+      <PanelBody>
+        <div className="px-2">
+          {(isLoading || busy || write.isPending) && (
+            <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {busy ? `Uploading ${busy}…` : isLoading ? "Loading…" : "Committing…"}
+            </div>
+          )}
+          {error && <p className="px-2 py-1.5 text-xs text-muted-foreground">Could not load files.</p>}
+          {(write.error || uploadError) && (
+            <p className="px-2 py-1.5 text-xs text-destructive break-words">
+              {uploadError ?? (write.error as Error).message}
+            </p>
+          )}
 
-        {/* An import that dropped things says so. Left until the next action
-            rather than auto-dismissed: "why is my .env not here" is exactly the
-            question this answers. */}
-        {skipped.length > 0 && (
-          <details className="px-2 py-1.5">
-            <summary className="text-xs text-muted-foreground cursor-pointer">
-              Skipped {skipped.length} file{skipped.length === 1 ? "" : "s"}
-            </summary>
-            <ul className="mt-1 space-y-0.5">
-              {skipped.map((s) => (
-                <li key={s.relativePath} className="text-[11px] text-muted-foreground break-all">
-                  <span className="text-ink-3">{s.relativePath}</span> — {s.reason}
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
+          {/* An import that dropped things says so. Left until the next action
+              rather than auto-dismissed: "why is my .env not here" is exactly the
+              question this answers. */}
+          {skipped.length > 0 && (
+            <details className="px-2 py-1.5">
+              <summary className="text-xs text-muted-foreground cursor-pointer">
+                Skipped {skipped.length} file{skipped.length === 1 ? "" : "s"}
+              </summary>
+              <ul className="mt-1 space-y-0.5">
+                {skipped.map((s) => (
+                  <li key={s.relativePath} className="text-[11px] text-muted-foreground break-all">
+                    <span className="text-ink-3">{s.relativePath}</span> — {s.reason}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
 
-        {/* Inline creator. Replaces window.prompt(), which put a Chrome dialog in
-            front of the app and asked for a path when a name is what is wanted. */}
-        {creating && (
-          <div
-            className="flex items-center gap-1.5 px-2 py-1"
-            style={{ animation: "fade-up 200ms var(--ease-spring) both" }}
-          >
-            {creating === "folder" ? (
-              <Folder className="h-3 w-3 shrink-0 text-muted-foreground" />
-            ) : (
-              <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
-            )}
-            <input
-              ref={nameInput}
-              value={newName}
-              onChange={(e) => {
-                setNewName(e.target.value)
-                setNameError(null)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  submitNew()
-                } else if (e.key === "Escape") {
-                  e.preventDefault()
-                  setCreating(null)
+          {/* Inline creator. Replaces window.prompt(), which put a Chrome dialog in
+              front of the app and asked for a path when a name is what is wanted. */}
+          {creating && (
+            <div
+              className="flex items-center gap-1.5 px-2 py-1"
+              style={{ animation: "fade-up 200ms var(--ease-spring) both" }}
+            >
+              {creating === "folder" ? (
+                <Folder className="h-3 w-3 shrink-0 text-muted-foreground" />
+              ) : (
+                <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+              )}
+              <input
+                ref={nameInput}
+                value={newName}
+                onChange={(e) => {
+                  setNewName(e.target.value)
                   setNameError(null)
-                }
-              }}
-              onBlur={() => {
-                // Blur cancels rather than commits. Creating a file is a commit to
-                // a shared repo; clicking away should not be enough to do that.
-                if (!newName.trim()) setCreating(null)
-              }}
-              placeholder={creating === "folder" ? "folder name" : "name.py"}
-              aria-label={creating === "folder" ? "New folder name" : "New file name"}
-              className="min-w-0 flex-1 rounded-chip border border-line bg-field px-1.5 py-0.5 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
-            />
-          </div>
-        )}
-        {nameError && (
-          <p className="px-2 pb-1 pl-7 text-[11px] text-destructive">{nameError}</p>
-        )}
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    submitNew()
+                  } else if (e.key === "Escape") {
+                    e.preventDefault()
+                    setCreating(null)
+                    setNameError(null)
+                  }
+                }}
+                onBlur={() => {
+                  // Blur cancels rather than commits. Creating a file is a commit to
+                  // a shared repo; clicking away should not be enough to do that.
+                  if (!newName.trim()) setCreating(null)
+                }}
+                placeholder={creating === "folder" ? "folder name" : "name.py"}
+                aria-label={creating === "folder" ? "New folder name" : "New file name"}
+                className="min-w-0 flex-1 rounded-chip border border-line bg-field px-1.5 py-0.5 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
+              />
+            </div>
+          )}
+          {nameError && (
+            <p className="px-2 pb-1 pl-7 text-[11px] text-destructive">{nameError}</p>
+          )}
 
-        {data && [...toTree(data.workspace).children.values()].map((c) => (
-          <TreeNode key={c.name} node={c} depth={0} />
-        ))}
+          {data && [...toTree(data.workspace).children.values()].map((c) => (
+            <TreeNode key={c.name} node={c} depth={0} />
+          ))}
 
-        {data && data.workspace.length === 0 && !isLoading && (
-          <p className="px-2 py-2 text-xs text-muted-foreground leading-snug">
-            No files yet. Drop text files here — they commit for everyone on the next run.
-          </p>
-        )}
-        </>
-      )}
+          {data && data.workspace.length === 0 && !isLoading && (
+            <p className="px-2 py-2 text-xs text-muted-foreground leading-snug">
+              No files yet. Drop text files here — they commit for everyone on the next run.
+            </p>
+          )}
+        </div>
+      </PanelBody>
     </div>
   )
 }

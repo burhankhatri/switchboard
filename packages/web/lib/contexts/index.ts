@@ -15,7 +15,7 @@ export {
   ARCHIVED_CHATS,
   MIN_WIDTH,
   MAX_WIDTH,
-  COLLAPSED_WIDTH,
+  RAIL_WIDTH,
   COLLAPSE_THRESHOLD,
 } from "./SidebarContext"
 export type { SidebarContextValue } from "./SidebarContext"

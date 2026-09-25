@@ -10,16 +10,17 @@ import {
 } from "@/lib/query/hooks/useWorkspaceSkills"
 import { skillSlug } from "@/lib/workspace-skills"
 import { cn } from "@/lib/utils"
+import { PanelAction, PanelBody, PanelHeader } from "@/components/sidebar/Panel"
 
 /**
- * The skills a workspace carries — the first thing in the panel, because it is
- * the thing people came for.
+ * The Skills panel: what the workspace teaches its agent, by name and
+ * description, because that is the thing people open a workspace for.
  *
  * A skill is a folder at `.claude/skills/<slug>/SKILL.md`, and that path is
  * what makes the agent find it. Adding one here sends a name and a description
  * and lets the server work out the path, so nobody has to know the convention
- * to add knowledge to a workspace. The files underneath are still there, one
- * disclosure down, for whoever does.
+ * to add knowledge to a workspace. The files underneath are in the Files panel
+ * for whoever does.
  */
 export function WorkspaceSkills() {
   const { activeWorkspace, openFile, requestOpenFile } = useWorkspace()
@@ -81,123 +82,122 @@ export function WorkspaceSkills() {
     create.mutate({ name: name.trim(), description: description.trim() })
   }
 
-  return (
-    <div className="px-2 pb-2">
-      <div className="flex items-center gap-0.5 px-2 py-1">
-        <p className="flex-1 text-[11px] uppercase tracking-wide text-muted-foreground">Skills</p>
-        <button
-          onClick={() => (adding ? close() : open())}
-          title="Add a skill"
-          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
-        >
-          <Plus className={cn("h-3.5 w-3.5 transition-transform", adding && "rotate-45")} />
-        </button>
-      </div>
-
-      {isLoading && (
-        <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" /> Loading…
-        </div>
-      )}
-
-      {/* A failed load must not read as an empty workspace — someone would add
-          a second copy of a skill that is already there. */}
-      {!isLoading && isError && (
-        <p className="px-2 py-1.5 text-xs text-destructive">Could not load skills.</p>
-      )}
-
-      {skills.map((s) => (
-        <button
-          key={s.slug}
-          onClick={() => void requestOpenFile(s.path)}
-          title={s.description || s.name}
-          className={cn(
-            "flex w-full items-start gap-1.5 rounded px-2 py-1.5 text-left cursor-pointer",
-            openFile === s.path ? "bg-accent" : "hover:bg-accent/50"
-          )}
-        >
-          <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs text-foreground">{s.name}</span>
-            <span
-              className={cn(
-                "block truncate text-[10px]",
-                s.description ? "text-muted-foreground" : "text-destructive"
-              )}
-            >
-              {/* No description means the agent has nothing to match a task
-                  against, so it is a fault to fix rather than a blank line. */}
-              {s.description || "No description — the agent cannot tell when to use this"}
-            </span>
-          </span>
-        </button>
-      ))}
-
-      {!isLoading && !isError && skills.length === 0 && !adding && (
-        <p className="px-2 py-2 text-xs leading-snug text-muted-foreground">
-          No skills yet. Add one and every run of this workspace picks it up.
+  const form = adding && (
+    <div
+      className="space-y-1.5 px-2 py-1.5"
+      style={{ animation: "fade-up 200ms var(--ease-spring) both" }}
+    >
+      <input
+        ref={nameInput}
+        value={name}
+        onChange={(e) => {
+          setName(e.target.value)
+          setError(null)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault()
+            close()
+          }
+        }}
+        placeholder="Campaign audit"
+        aria-label="Skill name"
+        className="w-full rounded-chip border border-line bg-field px-1.5 py-1 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
+      />
+      <textarea
+        value={description}
+        onChange={(e) => {
+          setDescription(e.target.value)
+          setError(null)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault()
+            close()
+          } else if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault()
+            submit()
+          }
+        }}
+        rows={2}
+        placeholder="When should the agent use this?"
+        aria-label="When the agent should use this skill"
+        className="w-full resize-none rounded-chip border border-line bg-field px-1.5 py-1 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
+      />
+      {name.trim() && (
+        <p className="text-[10px] text-muted-foreground">
+          Saved as <code>.claude/skills/{skillSlug(name) || "…"}/SKILL.md</code>
         </p>
       )}
+      <button
+        onClick={submit}
+        disabled={create.isPending}
+        className="flex w-full items-center justify-center gap-1.5 rounded-chip bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-60 cursor-pointer"
+      >
+        {create.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+        {create.isPending ? "Committing…" : "Add skill"}
+      </button>
+    </div>
+  )
 
-      {adding && (
-        <div
-          className="space-y-1.5 px-2 py-1.5"
-          style={{ animation: "fade-up 200ms var(--ease-spring) both" }}
-        >
-          <input
-            ref={nameInput}
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value)
-              setError(null)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault()
-                close()
-              }
-            }}
-            placeholder="Campaign audit"
-            aria-label="Skill name"
-            className="w-full rounded-chip border border-line bg-field px-1.5 py-1 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => {
-              setDescription(e.target.value)
-              setError(null)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault()
-                close()
-              } else if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                submit()
-              }
-            }}
-            rows={2}
-            placeholder="When should the agent use this?"
-            aria-label="When the agent should use this skill"
-            className="w-full resize-none rounded-chip border border-line bg-field px-1.5 py-1 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
-          />
-          {name.trim() && (
-            <p className="text-[10px] text-muted-foreground">
-              Saved as <code>.claude/skills/{skillSlug(name) || "…"}/SKILL.md</code>
+  return (
+    <>
+      <PanelHeader title="Skills">
+        <PanelAction label={adding ? "Cancel" : "Add a skill"} onClick={() => (adding ? close() : open())}>
+          <Plus className={cn("h-4 w-4 transition-transform", adding && "rotate-45")} />
+        </PanelAction>
+      </PanelHeader>
+      <PanelBody>
+        <div className="px-2">
+          {form}
+          {error && <p className="px-2 pb-1 text-[11px] text-destructive">{error}</p>}
+
+          {isLoading && (
+            <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Loading…
+            </div>
+          )}
+
+          {/* A failed load must not read as an empty workspace — someone would
+              add a second copy of a skill that is already there. */}
+          {!isLoading && isError && (
+            <p className="px-2 py-1.5 text-xs text-destructive">Could not load skills.</p>
+          )}
+
+          {skills.map((s) => (
+            <button
+              key={s.slug}
+              onClick={() => void requestOpenFile(s.path)}
+              title={s.description || s.name}
+              className={cn(
+                "flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left cursor-pointer",
+                openFile === s.path ? "bg-accent" : "hover:bg-accent/50"
+              )}
+            >
+              <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-foreground">{s.name}</span>
+                <span
+                  className={cn(
+                    "block truncate text-xs",
+                    s.description ? "text-muted-foreground" : "text-destructive"
+                  )}
+                >
+                  {/* No description means the agent has nothing to match a task
+                      against, so it is a fault to fix rather than a blank line. */}
+                  {s.description || "No description — the agent cannot tell when to use this"}
+                </span>
+              </span>
+            </button>
+          ))}
+
+          {!isLoading && !isError && skills.length === 0 && !adding && (
+            <p className="px-2 py-2 text-xs leading-snug text-muted-foreground">
+              No skills yet. Add one and every run of this workspace picks it up.
             </p>
           )}
-          <button
-            onClick={submit}
-            disabled={create.isPending}
-            className="flex w-full items-center justify-center gap-1.5 rounded-chip bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-60 cursor-pointer"
-          >
-            {create.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
-            {create.isPending ? "Committing…" : "Add skill"}
-          </button>
         </div>
-      )}
-
-      {error && <p className="px-2 pb-1 text-[11px] text-destructive">{error}</p>}
-    </div>
+      </PanelBody>
+    </>
   )
 }
