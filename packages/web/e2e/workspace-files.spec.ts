@@ -102,10 +102,12 @@ test.describe("workspace files @no-sandbox", () => {
     })
 
     const sent = page.waitForRequest(isImport(workspace.id))
-    const panel = page.getByRole("tabpanel", { name: "Files" })
-    await panel.dispatchEvent("dragenter", { dataTransfer })
-    await panel.dispatchEvent("dragover", { dataTransfer })
-    await panel.dispatchEvent("drop", { dataTransfer })
+    // The drop zone is the whole Files panel below the tabs; events are sent
+    // to it directly because a synthetic event does not travel down the tree.
+    const zone = page.getByRole("tabpanel", { name: "Files" }).getByTestId("files-drop-zone")
+    await zone.dispatchEvent("dragenter", { dataTransfer })
+    await zone.dispatchEvent("dragover", { dataTransfer })
+    await zone.dispatchEvent("drop", { dataTransfer })
 
     const body = (await sent).postDataJSON() as ImportBody
     expect(body.files.map((f) => f.relativePath).sort()).toEqual(["a.txt", "b.txt"])

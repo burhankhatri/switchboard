@@ -1,165 +1,50 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type DragEvent } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  ChevronRight, FilePlus, FileText, FolderPlus, Folder, FolderUp, Loader2, Sparkles, Upload,
-} from "lucide-react"
+import { FilePlus, FolderPlus, FolderUp, Loader2, Plus, Upload, X } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
-import { writeCachedFile } from "@/lib/workspace-file-cache"
-import { planFolderImport, type SkippedFile } from "@/lib/workspace-import"
-import { cn } from "@/lib/utils"
-import { PanelAction, PanelBody, PanelHeader } from "@/components/sidebar/Panel"
+import { collectDroppedFiles, entriesFromDataTransfer } from "@/lib/dropped-files"
+import { formatBytes } from "@/lib/format-bytes"
+import { IMPORT_MAX_FILE_BYTES } from "@/lib/workspace-import"
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu"
+import { PanelBody, PanelHeader } from "@/components/sidebar/Panel"
+import { FileTree, GITKEEP, type RepoFile } from "./files/FileTree"
+import { FileIcon, FolderIcon } from "./files/FileIcon"
+import { useWorkspaceUpload, type UploadItem } from "./files/useWorkspaceUpload"
 
-interface RepoFile { path: string; name: string; size: number }
+const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes("Files")
 
-interface Node { name: string; path?: string; children: Map<string, Node> }
-function toTree(files: RepoFile[]): Node {
-  const root: Node = { name: "", children: new Map() }
-  for (const f of files) {
-    let node = root
-    const parts = f.name.split("/")
-    parts.forEach((part, i) => {
-      if (!node.children.has(part)) node.children.set(part, { name: part, children: new Map() })
-      node = node.children.get(part)!
-      if (i === parts.length - 1) node.path = f.path
-    })
-  }
-  return root
-}
+const MENU_ITEM =
+  "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-accent cursor-pointer"
 
 /**
- * Uploads are committed as UTF-8 text, so this is for skills, scripts and data
- * files — not binaries. The cap keeps a stray large file from being turned into
- * a commit.
- */
-const MAX_UPLOAD_BYTES = 256 * 1024
-
-/** git has no empty directories, so a new folder is a folder with a .gitkeep. */
-const GITKEEP = ".gitkeep"
-
-/**
- * A file's bytes as base64.
- *
- * readAsDataURL rather than reading text: an imported folder contains images
- * and fixtures as readily as scripts, and `.text()` would turn every one of
- * them into replacement characters. Base64 travels through JSON unchanged and
- * is what the git blob API wants anyway.
- */
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error(`Could not read ${file.name}`))
-    reader.onload = () => {
-      const s = String(reader.result)
-      resolve(s.slice(s.indexOf(",") + 1))
-    }
-    reader.readAsDataURL(file)
-  })
-}
-
-function TreeNode({ node, depth }: { node: Node; depth: number }) {
-  const { activeWorkspace, openFile, requestOpenFile } = useWorkspace()
-  const [open, setOpen] = useState(depth < 2)
-  const qc = useQueryClient()
-  const pad = { paddingLeft: `${depth * 12 + 8}px` }
-
-  // Fetch on the way to the click. Reading a file is a GitHub round trip, and
-  // the ~300ms between pointing at a row and pressing it is enough to hide
-  // most of it — by the time the editor mounts the content is usually cached.
-  const prefetch = (path: string) => {
-    const wsId = activeWorkspace?.id
-    if (!wsId) return
-    void qc.prefetchQuery({
-      queryKey: ["workspace-file", wsId, path],
-      queryFn: async () => {
-        const r = await fetch(`/api/workspaces/${wsId}/files?path=${encodeURIComponent(path)}`)
-        if (!r.ok) throw new Error(String(r.status))
-        const file = await r.json()
-        writeCachedFile(wsId, path, {
-          content: file.content,
-          sha: file.sha,
-          truncated: file.truncated,
-        })
-        return file
-      },
-      staleTime: 30 * 1000,
-    })
-  }
-
-  if (node.path) {
-    if (node.name === GITKEEP) return null // placeholder, not content
-    const active = openFile === node.path
-    return (
-      <button
-        data-workspace-file
-        onClick={() => void requestOpenFile(node.path!)}
-        onMouseEnter={() => prefetch(node.path!)}
-        onFocus={() => prefetch(node.path!)}
-        style={pad}
-        className={cn(
-          "flex items-center gap-1.5 w-full py-1 pr-2 rounded-md text-left text-[13px] cursor-pointer",
-          active ? "bg-accent text-foreground" : "hover:bg-accent/50 text-muted-foreground"
-        )}
-      >
-        {node.name === "SKILL.md" ? (
-          <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />
-        ) : (
-          <FileText className="h-3.5 w-3.5 shrink-0" />
-        )}
-        <span className="truncate">{node.name}</span>
-      </button>
-    )
-  }
-
-  return (
-    <>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={pad}
-        className="flex items-center gap-1 w-full py-1 pr-2 rounded-md text-left text-[13px] text-muted-foreground hover:bg-accent/50 cursor-pointer"
-      >
-        <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 transition-transform", open && "rotate-90")} />
-        <Folder className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{node.name}</span>
-      </button>
-      {open &&
-        [...node.children.values()].map((c) => (
-          <TreeNode key={c.name + (c.path ?? "")} node={c} depth={depth + 1} />
-        ))}
-    </>
-  )
-}
-
-/**
- * The workspace's files.
- *
- * One tree, not two. Files live in the workspace repo and everyone in the
- * workspace sees the same ones — "shared" is not a separate place, it is what a
- * workspace already is. (The repo-root skills that also load are a platform
- * detail; surfacing them as a second `.claude` only invited the question of
- * which one you were editing.)
+ * The Files panel: the workspace the way Finder shows a folder.
  *
  * Its own panel, behind Skills rather than above them. A raw git tree is the
  * honest view of a workspace and the only way to reach a script or a fixture,
- * but it is not what most people open a workspace to do, and a tree of
- * dotfiles above the skills buried the thing that mattered.
+ * but it is not what most people open a workspace to do. It is mounted only
+ * while the panel is open, so the listing — a GitHub round trip — never runs
+ * for someone who did not ask for it.
  *
- * Anything added here is committed, so the next run clones it.
+ * Files arrive three ways — picked, a picked folder, or dropped onto the panel
+ * or onto a folder in it — and all three go through useWorkspaceUpload, so they
+ * share one set of caps and the binary-safe import route. Anything added here
+ * is committed, so the next run clones it.
  */
 export function WorkspaceFiles() {
   const { activeWorkspace } = useWorkspace()
-  const [dragging, setDragging] = useState(false)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  // What an import left behind, shown after it finishes. A folder pick sweeps
-  // in junk by definition, so "committed 12, skipped 4" is the honest result —
-  // reporting only the successes would look like files vanishing.
-  const [skipped, setSkipped] = useState<SkippedFile[]>([])
-  // What is being created inline, if anything. null means the row is not shown.
+  const { upload, progress, result, dismissResult } = useWorkspaceUpload()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // null: no drag over the panel. "": the workspace root. Otherwise a folder.
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
+  // dragenter/leave fire for every child the pointer crosses, so presence is a count.
+  const dragDepth = useRef(0)
   const [creating, setCreating] = useState<"file" | "folder" | null>(null)
   const [newName, setNewName] = useState("")
   const [nameError, setNameError] = useState<string | null>(null)
+  const addButton = useRef<HTMLButtonElement>(null)
   const nameInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
@@ -183,12 +68,12 @@ export function WorkspaceFiles() {
         if (!r.ok) throw new Error(String(r.status))
         return r.json() as Promise<{ workspace: RepoFile[]; shared: RepoFile[] }>
       }),
-    // Only mounted while the Files panel is open, so the listing — a GitHub
-    // round trip — never runs for someone who did not ask for it.
     enabled: !!activeWorkspace,
     retry: false,
   })
 
+  // New files and folders are empty text, so the editor's text route suits
+  // them; uploads go through the import route instead.
   const write = useMutation({
     mutationFn: async ({ path, content }: { path: string; content: string }) => {
       const res = await fetch(`/api/workspaces/${activeWorkspace!.id}/files`, {
@@ -207,12 +92,6 @@ export function WorkspaceFiles() {
   // A workspace persisted by an older build may lack `path`. Without it every
   // write would post "undefined/<file>" and be refused by the containment
   // check — which looked exactly like the upload doing nothing.
-  // Top-level names already taken, so a clash is caught before a commit that
-  // GitHub would reject anyway.
-  const existingNames = new Set(
-    (data?.workspace ?? []).map((f) => f.name.split("/")[0])
-  )
-
   const base = activeWorkspace.path
   if (!base) {
     return (
@@ -225,92 +104,25 @@ export function WorkspaceFiles() {
     )
   }
 
-  async function addFiles(files: File[]) {
-    // Sequential: each write is a commit, and GitHub rejects concurrent writes
-    // to the same branch with a 409.
-    const failed: string[] = []
-    for (const f of files) {
-      setBusy(f.name)
-      try {
-        if (f.size > MAX_UPLOAD_BYTES) {
-          throw new Error(`${f.name} is larger than ${MAX_UPLOAD_BYTES / 1024}KB`)
-        }
-        await write.mutateAsync({ path: `${base}/${f.name}`, content: await f.text() })
-      } catch (e) {
-        // Collect and report: a swallowed failure in a loop looked to the user
-        // like the upload silently doing nothing.
-        failed.push(`${f.name}: ${(e as Error).message}`)
-      }
-    }
-    setBusy(null)
-    setUploadError(failed.length ? failed.join("; ") : null)
+  const files = data?.workspace ?? []
+  const isEmpty = files.every((f) => f.name === GITKEEP)
+  const existingNames = new Set(files.map((f) => f.name.split("/")[0]))
+
+  const uploadInto = (items: UploadItem[], dir: string) => {
+    // Show where it went: a drop into a collapsed folder opens it.
+    if (dir) setExpanded((prev) => new Set(prev).add(dir))
+    void upload(items, dir)
   }
 
-  /**
-   * Import a picked folder: one request, one commit.
-   *
-   * Not addFiles in a loop. That commits per file, loses the nesting because it
-   * only ever sees `f.name`, and puts a folder's worth of commits into the
-   * history of a repo other people read. The whole tree goes up together and
-   * lands as one commit instead.
-   *
-   * The plan is computed here as well as on the server so the skip list can be
-   * shown without a round trip; the server recomputes it and is the authority.
-   */
-  async function importFolder(picked: File[]) {
-    setUploadError(null)
-    setSkipped([])
-    if (!picked.length) return
-
-    // webkitRelativePath is "<picked folder>/<path within it>". It is empty for
-    // a browser that ignored the directory attribute, and then the flat name is
-    // the honest fallback.
-    const entries = picked.map((f) => ({
-      relativePath: f.webkitRelativePath || f.name,
-      size: f.size,
-      file: f,
-    }))
-    const folder = entries[0].relativePath.split("/")[0] || "folder"
-
-    const plan = planFolderImport(
-      entries.map(({ relativePath, size }) => ({ relativePath, size })),
-      base!
+  const dropInto = (dir: string, dt: DataTransfer) => {
+    dragDepth.current = 0
+    setDropTarget(null)
+    // Entries must be taken now — the browser empties the DataTransfer once
+    // this handler returns. Reading them can wait.
+    const { entries, loose } = entriesFromDataTransfer(dt)
+    void collectDroppedFiles(entries).then((dropped) =>
+      uploadInto([...dropped, ...loose.map((file) => ({ relativePath: file.name, file }))], dir)
     )
-    if (!plan.files.length) {
-      setUploadError(`Nothing in ${folder} could be imported.`)
-      setSkipped(plan.skipped)
-      return
-    }
-
-    const byPath = new Map(entries.map((e) => [e.relativePath, e.file]))
-    setBusy(`${folder} — reading ${plan.files.length} files`)
-
-    try {
-      const files = await Promise.all(
-        plan.files.map(async (f) => ({
-          relativePath: f.relativePath,
-          contentBase64: await toBase64(byPath.get(f.relativePath)!),
-        }))
-      )
-
-      setBusy(`${folder} — committing ${files.length} files`)
-      const res = await fetch(`/api/workspaces/${activeWorkspace!.id}/import`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folder, files }),
-      })
-      if (!res.ok) {
-        throw new Error((await res.json().catch(() => ({}))).error ?? "Import failed")
-      }
-      const result = (await res.json()) as { committed: number; skipped: SkippedFile[] }
-      setSkipped(result.skipped)
-      await qc.invalidateQueries({ queryKey: ["workspace-files", activeWorkspace!.id] })
-    } catch (e) {
-      setUploadError((e as Error).message)
-      setSkipped(plan.skipped)
-    } finally {
-      setBusy(null)
-    }
   }
 
   /**
@@ -330,10 +142,7 @@ export function WorkspaceFiles() {
 
   function submitNew() {
     const problem = validateName(newName)
-    if (problem) {
-      setNameError(problem)
-      return
-    }
+    if (problem) return setNameError(problem)
     const name = newName.trim()
     write.mutate(
       creating === "folder"
@@ -346,50 +155,91 @@ export function WorkspaceFiles() {
   }
 
   function startCreating(kind: "file" | "folder") {
+    setMenuOpen(false)
     setCreating(kind)
     setNewName("")
     setNameError(null)
-    // The row mounts this render; focus on the next tick.
     requestAnimationFrame(() => nameInput.current?.focus())
+  }
+
+  function pick(input: HTMLInputElement | null) {
+    setMenuOpen(false)
+    input?.click()
   }
 
   return (
     <div
-      className={cn(
-        "flex min-h-0 flex-1 flex-col rounded-lg",
-        dragging && "ring-2 ring-inset ring-primary/60 bg-primary/5"
-      )}
-      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-      onDragLeave={() => setDragging(false)}
+      data-testid="files-drop-zone"
+      className="relative flex min-h-0 flex-1 flex-col"
+      onDragEnter={(e) => {
+        if (!hasFiles(e)) return
+        dragDepth.current++
+        setDropTarget((t) => t ?? "")
+      }}
+      onDragOver={(e) => {
+        if (!hasFiles(e)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = "copy"
+        setDropTarget("")
+      }}
+      onDragLeave={(e) => {
+        if (!hasFiles(e)) return
+        dragDepth.current = Math.max(0, dragDepth.current - 1)
+        if (dragDepth.current === 0) setDropTarget(null)
+      }}
       onDrop={(e) => {
         e.preventDefault()
-        setDragging(false)
-        void addFiles([...e.dataTransfer.files])
+        dropInto("", e.dataTransfer)
       }}
     >
       <PanelHeader title="Files">
-        <PanelAction label="New file" onClick={() => startCreating("file")}>
-          <FilePlus className="h-4 w-4" />
-        </PanelAction>
-        <PanelAction label="New folder" onClick={() => startCreating("folder")}>
-          <FolderPlus className="h-4 w-4" />
-        </PanelAction>
-        <PanelAction label="Add files from your computer" onClick={() => fileInput.current?.click()}>
-          <Upload className="h-4 w-4" />
-        </PanelAction>
-        <PanelAction
-          label="Import a folder — keeps its structure, lands as one commit"
-          onClick={() => folderInput.current?.click()}
+        <button
+          ref={addButton}
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label="Add files or folders"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          title="Add files or folders"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-foreground hover:bg-accent cursor-pointer"
         >
-          <FolderUp className="h-4 w-4" />
-        </PanelAction>
+          <Plus className="h-3.5 w-3.5" />
+          Add
+        </button>
       </PanelHeader>
+
+      <AnchoredMenu
+        anchorRef={addButton}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        align="right"
+        placement="below"
+        width={200}
+      >
+        <button role="menuitem" className={MENU_ITEM} onClick={() => pick(fileInput.current)}>
+          <Upload className="h-4 w-4 text-muted-foreground" /> Upload files…
+        </button>
+        <button role="menuitem" className={MENU_ITEM} onClick={() => pick(folderInput.current)}>
+          <FolderUp className="h-4 w-4 text-muted-foreground" /> Upload folder…
+        </button>
+        <div className="my-1 border-t border-border" />
+        <button role="menuitem" className={MENU_ITEM} onClick={() => startCreating("file")}>
+          <FilePlus className="h-4 w-4 text-muted-foreground" /> New file
+        </button>
+        <button role="menuitem" className={MENU_ITEM} onClick={() => startCreating("folder")}>
+          <FolderPlus className="h-4 w-4 text-muted-foreground" /> New folder
+        </button>
+      </AnchoredMenu>
+
       <input
         ref={fileInput}
         type="file"
         multiple
         className="hidden"
-        onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = "" }}
+        onChange={(e) => {
+          uploadInto([...(e.target.files ?? [])].map((file) => ({ relativePath: file.name, file })), "")
+          e.target.value = ""
+        }}
       />
       {/* Directory mode is set as an attribute in an effect — see above. */}
       <input
@@ -398,99 +248,157 @@ export function WorkspaceFiles() {
         multiple
         className="hidden"
         onChange={(e) => {
-          void importFolder([...(e.target.files ?? [])])
+          // webkitRelativePath is "<picked folder>/<path within it>", so the
+          // folder lands under its own name with its structure intact.
+          const picked = [...(e.target.files ?? [])].map((file) => ({
+            relativePath: file.webkitRelativePath || file.name,
+            file,
+          }))
+          uploadInto(picked, "")
           e.target.value = ""
         }}
       />
 
       <PanelBody>
-        <div className="px-2">
-          {(isLoading || busy || write.isPending) && (
-            <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {busy ? `Uploading ${busy}…` : isLoading ? "Loading…" : "Committing…"}
+        {progress && (
+          <div className="mx-3 mb-2 rounded-md border border-border px-3 py-2" role="status">
+            <div className="flex items-center gap-2 text-xs text-foreground">
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">Uploading {progress.label}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {formatBytes(progress.doneBytes)} of {formatBytes(progress.totalBytes)}
+              </span>
             </div>
-          )}
-          {error && <p className="px-2 py-1.5 text-xs text-muted-foreground">Could not load files.</p>}
-          {(write.error || uploadError) && (
-            <p className="px-2 py-1.5 text-xs text-destructive break-words">
-              {uploadError ?? (write.error as Error).message}
-            </p>
-          )}
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-blue-500 transition-[width]"
+                style={{ width: `${Math.max(4, (progress.doneBytes / progress.totalBytes) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
-          {/* An import that dropped things says so. Left until the next action
-              rather than auto-dismissed: "why is my .env not here" is exactly the
-              question this answers. */}
-          {skipped.length > 0 && (
-            <details className="px-2 py-1.5">
-              <summary className="text-xs text-muted-foreground cursor-pointer">
-                Skipped {skipped.length} file{skipped.length === 1 ? "" : "s"}
-              </summary>
-              <ul className="mt-1 space-y-0.5">
-                {skipped.map((s) => (
-                  <li key={s.relativePath} className="text-[11px] text-muted-foreground break-all">
-                    <span className="text-ink-3">{s.relativePath}</span> — {s.reason}
+        {result && (
+          <div className="mx-3 mb-2 rounded-md border border-border px-3 py-2 text-xs" role="status">
+            <div className="flex items-start gap-2">
+              <p className="min-w-0 flex-1">
+                {result.committed > 0 && (
+                  <span className="text-foreground">
+                    Added {result.committed} file{result.committed === 1 ? "" : "s"}.{" "}
+                  </span>
+                )}
+                {result.error && <span className="text-destructive">{result.error}</span>}
+                {!result.error && result.committed === 0 && (
+                  <span className="text-foreground">Nothing was added.</span>
+                )}
+              </p>
+              <button
+                onClick={dismissResult}
+                aria-label="Dismiss"
+                className="shrink-0 text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {/* Named rather than counted: "why is my .env not here" is exactly
+                the question this answers. */}
+            {result.skipped.length > 0 && (
+              <ul className="mt-1.5 space-y-0.5">
+                {result.skipped.map((s) => (
+                  <li key={s.relativePath} className="break-all text-muted-foreground">
+                    {`${s.relativePath} — ${s.reason}`}
                   </li>
                 ))}
               </ul>
-            </details>
-          )}
+            )}
+          </div>
+        )}
 
-          {/* Inline creator. Replaces window.prompt(), which put a Chrome dialog in
-              front of the app and asked for a path when a name is what is wanted. */}
-          {creating && (
-            <div
-              className="flex items-center gap-1.5 px-2 py-1"
-              style={{ animation: "fade-up 200ms var(--ease-spring) both" }}
-            >
-              {creating === "folder" ? (
-                <Folder className="h-3 w-3 shrink-0 text-muted-foreground" />
-              ) : (
-                <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
-              )}
-              <input
-                ref={nameInput}
-                value={newName}
-                onChange={(e) => {
-                  setNewName(e.target.value)
+        {creating && (
+          <div
+            className="flex items-center gap-1.5 px-3 py-1"
+            style={{ animation: "fade-up 200ms var(--ease-spring) both" }}
+          >
+            {creating === "folder" ? <FolderIcon /> : <FileIcon path={newName || "untitled"} />}
+            <input
+              ref={nameInput}
+              value={newName}
+              onChange={(e) => {
+                setNewName(e.target.value)
+                setNameError(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  submitNew()
+                } else if (e.key === "Escape") {
+                  e.preventDefault()
+                  setCreating(null)
                   setNameError(null)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault()
-                    submitNew()
-                  } else if (e.key === "Escape") {
-                    e.preventDefault()
-                    setCreating(null)
-                    setNameError(null)
-                  }
-                }}
-                onBlur={() => {
-                  // Blur cancels rather than commits. Creating a file is a commit to
-                  // a shared repo; clicking away should not be enough to do that.
-                  if (!newName.trim()) setCreating(null)
-                }}
-                placeholder={creating === "folder" ? "folder name" : "name.py"}
-                aria-label={creating === "folder" ? "New folder name" : "New file name"}
-                className="min-w-0 flex-1 rounded-chip border border-line bg-field px-1.5 py-0.5 text-xs text-ink outline-none focus:border-line-strong placeholder:text-ink-3"
-              />
-            </div>
-          )}
-          {nameError && (
-            <p className="px-2 pb-1 pl-7 text-[11px] text-destructive">{nameError}</p>
-          )}
+                }
+              }}
+              onBlur={() => {
+                // Blur cancels rather than commits. Creating a file is a commit
+                // to a shared repo; clicking away should not be enough to do that.
+                if (!newName.trim()) setCreating(null)
+              }}
+              placeholder={creating === "folder" ? "Folder name" : "name.py"}
+              aria-label={creating === "folder" ? "New folder name" : "New file name"}
+              className="min-w-0 flex-1 rounded-md border border-line bg-field px-1.5 py-0.5 text-[13px] text-ink outline-none focus:border-blue-500 placeholder:text-ink-3"
+            />
+          </div>
+        )}
+        {nameError && <p className="px-3 pb-1 pl-9 text-[11px] text-destructive">{nameError}</p>}
+        {write.error && <p className="px-3 py-1.5 text-xs text-destructive">{(write.error as Error).message}</p>}
 
-          {data && [...toTree(data.workspace).children.values()].map((c) => (
-            <TreeNode key={c.name} node={c} depth={0} />
-          ))}
+        {isLoading && (
+          <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" /> Loading…
+          </div>
+        )}
+        {error && <p className="px-4 py-1.5 text-xs text-muted-foreground">Could not load files.</p>}
 
-          {data && data.workspace.length === 0 && !isLoading && (
-            <p className="px-2 py-2 text-xs text-muted-foreground leading-snug">
-              No files yet. Drop text files here — they commit for everyone on the next run.
-            </p>
-          )}
-        </div>
+        {!isEmpty && (
+          <FileTree
+            files={files}
+            expanded={expanded}
+            onToggle={(rel) =>
+              setExpanded((prev) => {
+                const next = new Set(prev)
+                if (next.has(rel)) next.delete(rel)
+                else next.add(rel)
+                return next
+              })
+            }
+            dropTarget={dropTarget}
+            onDragTarget={setDropTarget}
+            onDropInto={dropInto}
+          />
+        )}
+
+        {data && isEmpty && (
+          <div className="mx-3 mt-2 flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-8 text-center">
+            <FolderIcon className="h-8 w-8" />
+            <p className="text-sm text-foreground">Drop files or folders here</p>
+            <p className="text-xs text-muted-foreground">They commit for everyone on the next run.</p>
+          </div>
+        )}
       </PanelBody>
+
+      <div className="flex shrink-0 items-center gap-2 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate">Drop files or folders</span>
+        <span className="shrink-0">{formatBytes(IMPORT_MAX_FILE_BYTES)} max each</span>
+      </div>
+
+      {/* Finder's drop highlight: the whole panel when dropping at the top
+          level, just the folder row when dropping into one. */}
+      {dropTarget === "" && (
+        <div className="pointer-events-none absolute inset-1 flex items-end justify-center rounded-lg border-2 border-dashed border-blue-500/70 bg-blue-500/5 pb-12">
+          <span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-medium text-white shadow-sm">
+            Add to {activeWorkspace.name}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

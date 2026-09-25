@@ -74,9 +74,44 @@ The system SHALL create a placeholder file when a folder is created.
 - **THEN** a `.gitkeep` is committed inside it, because git cannot represent an
   empty directory
 
+### Requirement: Every upload goes through the import
+The system SHALL send picked files, a picked folder, and files or folders
+dropped onto the Files panel through the import route, byte for byte.
+
+#### Scenario: Uploading a PDF or an image
+- **WHEN** a member uploads a binary file
+- **THEN** it is committed unchanged, because the import carries base64 and the
+  editor's text route would have turned it into replacement characters
+
+#### Scenario: Dropping a folder
+- **WHEN** a member drops a folder onto the Files panel
+- **THEN** its files are uploaded with their structure, the same as a picked
+  folder — including folders with more entries than the browser hands over in
+  one read
+
+#### Scenario: Dropping onto a folder in the tree
+- **WHEN** a member drops files onto a folder row
+- **THEN** they land inside that folder, and the folder opens to show them
+
+### Requirement: Uploads are capped by what one request carries
+The system SHALL accept a file of up to 3 MB, split an upload larger than one
+request into request-sized batches, and cap one upload at 25 MB in total.
+
+#### Scenario: A file over the old 256KB cap
+- **WHEN** a member uploads a 1 MB lead list
+- **THEN** it is accepted, because 256KB was a policy guess and the real ceiling
+  is the ~4.5MB request body a serverless function accepts, which base64 brings
+  to about 3 MB of file
+
+#### Scenario: A file too big for one request
+- **WHEN** a member uploads a file over 3 MB
+- **THEN** it is named as skipped with the limit in the reason, and nothing is
+  sent for it
+
 ### Requirement: A folder is imported as one commit
 The system SHALL commit an imported folder as a single commit that preserves
-the folder's structure, rather than one commit per file.
+the folder's structure, rather than one commit per file, as long as it fits in
+one request; a larger upload is one commit per request-sized batch.
 
 #### Scenario: Importing a folder of many files
 - **WHEN** a member imports a folder
