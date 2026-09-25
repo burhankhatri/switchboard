@@ -9,7 +9,8 @@ import { focusChatPrompt } from "@/components/ui/modal-header"
 import { useDragToClose } from "@/lib/hooks/useDragToClose"
 import { useElectron, type LicenseDetectResult } from "@/lib/hooks/useElectron"
 import type { Settings, Theme, Agent, Credentials, CredentialFlags, CustomEndpoint } from "@/lib/types"
-import { agentModels, resolveAgent, getDefaultModelForAgent } from "@/lib/types"
+import { resolveAgent, getDefaultModelForAgent } from "@/lib/types"
+import { defaultModelAfterAgentChange } from "@/lib/default-model"
 import {
   CREDENTIAL_KEYS,
   type CredentialId,
@@ -253,15 +254,13 @@ export function SettingsModal({ open, onClose, settings, credentialFlags, onSave
     }
   }, [open, highlightKey])
 
-  // Update model when agent changes
+  // Update model when agent changes: keep one the user can run on this agent,
+  // otherwise the agent's default for their credentials (not simply the first
+  // model in the list, which for OpenCode is the free tier).
   useEffect(() => {
-    const models = agentModels[defaultAgent] ?? []
-    // If current model isn't valid for the new agent, select the first available
-    const isValidModel = models.some((m) => m.value === defaultModel)
-    if (!isValidModel && models.length > 0) {
-      setDefaultModel(models[0].value)
-    }
-  }, [defaultAgent, defaultModel])
+    const next = defaultModelAfterAgentChange(defaultAgent, defaultModel, credentialFlags, endpoints)
+    if (next !== defaultModel) setDefaultModel(next)
+  }, [defaultAgent, defaultModel, credentialFlags, endpoints])
 
   // Apply theme immediately when changed
   const handleThemeChange = (theme: Theme) => {
