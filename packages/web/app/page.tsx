@@ -7,6 +7,8 @@ import { MobileHeader } from "@/components/MobileHeader"
 import { Sidebar } from "@/components/Sidebar"
 import { ChatPanel } from "@/components/ChatPanel"
 import { HomeView } from "@/components/chat/HomeView"
+import { WorkspaceFileViewer } from "@/components/workspaces/WorkspaceFileViewer"
+import { centerPaneFor } from "@/lib/center-pane"
 import { PreviewView } from "@/components/PreviewView"
 import { AppModals } from "@/components/AppModals"
 import { useGitDialogs } from "@/components/modals/git-dialogs"
@@ -115,7 +117,7 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
   }, [])
   const modals = useModals()
   const sidebar = useSidebar()
-  const { closeOpenFile } = useWorkspace()
+  const { closeOpenFile, openFile } = useWorkspace()
 
   // Derived route state for page title (uses Next.js pathname for SSR compatibility)
   const isJobsRoute = pathname?.startsWith("/jobs") ?? false
@@ -600,6 +602,12 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
     onToggleSkillsModal: () => setSkillsModalOpen((prev) => !prev),
   })
 
+  const centerPane = centerPaneFor({
+    openFile,
+    viewMode: sidebar.viewMode,
+    chatId: displayCurrentChatId,
+  })
+
   return (
     <PaletteProvider {...paletteProps}>
     <ChatProvider value={chatContextValue}>
@@ -669,14 +677,22 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
 
         <div className="flex-1 flex min-h-0">
             <div className="flex-1 flex flex-col min-w-0">
-              {sidebar.viewMode === "scheduled-jobs" ? (
+              {centerPane === "file" ? (
+                // A file opened from the sidebar takes over the centre pane
+                // whichever view would otherwise be here — home, scheduled
+                // agents or a chat. It used to live inside ChatPanel, so with
+                // no chat open a clicked skill showed nothing at all.
+                <div className="flex min-h-0 flex-1 flex-col" data-testid="workspace-file-view">
+                  <WorkspaceFileViewer />
+                </div>
+              ) : centerPane === "scheduled-jobs" ? (
                 <ScheduledJobsView
                   onOpenForm={() => modals.setScheduledJobFormOpen(true)}
                   refreshKey={scheduledJobsRefreshKey}
                   urlJobId={urlJobId}
                   onNavigateToJob={handleNavigateToJob}
                 />
-              ) : !displayCurrentChatId ? (
+              ) : centerPane === "home" ? (
                 <HomeView
                   isMobile={isMobile}
                   chats={chats}

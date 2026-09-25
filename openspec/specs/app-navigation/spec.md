@@ -86,3 +86,13 @@ desktop.
 - **WHEN** a member opens the menu on a narrow screen
 - **THEN** the drawer holds the rail and the panel, and switching categories
   works as it does on desktop
+
+### Requirement: An opened file owns the centre pane
+The system SHALL show a file opened from the Skills or Files panel in the
+centre pane, whatever the pane was showing.
+
+#### Scenario: Opening a skill from the home page
+- **WHEN** a member with no chat open clicks a skill
+- **THEN** the skill opens in the editor, because the home page is where most
+  people are when they go looking for one
+
