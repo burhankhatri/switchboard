@@ -140,7 +140,25 @@ describe("opencodeSetup — standard path", () => {
     await runSetup(fs)
 
     const global = JSON.parse(fs.files[GLOBAL_PATH])
-    expect(global.provider).toBeUndefined()
+    expect(global.provider.custom).toBeUndefined()
+    expect(global.mcp).toEqual(mcp("github"))
+  })
+
+  it("pins provider timeouts for Zen and Go so a stalled request fails fast enough to retry", async () => {
+    // OpenCode's default is 300s per attempt with up to 6 attempts: ~31 min
+    // before it gives up, past Switchboard's 20/25 min hard timeouts.
+    const fs = fakeSandbox({ [GLOBAL_PATH]: JSON.stringify({ mcp: mcp("github") }) })
+
+    await runSetup(fs)
+
+    const global = JSON.parse(fs.files[GLOBAL_PATH])
+    for (const id of ["opencode", "opencode-go"]) {
+      expect(global.provider[id].options).toEqual({ headerTimeout: 90_000, chunkTimeout: 120_000 })
+      for (const v of Object.values(global.provider[id].options)) {
+        // 0 fails OpenCode's config validation and breaks every run.
+        expect(Number.isInteger(v) && (v as number) > 0).toBe(true)
+      }
+    }
     expect(global.mcp).toEqual(mcp("github"))
   })
 })
