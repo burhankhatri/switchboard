@@ -43,6 +43,9 @@ test.describe("scheduled agents tab @no-sandbox", () => {
     })
     expect(created.ok()).toBeTruthy()
 
+    // Scheduled agents live under Runs: both are agent work that happens
+    // without you in the chat.
+    await page.getByRole("tab", { name: "Runs" }).click()
     await page.getByRole("button", { name: "Scheduled", exact: true }).click()
 
     await expect(page).toHaveURL(/\/jobs$/)
