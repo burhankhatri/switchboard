@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { X, FileText, Check, RefreshCw } from "lucide-react"
+import { X, Check, ChevronRight, RefreshCw } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import {
   clearDraft,
@@ -11,10 +11,25 @@ import {
   writeCachedFile,
   writeDraft,
 } from "@/lib/workspace-file-cache"
+import { cursorPosition, lineCount } from "@/lib/editor-position"
+import { isBinaryFile } from "@/lib/file-kind"
 import { SelectionActions } from "./SelectionActions"
+import { FileIcon } from "./files/FileIcon"
 import { cn } from "@/lib/utils"
 
 interface FilePayload { path: string; content: string; truncated: boolean; sha: string }
+
+const LANGUAGE: Record<string, string> = {
+  md: "Markdown", mdx: "MDX", py: "Python", ts: "TypeScript", tsx: "TypeScript JSX",
+  js: "JavaScript", jsx: "JavaScript JSX", json: "JSON", yaml: "YAML", yml: "YAML",
+  toml: "TOML", csv: "CSV", tsv: "TSV", sh: "Shell", sql: "SQL", html: "HTML",
+  css: "CSS", txt: "Plain Text",
+}
+
+function languageOf(path: string): string {
+  const ext = path.includes(".") ? path.slice(path.lastIndexOf(".") + 1).toLowerCase() : ""
+  return LANGUAGE[ext] ?? (ext ? ext.toUpperCase() : "Plain Text")
+}
 
 /**
  * Edit a workspace file.
@@ -39,7 +54,9 @@ export function WorkspaceFileViewer() {
   // Selection is tracked as offsets rather than the text itself, so applying a
   // rewrite can splice it back into exactly the range that was highlighted.
   const [range, setRange] = useState<{ start: number; end: number } | null>(null)
+  const [caret, setCaret] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const gutterRef = useRef<HTMLPreElement>(null)
   const qc = useQueryClient()
   const wsId = activeWorkspace?.id ?? ""
 
@@ -139,6 +156,7 @@ export function WorkspaceFileViewer() {
     const el = textareaRef.current
     if (!el) return
     const { selectionStart: start, selectionEnd: end } = el
+    setCaret(end)
     setRange(start === end ? null : { start, end })
   }
 
@@ -157,55 +175,107 @@ export function WorkspaceFileViewer() {
     if (wsId && openFile) writeDraft(wsId, openFile, { content: next, baseSha: data?.sha ?? "" })
   }
 
+  const fileName = openFile.split("/").pop() ?? openFile
+  const base = activeWorkspace?.path
+  const inside = base && openFile.startsWith(`${base}/`) ? openFile.slice(base.length + 1) : openFile
+  const crumbs = [activeWorkspace?.name ?? "Workspace", ...inside.split("/")]
+  // Opening a PDF as text shows noise, and saving it would commit that noise
+  // over the real file — so binary files are shown, never edited.
+  const binary = isBinaryFile(openFile)
+  const position = cursorPosition(value, Math.min(caret, value.length))
+  // Computed inline, not memoised: this runs after the early return above, and
+  // a hook here would change the hook order whenever a file opens or closes.
+  const gutter = Array.from({ length: lineCount(value) }, (_, i) => i + 1).join("\n")
+
   return (
-    <div
-      data-workspace-file-editor
-      className="flex h-full w-full max-w-3xl mx-auto flex-col min-h-0"
-    >
-      <div className="flex items-center gap-2 mb-3">
-        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="font-mono text-xs text-muted-foreground truncate flex-1">{openFile}</span>
-        {/* Revalidation is ambient, not a wait — it must never look like one. */}
-        {isFetching && !isPending && (
-          <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground/60" aria-label="Syncing" />
-        )}
-        {dirty && <span className="text-xs text-muted-foreground">unsaved</span>}
-        {saved && !dirty && (
-          <span className="flex items-center gap-1 text-xs text-primary">
-            <Check className="h-3 w-3" /> {save.isPending ? "saved locally" : "committed"}
-          </span>
-        )}
-        <button
-          onClick={() => save.mutate(value)}
-          disabled={!dirty || data?.truncated}
-          title={data?.truncated ? "This file is too large to edit here" : undefined}
-          className={cn(
-            "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer",
-            "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-default"
+    // Laid out like an editor rather than a card: edge to edge, a tab for the
+    // file, the path as a breadcrumb, a line-number gutter and a status bar.
+    <div className="flex h-full w-full min-h-0 flex-col bg-background">
+      <div className="flex h-9 shrink-0 items-stretch border-b border-border bg-muted/40">
+        <div className="-mb-px flex min-w-0 max-w-[60%] items-center gap-2 border-r border-border bg-background px-3 text-[13px]">
+          <FileIcon path={openFile} />
+          <span className="truncate">{fileName}</span>
+          {dirty ? (
+            <span className="h-2 w-2 shrink-0 rounded-full bg-foreground/60" title="Unsaved changes" />
+          ) : null}
+          <button
+            onClick={() => void closeOpenFile()}
+            className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
+            aria-label="Close file"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="flex-1" />
+        <div className="flex items-center gap-2 px-3">
+          {/* Revalidation is ambient, not a wait — it must never look like one. */}
+          {isFetching && !isPending && (
+            <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground/60" aria-label="Syncing" />
           )}
-        >
-          Save
-        </button>
-        <button
-          onClick={() => void closeOpenFile()}
-          className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
-          aria-label="Close file"
-        >
-          <X className="h-4 w-4" />
-        </button>
+          {saved && !dirty && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Check className="h-3 w-3" /> {save.isPending ? "Saved locally" : "Committed"}
+            </span>
+          )}
+          {!binary && (
+            <button
+              onClick={() => save.mutate(value)}
+              disabled={!dirty || data?.truncated}
+              title={data?.truncated ? "This file is too large to edit here" : "Commit to the workspace repo"}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium cursor-pointer",
+                "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-default"
+              )}
+            >
+              Save
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Only a file never opened before can show a loading state. */}
-      {isPending && (
-        <div className="flex-1 animate-pulse rounded-xl border border-border bg-card" aria-label="Loading" />
-      )}
-      {error && !data && <p className="text-sm text-muted-foreground py-6">Could not open this file.</p>}
-      {save.error && <p className="text-sm text-destructive mb-2">{(save.error as Error).message}</p>}
+      <nav
+        aria-label="File path"
+        className="flex h-7 shrink-0 items-center gap-1 overflow-hidden border-b border-border px-3 text-[12px] text-muted-foreground"
+      >
+        {crumbs.map((c, i) => (
+          <Fragment key={`${i}-${c}`}>
+            {i > 0 && <ChevronRight className="h-3 w-3 shrink-0 opacity-60" />}
+            <span className={cn("truncate", i === crumbs.length - 1 && "text-foreground")}>{c}</span>
+          </Fragment>
+        ))}
+      </nav>
 
-      {data && (
+      {/* Only a file never opened before can show a loading state. */}
+      {isPending && <div className="flex-1 animate-pulse bg-muted/30" aria-label="Loading" />}
+      {error && !data && <p className="p-6 text-sm text-muted-foreground">Could not open this file.</p>}
+      {save.error && (
+        <p className="shrink-0 border-b border-border bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {(save.error as Error).message}
+        </p>
+      )}
+
+      {data && binary && (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <FileIcon path={openFile} className="h-14 w-14" />
+          <p className="text-sm font-medium text-foreground">{fileName}</p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Stored in the workspace — the agent can read it on its next run. It
+            can&apos;t be previewed or edited here.
+          </p>
+        </div>
+      )}
+
+      {data && !binary && (
         // min-h-0 is load-bearing: without it the textarea's own content height
         // becomes the flex floor and the editor stops shrinking to its pane.
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1">
+          <pre
+            ref={gutterRef}
+            aria-hidden="true"
+            className="m-0 shrink-0 select-none overflow-hidden border-r border-border bg-muted/20 py-3 pb-8 pl-4 pr-3 text-right font-mono text-[12px] leading-6 text-muted-foreground/70"
+          >
+            {gutter}
+          </pre>
           <textarea
             ref={textareaRef}
             value={value}
@@ -213,28 +283,46 @@ export function WorkspaceFileViewer() {
             onSelect={syncSelection}
             onKeyUp={syncSelection}
             onMouseUp={syncSelection}
+            onScroll={(e) => {
+              if (gutterRef.current) gutterRef.current.scrollTop = e.currentTarget.scrollTop
+            }}
             spellCheck={false}
+            wrap="off"
             readOnly={data.truncated}
-            // Fills the pane rather than a fixed 22 rows, which left the editor
-            // floating in a tall empty region.
-            className="min-h-0 w-full flex-1 resize-none rounded-xl border border-border bg-card p-4 text-xs leading-relaxed font-mono outline-none focus:ring-2 focus:ring-ring/40"
+            aria-label={`Contents of ${fileName}`}
+            style={{ tabSize: 2 }}
+            className="min-h-0 min-w-0 flex-1 resize-none whitespace-pre bg-transparent px-4 py-3 font-mono text-[13px] leading-6 text-foreground outline-none"
           />
-          {wsId && (
-            <SelectionActions
-              workspaceId={wsId}
-              selection={selected}
-              onApply={applyRewrite}
-              onDismiss={() => setRange(null)}
-            />
-          )}
-
-          <p className="mt-2 shrink-0 text-xs text-muted-foreground">
-            {data.truncated
-              ? "Truncated — too large to edit here."
-              : "Edits are kept in this browser as you type. Saving commits to the workspaces repo, and the next run picks it up."}
-          </p>
         </div>
       )}
+
+      {data && !binary && wsId && (
+        <div className="shrink-0 px-3 empty:hidden">
+          <SelectionActions
+            workspaceId={wsId}
+            selection={selected}
+            onApply={applyRewrite}
+            onDismiss={() => setRange(null)}
+          />
+        </div>
+      )}
+
+      <div className="flex h-6 shrink-0 items-center gap-4 border-t border-border bg-muted/40 px-3 text-[11px] text-muted-foreground">
+        <span>{binary ? "Binary file" : languageOf(openFile)}</span>
+        {data && !binary && (
+          <span className="tabular-nums">
+            Ln {position.line}, Col {position.column}
+          </span>
+        )}
+        <span className="flex-1" />
+        <span className="truncate">
+          {data?.truncated
+            ? "Truncated — too large to edit here"
+            : dirty
+              ? "Unsaved — kept in this browser until you save"
+              : "Saving commits to the workspace repo"}
+        </span>
+      </div>
     </div>
   )
 }
