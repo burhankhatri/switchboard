@@ -71,9 +71,8 @@ export function WorkspaceFileUnsavedDialog({
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <Dialog.Portal>
-        <Dialog.Overlay data-workspace-file-unsaved className="fixed inset-0 z-[60] app-scrim" />
+        <Dialog.Overlay className="fixed inset-0 z-[60] app-scrim" />
         <Dialog.Content
-          data-workspace-file-unsaved
           className={cn(
             "fixed top-1/2 left-1/2 z-[60] w-full max-w-sm -translate-x-1/2 -translate-y-1/2",
             "rounded-xl border border-border bg-popover shadow-xl overflow-hidden flex flex-col"

@@ -168,26 +168,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     finishClosePrompt(true)
   }, [finishClosePrompt])
 
-  // Clicking outside the editor is the same as closing it: prompt if dirty,
-  // otherwise return to the last chat. File-tree rows and the unsaved dialog
-  // are excluded so they keep their own close/open handling.
-  useEffect(() => {
-    if (!openFile) return
-    const onClick = (e: MouseEvent) => {
-      const target = e.target
-      if (!(target instanceof Element)) return
-      if (
-        target.closest(
-          "[data-workspace-file-editor], [data-workspace-file], [data-workspace-file-unsaved]"
-        )
-      ) {
-        return
-      }
-      void closeOpenFile()
-    }
-    document.addEventListener("click", onClick, true)
-    return () => document.removeEventListener("click", onClick, true)
-  }, [openFile, closeOpenFile])
+  // No click-outside-to-close: the open file is a tab, and clicking the
+  // sidebar — a rail category, a folder, the Add menu — must not close what you
+  // are reading. It closes from its own ×, or when a chat, a new chat or the
+  // scheduled agents view takes the pane (each calls closeOpenFile, which still
+  // prompts over unsaved work).
 
   const value = useMemo(
     () => ({

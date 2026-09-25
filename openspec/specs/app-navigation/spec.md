@@ -89,10 +89,16 @@ desktop.
 
 ### Requirement: An opened file owns the centre pane
 The system SHALL show a file opened from the Skills or Files panel in the
-centre pane, whatever the pane was showing.
+centre pane, whatever the pane was showing, and SHALL keep it open while the
+member uses the sidebar.
 
 #### Scenario: Opening a skill from the home page
 - **WHEN** a member with no chat open clicks a skill
 - **THEN** the skill opens in the editor, because the home page is where most
   people are when they go looking for one
 
+#### Scenario: Clicking around the sidebar
+- **WHEN** a file is open and the member switches category, expands a folder or
+  opens a menu
+- **THEN** the file stays open; it closes from its own tab, or when a chat or
+  the scheduled agents view takes the pane
