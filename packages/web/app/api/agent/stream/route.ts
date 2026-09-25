@@ -179,11 +179,12 @@ export async function GET(req: Request) {
           }
 
           if (lastSnap.status === "completed" || lastSnap.status === "error") {
-            // A turn can end in "error" while its process is still alive — most
-            // notably OpenCode, which on a retryable model error (rate/usage
-            // limit, overload) retries with unbounded backoff. The snapshot
-            // surfaces that error, but the process keeps running and would
-            // linger as an orphan until the sandbox is torn down. Reap it.
+            // A turn can end in "error" while its process is still alive — e.g.
+            // OpenCode after a usage-limit or auth error, which it never retries
+            // and never exits from. (Errors it does retry, like a provider
+            // stall, no longer end the turn: the parser waits out its retries.)
+            // The process would linger as an orphan until the sandbox is torn
+            // down. Reap it.
             // Best-effort and idempotent: a no-op when the process already
             // exited (the common completed/crashed case).
             if (lastSnap.status === "error") {

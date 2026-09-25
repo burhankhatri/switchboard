@@ -127,6 +127,21 @@ type OpenCodeEvent =
  * Tool/bash ERROR logs and the title-generation sidecar are intentionally
  * ignored: the turn can recover from them.
  */
+/**
+ * Attempts OpenCode 1.18.x makes at one model-call step before giving up
+ * (RETRY_MAX_RETRIES = 5 in its session/retry.ts, plus the first try).
+ */
+const OPENCODE_STEP_ATTEMPTS = 6
+
+/**
+ * Stream errors OpenCode itself retries: a provider that sends no headers or
+ * stops streaming, a 5xx, or a dropped connection. Mirrors the retryable set in
+ * OpenCode's session/retry.ts. Usage limits, auth and balance errors are not
+ * here: OpenCode does not retry those, so they must end the turn at once.
+ */
+const RETRYABLE_STREAM_ERROR =
+  /Provider(HeaderTimeout|ResponseStream)Error|ResponseStreamError|response headers timed out|SSE read timed out|\b50[0234]\b|\b524\b|overloaded|server_error|ECONNRESET|socket hang up|fetch failed/i
+
 function parseOpencodeLogError(line: string, context: ParseContext): Event | null {
   if (context.state.llmErrorEmitted) return null
 
@@ -134,10 +149,19 @@ function parseOpencodeLogError(line: string, context: ParseContext): Event | nul
   //   timestamp=… level=ERROR … message="stream error" … modelID=… small=false
   //   agent=build mode=primary error.error="AI_APICallError: Monthly usage limit
   //   reached. …"
-  // This is the main model-call failure. It appears in real time and is then
-  // followed by an *indefinite* hang (no exit, no further output), so we MUST
-  // surface on the first one — there is no second line to wait for. The
-  // title/summary sidecar runs as `agent=title small=true`; ignore it so its
+  // One line per failed model-call attempt. What happens next depends on the
+  // error:
+  //   - Retryable (provider stall, stalled stream, 5xx, dropped connection):
+  //     OpenCode 1.18.x retries it itself, up to OPENCODE_STEP_ATTEMPTS times
+  //     with backoff, and writes one of these lines per attempt. Ending the turn
+  //     here killed runs OpenCode was about to recover (a replay of the
+  //     2026-09-25 gtm-lead-engine turn answered 2.6s after the first timeout),
+  //     so we let it retry and end only once it has spent its attempts on one
+  //     step. JSON progress between failures resets the count (see
+  //     parseOpencodeLine), because the budget is per step.
+  //   - Anything else (usage limits, the free-tier version gate, auth,
+  //     balance): nothing more arrives, so surface it at once.
+  // The title/summary sidecar runs as `agent=title small=true`; ignore it so its
   // own failure (e.g. a billing error on the default model) can't end the turn.
   if (/\blevel=ERROR\b/.test(line) && /\bmessage="stream error"/.test(line)) {
     const isSidecar = /\bagent=(title|summary)\b/.test(line) || /\bsmall=true\b/.test(line)
@@ -148,6 +172,11 @@ function parseOpencodeLogError(line: string, context: ParseContext): Event | nul
       ?.replace(/^AI_\w+:\s*/, "")
       .replace(/^Failed after \d+ attempts?\.\s*Last error:\s*/i, "")
       .trim()
+    if (raw && RETRYABLE_STREAM_ERROR.test(raw)) {
+      const stalls = ((context.state.transientStreamErrors as number) ?? 0) + 1
+      context.state.transientStreamErrors = stalls
+      if (stalls < OPENCODE_STEP_ATTEMPTS) return null
+    }
     context.state.llmErrorEmitted = true
     return { type: "end", error: resolveAgentError(msg || raw || "the model request failed", "opencode") }
   }
@@ -201,6 +230,10 @@ export function parseOpencodeLine(
     // here is the only signal during an otherwise-silent retry hang.
     return parseOpencodeLogError(line, context)
   }
+
+  // Any JSON event means the step made progress, so OpenCode's retry budget
+  // (per step) starts again.
+  context.state.transientStreamErrors = 0
 
   // Step start - session initialization
   if (json.type === "step_start") {
