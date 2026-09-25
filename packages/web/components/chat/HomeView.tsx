@@ -1,6 +1,6 @@
 "use client"
 
-import { MessageSquare, Plug, Plus, Users } from "lucide-react"
+import { ArrowRight, MessageSquare, Plug, Plus, Users } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { useWorkspaceOverview } from "@/lib/query/hooks/useWorkspaceOverview"
 import { WorkspaceLauncher } from "@/components/workspaces/WorkspaceLauncher"
@@ -74,16 +74,26 @@ export function HomeView({ isMobile, chats, onSelectChat, onNewChat }: HomeViewP
           </p>
         </header>
 
+        {/* The one thing this screen is for, so it looks like it: a thin muted
+            row read as a disabled input and people went looking elsewhere. */}
         <button
           onClick={() => void onNewChat()}
           className={cn(
-            "mt-6 flex w-full items-center gap-2.5 rounded-xl border border-line px-4 py-3",
-            "bg-surface text-left text-sm text-ink-2 shadow-hairline",
-            "hover:border-line-strong hover:text-ink cursor-pointer transition-colors"
+            "group mt-6 flex w-full items-center gap-4 rounded-2xl border border-line-strong bg-surface",
+            "px-5 py-5 text-left shadow-hairline transition-colors",
+            "hover:border-primary/60 hover:bg-hover cursor-pointer"
           )}
         >
-          <Plus className="h-4 w-4 shrink-0" />
-          Start a new chat in {active.name}
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Plus className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-medium text-ink">Start a new chat</span>
+            <span className="block truncate text-sm text-ink-3">
+              Ask {active.name} to do something — its skills and connections are ready.
+            </span>
+          </span>
+          <ArrowRight className="h-5 w-5 shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5" />
         </button>
 
         {connections.length > 0 && (

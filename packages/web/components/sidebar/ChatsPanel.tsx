@@ -169,10 +169,19 @@ export function ChatsPanel({
         <PanelAction label="Search chats" onClick={onOpenSearch}>
           <Search className="h-4 w-4" />
         </PanelAction>
-        <PanelAction label="New chat" onClick={onNewChat}>
-          <SquarePen className="h-4 w-4" />
-        </PanelAction>
       </PanelHeader>
+      {/* Labelled, not a lone pencil: starting a chat is the most common thing
+          anyone does here, and an unlabelled icon was easy to miss. */}
+      <div className="shrink-0 px-2 pb-1">
+        <button
+          type="button"
+          onClick={onNewChat}
+          className="flex w-full items-center gap-2 rounded-md border border-border px-2.5 py-[7px] text-sm text-foreground hover:bg-accent/60 cursor-pointer"
+        >
+          <SquarePen className="h-4 w-4 text-muted-foreground" />
+          New chat
+        </button>
+      </div>
       <PanelBody>
         {isLoading ? (
           <div className="space-y-0 px-2 animate-pulse">
@@ -184,7 +193,7 @@ export function ChatsPanel({
           </div>
         ) : roots.length === 0 ? (
           <p className="px-4 py-2 text-xs leading-snug text-muted-foreground">
-            No chats here yet. Start one with the pencil above.
+            No chats here yet. Start one with New chat above.
           </p>
         ) : (
           <>
