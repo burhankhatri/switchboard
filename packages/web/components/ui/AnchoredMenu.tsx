@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
+import { menuPosition } from "@/lib/anchored-panel"
 
 interface AnchoredMenuProps {
   /** The element the menu should hang off. */
@@ -17,8 +18,9 @@ interface AnchoredMenuProps {
   /** Take the anchor's width instead of a fixed one — for menus that belong to
    *  an input and should line up with it. */
   matchWidth?: boolean
-  /** Composer menus hang above; sidebar row menus hang below the trigger. */
-  placement?: "above" | "below"
+  /** Composer menus hang above; sidebar row menus hang below the trigger;
+   *  "right" opens beside it, so it does not cover the list it acts on. */
+  placement?: "above" | "below" | "right"
   className?: string
 }
 
@@ -59,26 +61,14 @@ export function AnchoredMenu({
       const anchor = anchorRef.current
       if (!anchor) return
       const rect = anchor.getBoundingClientRect()
-      const height = menuRef.current?.offsetHeight ?? 0
       const w = matchWidth ? rect.width : width
-
-      // Composer menus hang above (the input is pinned to the bottom of the
-      // window). Sidebar row menus hang below the trigger, flipping if they
-      // would run off-screen — same escape as the workspace dropdown, because
-      // backdrop-filter on the sidebar clips in-place descendants.
-      let top: number
-      if (placement === "below") {
-        top = rect.bottom + 6
-        if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6)
-      } else {
-        top = rect.top - height - 6
-        if (top < 8) top = rect.bottom + 6
-      }
-
-      let left = align === "right" ? rect.right - w : rect.left
-      // Keep it on screen horizontally whichever edge it was aligned to.
-      left = Math.max(8, Math.min(left, window.innerWidth - w - 8))
-
+      const { top, left } = menuPosition({
+        anchor: rect,
+        menu: { width: w, height: menuRef.current?.offsetHeight ?? 0 },
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        placement,
+        align,
+      })
       setPos({ top, left, width: w })
     }
 
