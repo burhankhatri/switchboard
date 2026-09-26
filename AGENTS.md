@@ -51,6 +51,10 @@ Neither of these is a unit test — both hit real infrastructure.
 # spins a real sandbox, sparse-clones, runs the agent, asserts skill discovery + isolation
 WORKSPACE_PATH=workspaces/lead-gen npx dotenv -e packages/web/.env.local -- node scripts/slice-zero.mjs
 
+# spins a real sandbox, checks out what a run gets, and asserts OpenCode (the agent
+# GTM-Lead-Engine runs) lists every workspace and repo-root skill — no model call
+WORKSPACE_PATH=workspaces/gtm-lead-engine npx dotenv -e packages/web/.env.local -- node scripts/skill-discovery.mjs
+
 # 36 assertions against the real HTTP API (needs the dev server up); creates a real
 # workspace and commits a real folder
 cd packages/web && GH_TOKEN=$(gh auth token) npx dotenv -e .env.local -- node ../../scripts/e2e-workspace.mjs
@@ -73,6 +77,9 @@ cd packages/web && GH_TOKEN=$(gh auth token) npx dotenv -e .env.local -- node ..
 - **Secrets use `encryptSecret`/`decryptSecret`, not `encrypt`/`decrypt`.** The
   plain pair returns ciphertext on failure, which would be sent to the CRM as a
   credential.
+- **`opencode debug skill` truncates when piped.** It prints every skill's full
+  body and exits before a pipe drains, so piped output stops at exactly 64KB and
+  most skills look missing. Write it to a file first (the discovery harness does).
 - **Rebuilding the sandbox image** (`npm run build:snapshot`) is only needed when
   `packages/sandbox-image` changes. The image has `python3` but **no `pip`** and
   **no `gh`**.
