@@ -216,8 +216,7 @@ export function WorkspaceFiles() {
         anchorRef={addButton}
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        align="right"
-        placement="below"
+        placement="right"
         width={200}
       >
         <button role="menuitem" className={MENU_ITEM} onClick={() => pick(fileInput.current)}>
