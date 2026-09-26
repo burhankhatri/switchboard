@@ -152,6 +152,11 @@ export interface CreateSandboxOptions {
    * creating a fresh one. Used when recreating a deleted sandbox.
    */
   restoreExistingBranch?: boolean
+  /**
+   * Launch from this snapshot instead of the active one. Only the skill harness
+   * sets it, to check a freshly built image before a rebuild makes it live.
+   */
+  snapshot?: string
 }
 
 export interface CreatedSandbox {
@@ -192,6 +197,7 @@ export async function createSandboxForChat(
     sparsePaths,
     userId,
     restoreExistingBranch,
+    snapshot,
   } = options
   const isNewRepo = repo === NEW_REPOSITORY || repo === "__new__"
   const repoName = "project"
@@ -213,7 +219,7 @@ export async function createSandboxForChat(
 
   const sandbox = await daytona.create({
     name: generateSandboxName(userId),
-    snapshot: await getActiveSnapshotName(daytona),
+    snapshot: snapshot ?? (await getActiveSnapshotName(daytona)),
     autoStopInterval: 5,
     // Archive an hour after it stops. Archiving moves the filesystem to cold
     // storage and releases the disk, and the sandbox still starts again on the
