@@ -8,6 +8,7 @@
  * SSE streaming updates TanStack Query cache directly.
  */
 
+import { agentModelForNewChat } from "@/lib/default-harness"
 import { useEffect, useCallback, useMemo, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useQueryClient } from "@tanstack/react-query"
@@ -148,7 +149,7 @@ export function useChatWithSync() {
   // with its own cache update (see sendMessage); defaults to true.
   const materializeDraft = useCallback(async (
     draftId: string,
-    options?: { status?: Chat["status"]; activate?: boolean }
+    options?: { status?: Chat["status"]; activate?: boolean; agent?: string | null; model?: string | null }
   ): Promise<Chat | null> => {
     // Read the draft config straight from the store so we always see the current
     // value, regardless of when this callback's closure was created.
@@ -181,8 +182,9 @@ export function useChatWithSync() {
         // The binding that makes this a workspace chat rather than an empty one.
         workspaceId: config.workspaceId ?? activeWorkspaceId ?? undefined,
         baseBranch: config.baseBranch,
-        agent: config.agent,
-        model: config.model,
+        // Created with what is being sent, not only the draft's record, so the
+        // chat never exists under another agent (e.g. the workspace's) first.
+        ...agentModelForNewChat(config, { agent: options?.agent, model: options?.model }),
         status: options?.status ?? "pending",
         planModeEnabled: config.planMode,
       })

@@ -58,7 +58,7 @@ interface UseMessageDispatchArgs {
   isDraftChatId: (chatId: string | null) => boolean
   materializeDraft: (
     draftId: string,
-    options?: { status?: Chat["status"]; activate?: boolean }
+    options?: { status?: Chat["status"]; activate?: boolean; agent?: string | null; model?: string | null }
   ) => Promise<Chat | null>
   reloadMessages: (chatId: string) => Promise<void>
   queryClient: QueryClient
@@ -121,7 +121,7 @@ export function useMessageDispatch({
     // so the real chat isn't shown empty for one render — which flashed the "new
     // chat" welcome screen. The draft stays selected until then.
     if (draftIdToActivate) {
-      const materializedChat = await materializeDraft(chatId, { activate: false })
+      const materializedChat = await materializeDraft(chatId, { activate: false, agent, model })
       if (!materializedChat) {
         console.error("Failed to materialize draft chat before sending message")
         return
