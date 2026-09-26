@@ -51,7 +51,9 @@ export function SidebarRail({
       )}
       style={isDesktopApp ? ({ WebkitAppRegion: "drag" } as CSSProperties) : undefined}
     >
-      <div className="flex flex-col items-center gap-1" style={isDesktopApp ? NO_DRAG : undefined}>
+      {/* Room between the two: the bell's unread badge sits above its corner
+          and crowded the workspace tile when they were stacked tight. */}
+      <div className="flex flex-col items-center gap-3" style={isDesktopApp ? NO_DRAG : undefined}>
         <WorkspaceDropdown />
         <NotificationBell />
       </div>
