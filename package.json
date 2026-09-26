@@ -31,7 +31,8 @@
     "clean": "npm run clean --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test -w @switchboard/web && npm run test -w @switchboard/sandbox-image",
-    "vercel-build": "npm run build --workspaces --if-present --workspace @switchboard/common --workspace @switchboard/agent-configuration --workspace @switchboard/claude-credentials --workspace @switchboard/mcp --workspace @switchboard/sandbox-git --workspace @switchboard/sandbox-jobs --workspace @switchboard/sandbox-skills --workspace @switchboard/sandbox-terminal --workspace @switchboard/sdk && npm run build -w @switchboard/web"
+    "vercel-build": "npm run build --workspaces --if-present --workspace @switchboard/common --workspace @switchboard/agent-configuration --workspace @switchboard/claude-credentials --workspace @switchboard/mcp --workspace @switchboard/sandbox-git --workspace @switchboard/sandbox-jobs --workspace @switchboard/sandbox-skills --workspace @switchboard/sandbox-terminal --workspace @switchboard/sdk && npm run build -w @switchboard/web",
+    "test:skills": "npm run test:skills -w @switchboard/web --"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
