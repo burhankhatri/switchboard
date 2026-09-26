@@ -1,3 +1,4 @@
+import { workspaceHarness } from "@/lib/default-harness"
 import type { NextRequest } from "next/server"
 import { prisma } from "@/lib/db/prisma"
 import {
@@ -64,6 +65,7 @@ interface CreateBody {
   name?: string
   systemPrompt?: string
   agent?: string
+  model?: string
   env?: string[]
 }
 
@@ -101,7 +103,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       .map((e) => e.trim().toUpperCase())
       .filter((e) => /^[A-Z][A-Z0-9_]*$/.test(e))
 
-    const agent = body.agent ?? "claude"
+    // OpenCode on GLM-5.2 unless the creator picked another harness.
+    const { agent, model } = workspaceHarness(body)
 
     await ensureWorkspacesRepo(token)
     const { path } = await scaffoldWorkspace(token, {
@@ -121,6 +124,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         repo: WORKSPACES_REPO,
         path,
         agent,
+        model,
         systemPrompt: body.systemPrompt?.trim() || null,
         createdById: userId,
         members: { create: { userId, role: "owner" } },
