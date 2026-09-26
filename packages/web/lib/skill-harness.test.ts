@@ -89,13 +89,13 @@ describe("discoveryChecks", () => {
         { name: "crm-write-safety", location: shared },
       ],
       panelFiles: [ws("a")],
-      workspaceDir: WS,
+      workspaceDir: WS, repoRoot: ROOT,
     })
     expect(checks.every((c) => c.pass)).toBe(true)
   })
 
   it("fails for a skill the agent does not list", () => {
-    const checks = discoveryChecks({ expected: [ws("a"), ws("b")], listed: [{ name: "a", location: ws("a") }], panelFiles: [ws("a"), ws("b")], workspaceDir: WS })
+    const checks = discoveryChecks({ expected: [ws("a"), ws("b")], listed: [{ name: "a", location: ws("a") }], panelFiles: [ws("a"), ws("b")], workspaceDir: WS, repoRoot: ROOT })
     expect(checks.filter((c) => !c.pass).map((c) => c.name)).toEqual([
       "the agent lists workspaces/gtm-lead-engine/.claude/skills/b/SKILL.md",
     ])
@@ -107,7 +107,7 @@ describe("discoveryChecks", () => {
       expected: [nested],
       listed: [{ name: "cold-email", location: nested }],
       panelFiles: [],
-      workspaceDir: WS,
+      workspaceDir: WS, repoRoot: ROOT,
     })
     expect(checks.filter((c) => !c.pass).map((c) => c.name)).toEqual([
       "the Skills panel shows cold-email, which the agent loads",
