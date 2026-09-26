@@ -17,7 +17,8 @@ import { createSandboxGit } from "@switchboard/sandbox-git"
 
 const REPO = process.env.WORKSPACE_REPO ?? "burhankhatri/agent-workspaces"
 const WORKSPACE_PATH = process.env.WORKSPACE_PATH ?? "workspaces/marketing-automation"
-const SNAPSHOT = "background-agents"
+/** Same preference order as getActiveSnapshotName in packages/sandbox-image. */
+const SNAPSHOTS = ["switchboard", "switchboard-temp"]
 const REPO_ROOT = "/home/daytona/project"
 /**
  * Paths fetched on every run. The workspace's own folder, plus the repo-root
@@ -47,9 +48,20 @@ function githubToken() {
   return sh("gh auth token")
 }
 
+// It named "background-agents", a snapshot that no longer exists, so the script
+// failed before it tested anything.
+async function activeSnapshot(daytona) {
+  for (const name of SNAPSHOTS) {
+    const snapshot = await daytona.snapshot.get(name).catch(() => null)
+    if (snapshot?.state === "active") return name
+  }
+  throw new Error(`no active snapshot among ${SNAPSHOTS.join(", ")}`)
+}
+
 async function main() {
   const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY })
 
+  const SNAPSHOT = await activeSnapshot(daytona)
   log(`\n[1/5] creating sandbox from snapshot "${SNAPSHOT}"...`)
   const t0 = Date.now()
   const sandbox = await daytona.create({
