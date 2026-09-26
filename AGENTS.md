@@ -39,21 +39,22 @@ on case-insensitive filesystems; importing `@/components/sidebar/index`
 explicitly resolved it. If errors reappear there, that is the cause.
 
 ```bash
-npm run test                             # 462 tests: 451 web + 11 sandbox-image
+npm run test                             # 527 tests: 513 web + 14 sandbox-image
 cd packages/web && npx vitest run        # web only; run from packages/web, the @/ alias breaks from the repo root
 ```
 
 ## Verifying real behaviour
 
-Neither of these is a unit test — both hit real infrastructure.
+None of these is a unit test — all hit real infrastructure.
 
 ```bash
 # spins a real sandbox, sparse-clones, runs the agent, asserts skill discovery + isolation
 WORKSPACE_PATH=workspaces/lead-gen npx dotenv -e packages/web/.env.local -- node scripts/slice-zero.mjs
 
-# spins a real sandbox, checks out what a run gets, and asserts OpenCode (the agent
-# GTM-Lead-Engine runs) lists every workspace and repo-root skill — no model call
-WORKSPACE_PATH=workspaces/gtm-lead-engine npx dotenv -e packages/web/.env.local -- node scripts/skill-discovery.mjs
+# the skill harness: the production sandbox and session code, one real turn per
+# agent; proves every skill is discovered, seen by the model and loaded through the
+# skill tool. Needs OPENCODE_API_KEY (and Claude Code credentials for claude-code).
+npm run test:skills -- --workspace workspaces/gtm-lead-engine --agent opencode,claude-code
 
 # 36 assertions against the real HTTP API (needs the dev server up); creates a real
 # workspace and commits a real folder
@@ -79,7 +80,9 @@ cd packages/web && GH_TOKEN=$(gh auth token) npx dotenv -e .env.local -- node ..
   credential.
 - **`opencode debug skill` truncates when piped.** It prints every skill's full
   body and exits before a pipe drains, so piped output stops at exactly 64KB and
-  most skills look missing. Write it to a file first (the discovery harness does).
+  most skills look missing. Write it to a file and read it whole (the skill harness does).
 - **Rebuilding the sandbox image** (`npm run build:snapshot`) is only needed when
   `packages/sandbox-image` changes. The image has `python3` but **no `pip`** and
-  **no `gh`**.
+  **no `gh`**. The rebuild runs the skill harness against the new image before it
+  replaces the live one, so it needs the harness's credentials too; a failure
+  leaves the live image serving.

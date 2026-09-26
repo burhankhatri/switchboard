@@ -80,6 +80,34 @@ await setDefaultAgentEliza(page)
 npm run typecheck             # all workspaces
 ```
 
+### Skill harness (real sandbox, real model)
+
+```bash
+npm run test:skills -- --workspace workspaces/gtm-lead-engine --agent opencode,claude-code
+```
+
+Proves a workspace's skills reach its agent through the production code path:
+`createSandboxForChat` (the live snapshot, or `--snapshot <name>`), the sparse
+checkout, `createBackgroundAgentSession`, and one real turn per agent. Each turn
+must load a workspace skill and a repo-root skill through the skill tool — each
+carrying a canary written into the sandbox only — and name every skill it can
+see; for OpenCode, `opencode debug skill` must also list every `SKILL.md` the
+walk from the workspace folder up to the repo root reaches, and the Skills panel
+must show every workspace skill the agent loads. The decisions live in
+`packages/web/lib/skill-harness.ts` and are unit-tested.
+
+| Var | Why |
+|---|---|
+| `DAYTONA_API_KEY`, `WORKSPACES_REPO` | The sandbox and the repo it checks out. |
+| `WORKSPACES_REPO_TOKEN` | Read access to that repo. Falls back to `GH_TOKEN`, then `gh auth token`. |
+| `OPENCODE_API_KEY` | OpenCode's turn (`opencode-go/glm-5.2`, the default). |
+| `CLAUDE_CODE_CREDENTIALS` | Claude Code's turn. Falls back to the macOS keychain. |
+
+It runs in CI (`.github/workflows/skill-harness.yml`) on changes to the code
+that decides skill discovery, weekly, and on demand; and before every snapshot
+rebuild promotes a new image. A missing credential fails the run rather than
+skipping it.
+
 ## Debugging Failed Tests
 
 - Single test by name: `npx playwright test -g "shows an unread badge"`
