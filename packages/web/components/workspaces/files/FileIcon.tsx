@@ -33,6 +33,16 @@ export function FolderIcon({ open = false, className }: { open?: boolean; classN
   )
 }
 
+/** The Skills folder: a folder carrying the sparkle skills wear everywhere else. */
+export function SkillsFolderIcon({ className }: { className?: string }) {
+  return (
+    <span className={cn("relative inline-flex h-4 w-4 shrink-0", className)} aria-hidden="true">
+      <FolderIcon />
+      <Sparkles className="absolute -right-1 -top-1 h-2.5 w-2.5 fill-primary text-primary" />
+    </span>
+  )
+}
+
 export function FileIcon({ path, className }: { path: string; className?: string }) {
   const kind = fileKind(path)
   if (kind === "skill") return <Sparkles className={cn("h-4 w-4 shrink-0 text-primary", className)} aria-hidden="true" />

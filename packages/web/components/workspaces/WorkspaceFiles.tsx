@@ -9,7 +9,9 @@ import { formatBytes } from "@/lib/format-bytes"
 import { IMPORT_MAX_FILE_BYTES } from "@/lib/workspace-import"
 import { AnchoredMenu } from "@/components/ui/AnchoredMenu"
 import { PanelBody, PanelHeader } from "@/components/sidebar/Panel"
-import { FileTree, GITKEEP, type RepoFile } from "./files/FileTree"
+import { GITKEEP } from "@/lib/file-tree"
+import { SKILLS_DIR } from "@/lib/workspace-skills"
+import { FileTree, type RepoFile } from "./files/FileTree"
 import { FileIcon, FolderIcon } from "./files/FileIcon"
 import { useWorkspaceUpload, type UploadItem } from "./files/useWorkspaceUpload"
 
@@ -36,7 +38,9 @@ export function WorkspaceFiles() {
   const { activeWorkspace } = useWorkspace()
   const { upload, progress, result, dismissResult } = useWorkspaceUpload()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // Skills open by default: they are what a workspace is for, and seeing each
+  // one without clicking is the point of lifting them to the top.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set([SKILLS_DIR]))
   // null: no drag over the panel. "": the workspace root. Otherwise a folder.
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   // dragenter/leave fire for every child the pointer crosses, so presence is a count.

@@ -52,6 +52,21 @@ shared root.
 - **THEN** the request is rejected with 403, because every workspace shares one
   repo and containment is the only thing separating them
 
+### Requirement: Skills are a top-level folder in the file tree
+The system SHALL show the workspace's `.claude/skills` as a Skills folder at the
+top of the file tree, open by default, and leave anything else in `.claude`
+where it is.
+
+#### Scenario: Browsing a workspace's files
+- **WHEN** a member opens the Files panel
+- **THEN** every skill is listed under Skills without expanding anything, because
+  `.claude/skills` is the one path the agent reads skills from, and as a dotfolder
+  two levels down it was invisible to anyone browsing the way Finder does
+
+#### Scenario: Dropping a folder onto Skills
+- **WHEN** a member drops a skill folder onto the Skills folder
+- **THEN** it is committed under `.claude/skills`, where the agent discovers it
+
 ### Requirement: Files are listed only when asked for
 The system SHALL NOT list a workspace's files until the member opens the Files
 panel.
