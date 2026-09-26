@@ -1,0 +1,91 @@
+name: skill harness
+
+# Proves a workspace's skills reach its agent through the production launch
+# path: a real sandbox, the real session code, one real model turn. It needs
+# live credentials, so it runs when something that decides skill discovery
+# changes, weekly (skills are edited in the workspaces repo, which this repo's
+# pushes never see), and on demand.
+#
+# Snapshot rebuilds run the same harness before a new image goes live
+# (packages/sandbox-image/scripts/build-snapshot.ts); this covers the rest.
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: Workspace folder in the workspaces repo
+        default: workspaces/gtm-lead-engine
+      agents:
+        description: Comma-separated agents (opencode, claude-code)
+        default: opencode
+  schedule:
+    - cron: "0 6 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - "packages/sandbox-image/**"
+      - "packages/sdk/src/agents/**"
+      - "packages/sdk/src/session.ts"
+      - "packages/agent-configuration/**"
+      - "packages/common/src/agents.ts"
+      - "packages/web/lib/sandbox.ts"
+      - "packages/web/lib/agent-session.ts"
+      - "packages/web/lib/session.ts"
+      - "packages/web/lib/workspace.ts"
+      - "packages/web/lib/workspace-skills.ts"
+      - "packages/web/lib/skill-harness.ts"
+      - "packages/web/scripts/skill-harness.ts"
+      - ".github/workflows/skill-harness.yml"
+
+concurrency:
+  group: skill-harness
+  cancel-in-progress: false
+
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      WORKSPACE: ${{ inputs.workspace || 'workspaces/gtm-lead-engine' }}
+      # OpenCode on GLM-5.2 is every workspace's default. Claude Code's
+      # subscription credentials rotate, so it is proved at snapshot rebuild and
+      # on demand here, with CLAUDE_CODE_CREDENTIALS set.
+      AGENTS: ${{ inputs.agents || 'opencode' }}
+      DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+      WORKSPACES_REPO: ${{ vars.WORKSPACES_REPO }}
+      WORKSPACES_REPO_TOKEN: ${{ secrets.WORKSPACES_REPO_TOKEN }}
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      CLAUDE_CODE_CREDENTIALS: ${{ secrets.CLAUDE_CODE_CREDENTIALS }}
+    steps:
+      # A missing secret must fail, not skip: a green run that proved nothing
+      # is worse than a red one.
+      - name: Check credentials
+        run: |
+          need="DAYTONA_API_KEY WORKSPACES_REPO WORKSPACES_REPO_TOKEN"
+          case ",$AGENTS," in *,opencode,*) need="$need OPENCODE_API_KEY";; esac
+          case ",$AGENTS," in *,claude-code,*) need="$need CLAUDE_CODE_CREDENTIALS";; esac
+          missing=""
+          for v in $need; do [ -n "${!v}" ] || missing="$missing $v"; done
+          if [ -n "$missing" ]; then
+            echo "::error::Set these in Settings → Secrets and variables → Actions:$missing"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+
+      # The harness imports the SDK and sandbox packages from their built dist,
+      # the same set vercel-build compiles before the web app.
+      - name: Build workspace packages
+        run: >-
+          npm run build --workspaces --if-present
+          --workspace @switchboard/common --workspace @switchboard/agent-configuration
+          --workspace @switchboard/claude-credentials --workspace @switchboard/mcp
+          --workspace @switchboard/sandbox-git --workspace @switchboard/sandbox-jobs
+          --workspace @switchboard/sandbox-skills --workspace @switchboard/sandbox-terminal
+          --workspace @switchboard/sdk
+
+      - name: Skill harness
+        run: npm run test:skills -- --workspace "$WORKSPACE" --agent "$AGENTS"
