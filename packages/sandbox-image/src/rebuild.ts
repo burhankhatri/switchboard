@@ -9,6 +9,12 @@ import {
 export interface RebuildSnapshotOptions {
   /** Receives progress and image-build log lines. */
   onLog?: (line: string) => void
+  /**
+   * Checks a freshly built snapshot before it replaces the live one; throw to
+   * refuse it. build-snapshot runs the skill harness here, so an agent CLI bump
+   * that breaks skill discovery never reaches a run.
+   */
+  verify?: (snapshotName: string) => Promise<void>
 }
 
 /** Snapshot state meaning "built and ready". Mirrors image.ts. */
@@ -85,6 +91,7 @@ async function buildSnapshot(
  *   0. Delete any leftover temp from a previously failed run (self-heals).
  *   1. First run (no canonical snapshot yet) → build it directly and stop.
  *   2. Build temp                  → canonical still active & serving.
+ *   2b. Verify temp                → on failure, delete temp; canonical untouched.
  *   3. Delete canonical            → temp is now the only active one, serving.
  *   4. Rebuild canonical           → "building" (invisible); temp serves.
  *                                     once ready it becomes active again.
@@ -100,7 +107,7 @@ export async function rebuildSnapshot(
   daytona: Daytona,
   options: RebuildSnapshotOptions = {}
 ): Promise<Awaited<ReturnType<typeof buildSnapshot>>> {
-  const { onLog } = options
+  const { onLog, verify } = options
 
   // 0. Clean up a stale temp snapshot from any previous failed rebuild so the
   //    build in step 2 can't fail on a taken name.
@@ -110,11 +117,29 @@ export async function rebuildSnapshot(
   const canonical = await getSnapshotIfExists(daytona, SNAPSHOT_NAME)
   if (!canonical) {
     onLog?.(`No existing "${SNAPSHOT_NAME}" — building it directly.`)
-    return buildSnapshot(daytona, SNAPSHOT_NAME, onLog)
+    const built = await buildSnapshot(daytona, SNAPSHOT_NAME, onLog)
+    // Nothing to fall back to, so the snapshot stays live — but it says so.
+    await verify?.(SNAPSHOT_NAME).catch((err: unknown) => {
+      const reason = err instanceof Error ? err.message : String(err)
+      throw new Error(`"${SNAPSHOT_NAME}" is a first build, so it is live anyway, and it failed verification: ${reason}`)
+    })
+    return built
   }
 
   // 2. Build temp while the canonical snapshot keeps serving.
   await buildSnapshot(daytona, SNAPSHOT_NAME_TEMP, onLog)
+
+  // 2b. Check it before anything live is touched. A refused image is removed
+  //     and the canonical snapshot keeps serving as if nothing happened.
+  if (verify) {
+    onLog?.(`Verifying "${SNAPSHOT_NAME_TEMP}" before it replaces "${SNAPSHOT_NAME}"...`)
+    try {
+      await verify(SNAPSHOT_NAME_TEMP)
+    } catch (err) {
+      await deleteSnapshotAndWait(daytona, SNAPSHOT_NAME_TEMP, onLog)
+      throw err
+    }
+  }
 
   // 3. Delete the canonical snapshot — temp is now the only active one.
   await deleteSnapshotAndWait(daytona, SNAPSHOT_NAME, onLog)
