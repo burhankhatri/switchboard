@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server"
 import { badRequest } from "@/lib/db/api-helpers"
 import type { MessagePayload } from "./types"
+import { MAX_CHAT_UPLOAD_FILES, MAX_UPLOAD_TOTAL_BYTES, validateUploadFile, validateUploadIds } from "@/lib/upload-limits"
 
 export interface ParsedMessageRequest {
   payload: MessagePayload
@@ -34,6 +35,7 @@ export async function parseMessageRequest(
     payload = (await req.json()) as MessagePayload
   }
 
+  if (!payload || typeof payload !== "object") return badRequest("Invalid payload")
   if (
     !payload.message ||
     !payload.agent ||
@@ -43,6 +45,13 @@ export async function parseMessageRequest(
   ) {
     return badRequest("Missing required fields")
   }
+
+  try {
+    validateUploadIds(payload.uploadIds ?? [], MAX_CHAT_UPLOAD_FILES)
+    if (payload.uploadIds?.length && files.length) return badRequest("Use upload references or attached files, not both")
+    if (files.length > MAX_CHAT_UPLOAD_FILES || files.reduce((sum, file) => sum + file.size, 0) > MAX_UPLOAD_TOTAL_BYTES) return badRequest("Attachments must total 100 MB or less, with at most 20 files")
+    for (const file of files) validateUploadFile(file.name, file.size)
+  } catch (error) { return badRequest((error as Error).message) }
 
   return { payload, files }
 }

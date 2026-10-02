@@ -121,8 +121,8 @@ export function ChatMessageList({
               - "error": the agent itself errored. The Retry action resends the
                 last user message — note this leaves the previously-failed
                 assistant turn in the history (the user can see what failed) and
-                doesn't re-attach any originally-uploaded files (those File
-                objects are no longer in memory).
+                re-attaches files from a failed send while they remain in memory.
+                After a page reload, the user must select those files again.
               - "disconnected": the SSE stream died before the turn finished. The
                 agent may still be running in the background, so the action is
                 Reload (refresh the chat history) rather than resending. */}

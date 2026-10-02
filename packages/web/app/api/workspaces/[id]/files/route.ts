@@ -13,6 +13,7 @@ import {
   readWorkspaceFile,
   writeWorkspaceFile,
 } from "@/lib/workspace-repo"
+import { signedDownloadUrl } from "@/lib/server/upload-storage"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -55,6 +56,9 @@ export async function GET(req: NextRequest, { params }: Ctx): Promise<Response> 
   try {
     if (!path) {
       const files = await listWorkspaceFiles(token, workspace.path, workspace.baseBranch)
+      const assets = await prisma.workspaceAsset.findMany({ where: { workspaceId: id }, include: { upload: true } })
+      files.workspace.push(...assets.map(asset => ({ path: asset.path, name: asset.path.slice(workspace.path.length + 1), size: asset.upload.size })))
+      files.workspace.sort((a, b) => a.name.localeCompare(b.name))
       return Response.json(files)
     }
 
@@ -68,6 +72,12 @@ export async function GET(req: NextRequest, { params }: Ctx): Promise<Response> 
     }
     if (path.includes("..")) return badRequest("Invalid path")
 
+    const asset = await prisma.workspaceAsset.findUnique({ where: { workspaceId_path: { workspaceId: id, path } }, include: { upload: true } })
+    if (asset) {
+      return Response.json({ path, content: "", truncated: true, sha: asset.uploadId, storageAsset: true,
+        downloadUrl: await signedDownloadUrl(asset.upload.objectPath, asset.upload.name), size: asset.upload.size,
+      }, { headers: { "Cache-Control": "no-store" } })
+    }
     const file = await readWorkspaceFile(token, path)
     return Response.json({ path, ...file })
   } catch (err) {
@@ -125,6 +135,10 @@ export async function PUT(req: NextRequest, { params }: Ctx): Promise<Response> 
     const inShared = path.startsWith(".claude/")
     if (!inWorkspace && !inShared) return forbidden("That file is not in this workspace")
     if (path.includes("..")) return badRequest("Invalid path")
+
+    if (await prisma.workspaceAsset.findUnique({ where: { workspaceId_path: { workspaceId: id, path } } })) {
+      return badRequest("This file is available for download. Upload a replacement to update it.")
+    }
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
 

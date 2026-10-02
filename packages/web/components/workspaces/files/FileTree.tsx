@@ -63,7 +63,7 @@ function TreeRow({ node, depth, ...props }: { node: FileNode; depth: number } & 
         const r = await fetch(`/api/workspaces/${wsId}/files?path=${encodeURIComponent(path)}`)
         if (!r.ok) throw new Error(String(r.status))
         const file = await r.json()
-        writeCachedFile(wsId, path, { content: file.content, sha: file.sha, truncated: file.truncated })
+        if (!file.storageAsset) writeCachedFile(wsId, path, { content: file.content, sha: file.sha, truncated: file.truncated })
         return file
       },
       staleTime: 30 * 1000,

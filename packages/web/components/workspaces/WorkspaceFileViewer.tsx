@@ -75,7 +75,7 @@ export function WorkspaceFileViewer() {
         const r = await fetch(`/api/workspaces/${wsId}/files?path=${encodeURIComponent(openFile!)}`)
         if (!r.ok) throw new Error(String(r.status))
         const file = (await r.json()) as FilePayload
-        writeCachedFile(wsId, openFile!, {
+        if (!file.storageAsset) writeCachedFile(wsId, openFile!, {
           content: file.content,
           sha: file.sha,
           truncated: file.truncated,
@@ -206,7 +206,7 @@ export function WorkspaceFileViewer() {
               <Check className="h-3 w-3" /> {save.isPending ? "Saved locally" : "Committed"}
             </span>
           )}
-          {!binary && (
+          {!binary && !data?.storageAsset && (
             <button
               onClick={() => save.mutate(value)}
               disabled={!dirty || data?.truncated}
@@ -243,7 +243,23 @@ export function WorkspaceFileViewer() {
         </p>
       )}
 
-      {data && binary && (
+      {data && data.storageAsset && (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <FileIcon path={openFile} className="h-14 w-14" />
+          <p className="text-sm font-medium">{fileName}</p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Available to the agent on its next run. Upload a replacement to update this file; changes made during a run stay in that run.
+          </p>
+          <button className="rounded-md border px-3 py-2 text-sm" onClick={async () => {
+            const response = await fetch(`/api/workspaces/${wsId}/files?path=${encodeURIComponent(openFile)}`)
+            if (response.ok) {
+              const file = await response.json() as FilePayload
+              if (file.downloadUrl) window.location.assign(file.downloadUrl)
+            }
+          }}>Download file</button>
+        </div>
+      )}
+      {data && binary && !data.storageAsset && (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <FileIcon path={openFile} className="h-14 w-14" />
           <p className="text-sm font-medium text-foreground">{fileName}</p>
@@ -254,7 +270,7 @@ export function WorkspaceFileViewer() {
         </div>
       )}
 
-      {data && !binary && (
+      {data && !binary && !data.storageAsset && (
         // min-h-0 is load-bearing: without it the textarea's own content height
         // becomes the flex floor and the editor stops shrinking to its pane.
         <div className="flex min-h-0 flex-1">

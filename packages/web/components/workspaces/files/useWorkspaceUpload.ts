@@ -4,7 +4,8 @@ import { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { workspaceSkillsKey } from "@/lib/query/hooks/useWorkspaceSkills"
-import { batchForRequests, planFolderImport, type SkippedFile } from "@/lib/workspace-import"
+import { planFolderImport, type SkippedFile } from "@/lib/workspace-import"
+import { stageFile, forgetStagedFile } from "@/lib/direct-upload"
 
 export interface UploadItem {
   /** Where it lands, relative to the drop or pick — "campaign/brief.md". */
@@ -24,25 +25,6 @@ export interface UploadResult {
   error: string | null
 }
 
-/**
- * A file's bytes as base64.
- *
- * readAsDataURL rather than reading text: uploads are PDFs and images as often
- * as scripts, and `.text()` would turn every one of them into replacement
- * characters. Base64 travels through JSON unchanged and is what the git blob
- * API wants anyway.
- */
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error(`Could not read ${file.name}`))
-    reader.onload = () => {
-      const s = String(reader.result)
-      resolve(s.slice(s.indexOf(",") + 1))
-    }
-    reader.readAsDataURL(file)
-  })
-}
 
 /** What the commit message calls the upload: the folder, the file, or a count. */
 function labelFor(items: UploadItem[]): string {
@@ -56,8 +38,7 @@ function labelFor(items: UploadItem[]): string {
  * — ends here, so they share one set of caps and one binary-safe route.
  *
  * The plan runs first so a file that cannot go is named before anything is
- * sent. The rest goes up in request-sized batches, one commit each, which keeps
- * a small upload to a single commit.
+ * sent. Bytes go directly to Storage; only upload IDs reach the import route.
  */
 export function useWorkspaceUpload() {
   const { activeWorkspace } = useWorkspace()
@@ -86,29 +67,28 @@ export function useWorkspaceUpload() {
     const outcome: UploadResult = { committed: 0, skipped: [...plan.skipped], error: null }
     setProgress({ label, doneBytes: 0, totalBytes: plan.totalBytes })
     try {
-      for (const batch of batchForRequests(plan.files)) {
-        const files = await Promise.all(
-          batch.map(async (f) => ({
-            relativePath: f.relativePath,
-            contentBase64: await toBase64(byPath.get(f.relativePath)!),
-          }))
-        )
-        const res = await fetch(`/api/workspaces/${wsId}/import`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ folder: label, files }),
+      const uploadFiles: { relativePath: string; uploadId: string }[] = []
+      let completedBytes = 0
+      const scope = { kind: "workspace" as const, id: wsId }
+      for (const file of plan.files) {
+        const uploadId = await stageFile(byPath.get(file.relativePath)!, scope, bytes => {
+          setProgress(p => p && { ...p, doneBytes: completedBytes + bytes })
         })
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Upload failed")
-        const done = (await res.json()) as { committed: number; skipped: SkippedFile[] }
-        outcome.committed += done.committed
-        outcome.skipped.push(...done.skipped)
-        const sent = batch.reduce((n, f) => n + f.size, 0)
-        setProgress((p) => p && { ...p, doneBytes: p.doneBytes + sent })
+        uploadFiles.push({ relativePath: file.relativePath, uploadId })
+        completedBytes += file.size
       }
+      const res = await fetch(`/api/workspaces/${wsId}/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder: label, uploadFiles }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Upload failed")
+      const done = (await res.json()) as { committed: number; skipped: SkippedFile[] }
+      outcome.committed += done.committed
+      outcome.skipped.push(...done.skipped)
+      for (const file of plan.files) forgetStagedFile(byPath.get(file.relativePath)!, scope)
     } catch (e) {
-      // Stop at the first failed batch: the usual cause (auth, a moved branch)
-      // fails every later batch the same way, and the batches already
-      // committed are real and stay reported.
+      // Staged objects survive for retry if finalization fails.
       outcome.error = (e as Error).message
     } finally {
       setProgress(null)

@@ -92,8 +92,20 @@ describe("planFolderImport", () => {
     expect(plan.skipped).toEqual([])
   })
 
-  it("lets one file be as large as one request can carry", () => {
-    expect(IMPORT_MAX_FILE_BYTES).toBe(IMPORT_MAX_REQUEST_BYTES)
+  it("accepts a 25 MiB file independently of the legacy request budget", () => {
+    const plan = planFolderImport([entry("dataset.csv", 25 * 1024 * 1024)], base)
+    expect(plan.files).toHaveLength(1)
+    expect(plan.skipped).toEqual([])
+    expect(IMPORT_MAX_FILE_BYTES).toBe(25 * 1024 * 1024)
+    expect(IMPORT_MAX_FILE_BYTES).toBeGreaterThan(IMPORT_MAX_REQUEST_BYTES)
+  })
+
+  it.each(["folder\\escape.csv", "folder/new\nline.csv", "folder/tab\t.csv"])("rejects ambiguous or control-character paths: %s", relativePath => {
+    expect(planFolderImport([entry(relativePath)], base).files).toEqual([])
+  })
+
+  it.each([-1, NaN, Infinity, 0.5])("rejects invalid sizes: %s", size => {
+    expect(planFolderImport([entry("a.csv", size)], base).files).toEqual([])
   })
 
   it("refuses a path that would escape the workspace", () => {

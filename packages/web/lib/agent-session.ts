@@ -32,6 +32,7 @@ import {
 } from "@switchboard/agent-configuration/mcp"
 import { DEFAULT_GIT_POLICY } from "./git-policy"
 import type { Sandbox as DaytonaSandbox } from "@daytonaio/sdk"
+import { hydrateWorkspaceAssets } from "@/lib/server/hydrate-workspace-assets"
 
 // Re-export Agent type for convenience
 export type { Agent }
@@ -72,6 +73,8 @@ export function formatAgentError(err: unknown): string {
 export interface AgentSessionOptions {
   /** Clone root inside the sandbox. Git operations always use THIS path. */
   repoPath: string
+  workspaceId?: string | null
+  userId?: string
   /**
    * Repo-relative directory of the active Workspace, e.g.
    * "workspaces/marketing-automation". When set, the agent runs with its cwd
@@ -146,6 +149,12 @@ export async function createBackgroundAgentSession(
   options: AgentSessionOptions
 ): Promise<BackgroundAgentSession> {
   const workspace = resolveWorkspace(options)
+  if (options.workspaceId && options.workspacePath && options.userId) {
+    await hydrateWorkspaceAssets(sandbox, {
+      workspaceId: options.workspaceId, workspacePath: options.workspacePath,
+      userId: options.userId, repoPath: options.repoPath,
+    })
+  }
   const systemPrompt = buildSystemPrompt(
     options.repoPath,
     options.previewUrlPattern,

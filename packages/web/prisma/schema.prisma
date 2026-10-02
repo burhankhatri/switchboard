@@ -261,8 +261,43 @@ model Workspace {
   invites       WorkspaceInvite[]
   connections   WorkspaceConnection[]
   notifications Notification[]
+  assets        WorkspaceAsset[]
 
   @@index([archived, name])
+}
+
+// Objects live in a private bucket; scope and ownership are enforced by the app.
+// Keep expired metadata until cleanup removes the object, including late uploads.
+model FileUpload {
+  id          String   @id @default(cuid())
+  userId      String
+  scope       String
+  scopeId     String
+  name        String
+  size        Int
+  contentType String
+  objectPath  String   @unique
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime?
+  consumedAt  DateTime?
+  claimToken  String?
+  claimUntil  DateTime?
+  asset       WorkspaceAsset?
+
+  @@index([expiresAt])
+  @@index([userId, scope, scopeId])
+}
+
+model WorkspaceAsset {
+  id          String     @id @default(cuid())
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  path        String
+  uploadId    String     @unique
+  upload      FileUpload @relation(fields: [uploadId], references: [id], onDelete: Restrict)
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([workspaceId, path])
 }
 
 // Membership is what "join a workspace" means. It is deliberately separate from

@@ -42,6 +42,11 @@ folder gets both the workspace's own skills and the shared ones for free — no
 
 ## Done
 
+**Private uploads (2026-10-02)**
+- Files up to 25 MiB upload directly to private Supabase Storage, bypassing Vercel's request body limit. Workspace files up to 3 MiB are committed to Git; larger assets are hydrated before interactive and scheduled runs and excluded from Git staging.
+- Chat attachments transfer to Daytona before the agent starts. Upload ownership, workspace membership, size, path containment and symlink checks apply on the server; expired temporary objects are cleaned by the authenticated lifecycle cron.
+- Implementation verified with 578 passing tests and a clean web typecheck. Deployment still needs Storage environment variables, a private bucket and the additive migration; live Storage/Daytona verification remains pending. See [setup instructions](docs/file-uploads.md).
+
 **Core**
 - `Workspace`, `WorkspaceMember`, `Chat.workspaceId`, `ScheduledJob.workspaceId` (+ migrations)
 - Agent cwd narrows to the workspace folder; workspace system prompt appended after platform rules (fenced, so it cannot reframe them)

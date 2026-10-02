@@ -13,6 +13,7 @@
  */
 
 import { formatBytes } from "./format-bytes"
+import { MAX_UPLOAD_FILE_BYTES, MAX_UPLOAD_TOTAL_BYTES } from "./upload-limits"
 
 /**
  * How much one import request may carry, counted in raw bytes.
@@ -26,17 +27,16 @@ import { formatBytes } from "./format-bytes"
 export const IMPORT_MAX_REQUEST_BYTES = 3 * 1024 * 1024
 
 /**
- * Per-file cap: a file cannot be split across requests, so one file is as big
- * as one request can carry. This used to be 256KB, a guess that refused
- * ordinary lead lists and PDFs for no limit anything actually imposed.
+ * Direct uploads bypass the function request ceiling. Small files still land
+ * in Git, while larger assets stay in private Storage.
  */
-export const IMPORT_MAX_FILE_BYTES = IMPORT_MAX_REQUEST_BYTES
+export const IMPORT_MAX_FILE_BYTES = MAX_UPLOAD_FILE_BYTES
 
 /**
  * How much one upload — a drop or a pick — may carry across all its requests.
  * The backstop for dragging in a folder of video by accident.
  */
-export const IMPORT_MAX_TOTAL_BYTES = 25 * 1024 * 1024
+export const IMPORT_MAX_TOTAL_BYTES = MAX_UPLOAD_TOTAL_BYTES
 
 /**
  * Ceiling on file count, independent of size.
@@ -107,7 +107,7 @@ export interface ImportPlan {
 
 /** Traversal, absolute paths, and anything that cannot name a file. */
 function isUnsafe(relativePath: string): boolean {
-  if (!relativePath || relativePath.startsWith("/")) return true
+  if (!relativePath || relativePath.length > 512 || relativePath.startsWith("/") || /[\\\x00-\x1f\x7f]/.test(relativePath)) return true
   const parts = relativePath.split("/")
   return parts.some((p) => p === "" || p === "." || p === "..")
 }
@@ -149,6 +149,10 @@ export function planFolderImport(
     }
     if (looksLikeSecrets(e.relativePath.split("/").pop() ?? "")) {
       skip("looks like a secrets file")
+      continue
+    }
+    if (!Number.isSafeInteger(e.size) || e.size < 0) {
+      skip("invalid file size")
       continue
     }
     if (e.size > IMPORT_MAX_FILE_BYTES) {

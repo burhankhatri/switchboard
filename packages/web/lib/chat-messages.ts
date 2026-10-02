@@ -12,6 +12,8 @@ import type { SettingsData } from "@/lib/query"
 import type { Plan } from "@/lib/server/usage-budgets"
 import { isPlan } from "@/lib/usage-limit-copy"
 import { generateBranchName } from "@/lib/utils"
+import { stageFile, forgetStagedFile } from "@/lib/direct-upload"
+import { MAX_UPLOAD_TOTAL_BYTES, MAX_CHAT_UPLOAD_FILES } from "@/lib/upload-limits"
 
 // =============================================================================
 // API contract
@@ -66,15 +68,30 @@ export type SendMessageResult =
 export async function sendMessageToApi(
   chatId: string,
   payload: SendMessagePayload,
-  files?: File[]
+  files?: File[],
+  onUploadProgress?: (bytes: number, total: number) => void
 ): Promise<SendMessageResult> {
   let response: Response
 
   if (files?.length) {
-    const formData = new FormData()
-    formData.append("payload", JSON.stringify(payload))
-    files.forEach((file, i) => formData.append(`file-${i}`, file))
-    response = await fetch(`/api/chats/${chatId}/messages`, { method: "POST", body: formData })
+    if (files.length > MAX_CHAT_UPLOAD_FILES || files.reduce((sum, file) => sum + file.size, 0) > MAX_UPLOAD_TOTAL_BYTES) {
+      return { ok: false, error: "Attach up to 20 files totaling 100 MB or less", isDailyLimit: false }
+    }
+    const uploadIds: string[] = []
+    const total = files.reduce((sum, file) => sum + file.size, 0)
+    let completed = 0
+    try {
+      for (const file of files) {
+        uploadIds.push(await stageFile(file, { kind: "chat", id: chatId }, bytes => onUploadProgress?.(completed + bytes, total)))
+        completed += file.size
+      }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : "File upload failed", isDailyLimit: false }
+    }
+    response = await fetch(`/api/chats/${chatId}/messages`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, uploadIds }),
+    })
   } else {
     response = await fetch(`/api/chats/${chatId}/messages`, {
       method: "POST",
@@ -91,7 +108,7 @@ export async function sendMessageToApi(
     if (response.status === 413) {
       return {
         ok: false,
-        error: "Attachments are too large to upload (max ~4 MB total). Remove or shrink files and try again.",
+        error: "The message request is too large. Shorten the message and try again.",
         isDailyLimit: false,
       }
     }
@@ -126,6 +143,7 @@ export async function sendMessageToApi(
   }
 
   const data = (await response.json()) as SendMessageResponse
+  files?.forEach(file => forgetStagedFile(file, { kind: "chat", id: chatId }))
   return { ok: true, data }
 }
 

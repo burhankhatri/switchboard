@@ -10,24 +10,25 @@ import {
 } from "@/lib/db/api-helpers"
 import { commitWorkspaceFiles } from "@/lib/workspace-repo"
 import { planFolderImport, IMPORT_MAX_FILES, IMPORT_MAX_REQUEST_BYTES } from "@/lib/workspace-import"
+import { importStagedWorkspaceFiles } from "@/lib/server/workspace-assets"
+import { UploadError, uploadErrorResponse } from "@/lib/server/file-uploads"
 
 type Ctx = { params: Promise<{ id: string }> }
+export const maxDuration = 300
 
 interface ImportBody {
   /** The picked folder's own name, used in the commit message. */
   folder?: string
   files?: { relativePath?: string; contentBase64?: string }[]
+  uploadFiles?: { relativePath: string; uploadId: string }[]
 }
 
 /**
- * POST /api/workspaces/:id/import — commit uploaded files in one commit.
+ * POST /api/workspaces/:id/import — finalize workspace uploads.
  *
- * Every upload comes through here — picked files, a picked folder, a drop —
- * because it is the binary-safe path: content travels as base64 and becomes a
- * git blob byte for byte. The editor's PUT /files is text. A folder of fifty
- * files through that route would also be fifty commits racing for the same
- * branch; here the tree is assembled first and the branch moves once. An upload
- * bigger than one request can carry arrives as several requests, one commit each.
+ * The browser stages bytes directly in private Storage and sends references.
+ * Small files are committed together; larger files remain workspace assets.
+ * Legacy base64 requests remain supported within the small request budget.
  *
  * The client plans the import too, so it can show what will be skipped before
  * anything is sent — but that preview is not trusted. The plan is recomputed
@@ -61,6 +62,13 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
 
   try {
     const body: ImportBody = await req.json()
+    if ("uploadFiles" in body) {
+      return Response.json(await importStagedWorkspaceFiles({
+        userId, token, workspaceId: id, base: workspace.path,
+        branch: workspace.baseBranch ?? "main", slug: workspace.slug,
+        folder: body.folder?.trim() || "files", incoming: body.uploadFiles,
+      }))
+    }
     const incoming = body.files
     if (!Array.isArray(incoming) || incoming.length === 0) {
       return badRequest("Pick a folder with at least one file in it")
@@ -86,8 +94,7 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
       })
     }
 
-    // Held to what one request can carry: the client batches to this, and a
-    // request that ignores it is refused here rather than by a 413 halfway in.
+    // Legacy inline requests retain the small request budget.
     const plan = planFolderImport(entries, workspace.path, IMPORT_MAX_REQUEST_BYTES)
     if (plan.files.length === 0) {
       return badRequest(
@@ -102,6 +109,11 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
       return forbidden("That file is not in this workspace")
     }
 
+    const assets = await prisma.workspaceAsset.findMany({ where: { workspaceId: id }, select: { path: true } })
+    if (plan.files.some(file => assets.some(asset => asset.path === file.path || asset.path.startsWith(`${file.path}/`) || file.path.startsWith(`${asset.path}/`)))) {
+      return badRequest("An imported path conflicts with a Storage file. Use a different filename.")
+    }
+
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
     const folder = body.folder?.trim() || "folder"
 
@@ -114,6 +126,7 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
 
     return Response.json({ commit, committed, skipped: plan.skipped })
   } catch (err) {
+    if (err instanceof UploadError) return uploadErrorResponse(err)
     const message = err instanceof Error ? err.message : "Import failed"
     if (message.includes("pushed while the import")) return badRequest(message)
     return internalError(err)

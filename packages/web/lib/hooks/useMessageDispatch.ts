@@ -19,6 +19,7 @@ import type { QueryClient } from "@tanstack/react-query"
 import type { Chat, Message, QueuedMessage, Settings } from "@/lib/types"
 import { useChatSyncStore } from "@/lib/stores/chat-sync-store"
 import { useStreamStore } from "@/lib/stores/stream-store"
+import { useUploadProgressStore } from "@/lib/stores/upload-progress-store"
 import { useQueueDispatch } from "./useQueueDispatch"
 import type { useStreaming } from "./useStreaming"
 import type { useSuggestNameMutation } from "@/lib/query"
@@ -102,6 +103,7 @@ export function useMessageDispatch({
   queuePaused,
 }: UseMessageDispatchArgs): MessageDispatch {
   const setLimitReachedState = useChatSyncStore((s) => s.setLimitReachedState)
+  const retryFiles = useRef(new Map<string, { content: string; files: File[] }>())
 
   // Effect-/action-local bookkeeping. Stable refs coordinating in-flight async
   // work; no stale-closure hazard, so they stay refs rather than store state.
@@ -184,7 +186,16 @@ export function useMessageDispatch({
           planMode: planMode || undefined,
         }
 
-        const result = await sendMessageToApi(chatId, payload, files)
+        const previousFiles = retryFiles.current.get(chatId)
+        if (!files && previousFiles?.content === content) files = previousFiles.files
+        if (files?.length) retryFiles.current.set(chatId, { content, files })
+        else retryFiles.current.delete(chatId)
+        let result: Awaited<ReturnType<typeof sendMessageToApi>>
+        try {
+          result = await sendMessageToApi(chatId, payload, files, (bytes, total) => {
+            useUploadProgressStore.getState().set(chatId, { bytes, total })
+          })
+        } finally { useUploadProgressStore.getState().set(chatId) }
 
         if (!result.ok) {
           // Pre-run auto-pull hit a merge conflict and left the merge in
@@ -235,6 +246,7 @@ export function useMessageDispatch({
         }
 
         const { data } = result
+        retryFiles.current.delete(chatId)
         updateChatsCache((old) => old.map((c) =>
           c.id === chatId ? applySendSuccess(c, data, selectedAgent, selectedModel, userMessage.id) : c
         ))

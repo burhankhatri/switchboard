@@ -5,6 +5,9 @@ export interface FilePayload {
   content: string
   truncated: boolean
   sha: string
+  storageAsset?: boolean
+  downloadUrl?: string
+  size?: number
 }
 
 /** Past this age a file is refetched when opened; within it the copy is used as is. */
@@ -38,7 +41,7 @@ export function workspaceFileQueryOptions({
     retry: false,
     initialData:
       cached && path
-        ? { path, content: cached.content, sha: cached.sha, truncated: cached.truncated }
+        ? { path, content: cached.content, sha: cached.sha, truncated: cached.truncated } as FilePayload
         : undefined,
     initialDataUpdatedAt: cached ? (cached.fetchedAt ?? 0) : undefined,
     staleTime: FILE_STALE_MS,

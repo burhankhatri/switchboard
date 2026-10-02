@@ -267,7 +267,7 @@ export function useChatComposer({
       return
     }
 
-    // Pass files to sendMessage - upload will happen after sandbox is ready
+    // The dispatcher stages files privately before sending the agent request.
     const files = pendingFiles.length > 0 ? pendingFiles.map(pf => pf.file) : undefined
     onSendMessage(input.trim(), currentAgent, currentModel, files, planModeEnabled || undefined)
     setInput("")

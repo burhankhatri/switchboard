@@ -216,6 +216,7 @@ export async function startJobExecution(
   }
 
   const bgSession = await createBackgroundAgentSession(sandbox, {
+    workspaceId: job.workspaceId, userId: job.userId,
     repoPath,
     ...workspaceSessionOptions(job.workspace),
     previewUrlPattern: previewUrlPattern ?? undefined,

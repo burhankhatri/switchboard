@@ -19,6 +19,7 @@ import { AgentModelSelector } from "./AgentModelSelector"
 import { BranchCombobox } from "./BranchCombobox"
 import { SlashCommandMenu, type SlashCommandType } from "../SlashCommandMenu"
 import { MobileSelect } from "../ui/MobileBottomSheet"
+import { useUploadProgressStore } from "@/lib/stores/upload-progress-store"
 
 // =============================================================================
 // ChatInput - The main chat input area with all controls
@@ -249,6 +250,7 @@ export function ChatInput({
   // Mobile
   isMobile,
 }: ChatInputProps) {
+  const uploadProgress = useUploadProgressStore(state => state.chats[chat.id])
   const modals = useModals()
   const [showModeDropdown, setShowModeDropdown] = useState(false)
   const [showModeSheet, setShowModeSheet] = useState(false)
@@ -524,6 +526,12 @@ export function ChatInput({
           />
         </div>
 
+        {uploadProgress && (
+          <div className="mx-2 mb-2 text-xs text-muted-foreground" role="status">
+            Uploading attachments… {uploadProgress.total ? Math.round(uploadProgress.bytes / uploadProgress.total * 100) : 100}%
+            <progress className="mt-1 h-1 w-full" max={Math.max(1, uploadProgress.total)} value={uploadProgress.bytes} />
+          </div>
+        )}
         {/* File upload error message */}
         {fileError && (
           <div className={cn(

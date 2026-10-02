@@ -1,4 +1,5 @@
 import { Daytona } from "@daytonaio/sdk"
+import { cleanupExpiredUploads } from "@/lib/server/file-uploads"
 import { WORKSPACE_RUNTIME_SELECT } from "@/lib/workspace"
 import { addMinutes, differenceInMinutes } from "date-fns"
 
@@ -54,6 +55,8 @@ export async function GET(req: Request) {
   }
 
   const now = new Date()
+  try { if (cronSecret) await cleanupExpiredUploads() }
+  catch { console.warn("[uploads] Expired file cleanup will retry on the next tick") }
   const daytona = new Daytona({ apiKey: daytonaApiKey })
 
   const results = {

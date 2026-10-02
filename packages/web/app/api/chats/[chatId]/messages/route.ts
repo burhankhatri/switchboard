@@ -35,6 +35,9 @@ import { buildAgentEnv } from "./_lib/agent-env"
 import { workspaceSessionOptions } from "@/lib/workspace"
 import { mcpConnectionServers } from "@/lib/workspace-connections"
 import { persistTurn } from "./_lib/persist-turn"
+import { claimUploads, releaseUploads, consumeUploads, UploadError, uploadErrorResponse, type ClaimedUploads } from "@/lib/server/file-uploads"
+import { downloadStoredFile } from "@/lib/server/upload-storage"
+import { MAX_CHAT_UPLOAD_FILES } from "@/lib/upload-limits"
 
 
 export const maxDuration = 300
@@ -144,7 +147,11 @@ export async function POST(
     createdSandbox: false,
   }
 
+  let claimed: ClaimedUploads | undefined
   try {
+    if (payload.uploadIds?.length) {
+      claimed = await claimUploads(userId, { kind: "chat", id: chatId }, payload.uploadIds, MAX_CHAT_UPLOAD_FILES)
+    }
     // ── Stages 1–2: ensure (or recreate) a started sandbox ─────────────────
     const ensured = await ensureSandboxForChat({
       daytona,
@@ -176,14 +183,15 @@ export async function POST(
 
     // ── Stage 3: file upload ───────────────────────────────────────────────
     let uploadedFilePaths: string[] = []
-    if (files.length > 0) {
-      try {
-        uploadedFilePaths = await uploadFilesToSandbox(sandbox, PATHS.UPLOADS_DIR, files)
-      } catch (err) {
-        // Match the legacy behavior: file-upload errors don't abort the
-        // send. The agent simply runs without seeing the files.
-        console.error("[chats/messages] file upload failed:", err)
+    if (claimed) {
+      for (const upload of claimed.uploads) {
+        const bytes = await downloadStoredFile(upload.objectPath, upload.size)
+        const file = new File([new Uint8Array(bytes)], upload.name, { type: upload.contentType })
+        uploadedFilePaths.push(...await uploadFilesToSandbox(sandbox, PATHS.UPLOADS_DIR, [file]))
       }
+    }
+    if (files.length > 0) {
+      uploadedFilePaths = await uploadFilesToSandbox(sandbox, PATHS.UPLOADS_DIR, files)
     }
 
     // Build the prompt the agent sees. Mirrors the legacy client logic.
@@ -236,6 +244,7 @@ export async function POST(
     }
 
     const bgSession = await createBackgroundAgentSession(sandbox, {
+      workspaceId: chat.workspaceId, userId,
       repoPath,
       // Narrows the agent's cwd to the workspace folder inside the clone. `repoPath`
       // stays the clone root so git operations and auto-push are unaffected.
@@ -277,6 +286,12 @@ export async function POST(
 
     // ── Stage 6: kick off the agent ────────────────────────────────────────
     await bgSession.start(agentPrompt, history ? { history } : undefined)
+    if (claimed) {
+      // The agent is running now; cleanup failure must not turn a successful
+      // send into an apparent failure that the user could resend.
+      try { await consumeUploads(claimed) }
+      catch { console.warn("[uploads] Consumption cleanup deferred") }
+    }
 
     // Log message sent activity (fire and forget)
     // Include useSharedClaude flag to track shared Claude subscription usage
@@ -296,6 +311,7 @@ export async function POST(
     }
     return Response.json(response)
   } catch (error) {
+    if (error instanceof UploadError) return uploadErrorResponse(error)
     console.error("[chats/messages] Error:", error)
 
     // If we just created the sandbox in this request and something
@@ -327,5 +343,10 @@ export async function POST(
     }
 
     return internalError(error)
+  } finally {
+    if (claimed) {
+      try { await releaseUploads(claimed) }
+      catch { console.warn("[uploads] Claim release deferred until lease expiry") }
+    }
   }
 }

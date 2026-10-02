@@ -407,7 +407,8 @@ async function fileExists(
   path: string
 ): Promise<boolean> {
   try {
-    const result = await sandbox.process.executeCommand(`test -e "${path}" && echo "exists"`)
+    const quotedPath = "'" + path.replace(/'/g, "'\\''") + "'"
+    const result = await sandbox.process.executeCommand(`test -e ${quotedPath} && echo exists`)
     return result.result?.trim() === "exists"
   } catch {
     return false
