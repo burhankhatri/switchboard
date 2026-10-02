@@ -367,7 +367,8 @@ export const MAX_VIEWABLE_BYTES = 256 * 1024
  */
 export async function readWorkspaceFile(
   token: string,
-  path: string
+  path: string,
+  branch?: string | null
 ): Promise<{ content: string; truncated: boolean; sha: string }> {
   if (path.includes("..") || path.startsWith("/")) {
     throw new Error(`unsafe path: ${path}`)
@@ -381,7 +382,7 @@ export async function readWorkspaceFile(
   }
   try {
     data = await ghCachedJson(
-      `${GH}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}`,
+      `${GH}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}${branch ? `?ref=${encodeURIComponent(branch)}` : ""}`,
       repoAuth(token)
     )
   } catch (err) {
@@ -445,6 +446,19 @@ export async function writeWorkspaceFile(
   // being served their own pre-edit copy.
   invalidateRepoCache()
   return { sha: data.content?.sha ?? "" }
+}
+
+/** Delete only the version the member confirmed, on the workspace's branch. */
+export async function deleteWorkspaceFile(token: string, path: string, sha: string, message: string, branch = "main"): Promise<void> {
+  if (!sha || path.startsWith("/") || path.includes("\\") || path.split("/").some(part => !part || part === "." || part === "..") || /[\x00-\x1f\x7f]/.test(path)) throw new Error("Invalid file deletion")
+  const [owner, repo] = WORKSPACES_REPO.split("/")
+  const res = await ghFetch(`${GH}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}`, {
+    method: "DELETE", headers: headers(repoAuth(token)), body: JSON.stringify({ message, sha, branch }),
+  })
+  if (res.status === 409 || res.status === 422) throw Object.assign(new Error("This file changed. Reopen Delete to confirm the latest version."), { status: 409 })
+  if (res.status === 404) throw Object.assign(new Error("File not found. Refresh the file list."), { status: 404 })
+  if (!res.ok) throw new Error(`Could not delete file (GitHub ${res.status})`)
+  invalidateRepoCache()
 }
 
 /** A file on its way into the repo. `contentBase64` so binaries survive. */

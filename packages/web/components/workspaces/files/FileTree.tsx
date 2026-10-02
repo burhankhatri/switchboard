@@ -1,13 +1,17 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { ChevronRight } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { ChevronRight, Trash2 } from "lucide-react"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { buildFileTree, childrenOf, type FileNode, type TreeFile } from "@/lib/file-tree"
 import { formatBytes } from "@/lib/format-bytes"
-import { writeCachedFile } from "@/lib/workspace-file-cache"
+import { writeCachedFile, clearWorkspaceFile } from "@/lib/workspace-file-cache"
+import { workspaceSkillsKey } from "@/lib/query/hooks/useWorkspaceSkills"
 import { cn } from "@/lib/utils"
 import { FileIcon, FolderIcon, SkillsFolderIcon } from "./FileIcon"
+import { DeleteFileDialog } from "./DeleteFileDialog"
 
 export type { TreeFile as RepoFile } from "@/lib/file-tree"
 
@@ -31,17 +35,50 @@ interface FileTreeProps {
  * target — onto a folder drops into it, onto a file drops beside it.
  */
 export function FileTree(props: FileTreeProps) {
+  const { activeWorkspace, openFile, setOpenFile } = useWorkspace()
+  const qc = useQueryClient()
+  const [menu, setMenu] = useState<{ path: string; x: number; y: number } | null>(null)
+  const [deletePath, setDeletePath] = useState<string | null>(null)
+  const latest = useRef({ activeWorkspace, openFile })
+  latest.current = { activeWorkspace, openFile }
+  useEffect(() => { setMenu(null); setDeletePath(null) }, [activeWorkspace?.id])
+  const showMenu = (file: TreeFile, x: number, y: number) => {
+    if (activeWorkspace && file.path.startsWith(`${activeWorkspace.path}/`)) setMenu({ path: file.path, x, y })
+  }
   const root = buildFileTree(props.files)
   return (
+    <>
     <div role="tree" aria-label="Workspace files" className="px-2">
       {childrenOf(root).map((node) => (
-        <TreeRow key={node.rel} node={node} depth={0} {...props} />
+        <TreeRow key={node.rel} node={node} depth={0} {...props} onFileMenu={showMenu} />
       ))}
     </div>
+    <DropdownMenu open={!!menu} onOpenChange={open => { if (!open) setMenu(null) }} modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button tabIndex={-1} aria-hidden style={{ position: "fixed", left: menu?.x ?? 0, top: menu?.y ?? 0, width: 1, height: 1, pointerEvents: "none", opacity: 0 }} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={0} onCloseAutoFocus={event => event.preventDefault()}>
+        <DropdownMenuItem className="text-destructive" onSelect={() => { if (menu) setDeletePath(menu.path) }}>
+          <Trash2 className="mr-2 h-4 w-4" />Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+    {deletePath && activeWorkspace && (
+      <DeleteFileDialog key={`${activeWorkspace.id}:${deletePath}`} workspaceId={activeWorkspace.id} path={deletePath} onCancel={() => setDeletePath(null)} onDeleted={() => {
+        const wsId = activeWorkspace.id
+        clearWorkspaceFile(wsId, deletePath)
+        void qc.cancelQueries({ queryKey: ["workspace-file", wsId, deletePath] }).then(() => qc.removeQueries({ queryKey: ["workspace-file", wsId, deletePath] }))
+        void qc.invalidateQueries({ queryKey: ["workspace-files", wsId] })
+        void qc.invalidateQueries({ queryKey: workspaceSkillsKey(wsId) })
+        if (latest.current.activeWorkspace?.id === wsId && latest.current.openFile === deletePath) setOpenFile(null)
+        setDeletePath(null)
+      }} />
+    )}
+    </>
   )
 }
 
-function TreeRow({ node, depth, ...props }: { node: FileNode; depth: number } & FileTreeProps) {
+function TreeRow({ node, depth, ...props }: { node: FileNode; depth: number; onFileMenu: (file: TreeFile, x: number, y: number) => void } & FileTreeProps) {
   const { activeWorkspace, openFile, requestOpenFile } = useWorkspace()
   const qc = useQueryClient()
   const isFolder = !node.file
@@ -81,6 +118,17 @@ function TreeRow({ node, depth, ...props }: { node: FileNode; depth: number } & 
         onClick={() => (isFolder ? props.onToggle(node.rel) : void requestOpenFile(node.file!.path))}
         onMouseEnter={prefetch}
         onFocus={prefetch}
+        onContextMenu={event => {
+          if (!node.file || !activeWorkspace || !node.file.path.startsWith(`${activeWorkspace.path}/`)) return
+          event.preventDefault()
+          props.onFileMenu(node.file, event.clientX, event.clientY)
+        }}
+        onKeyDown={event => {
+          if (!node.file || !(event.key === "ContextMenu" || (event.shiftKey && event.key === "F10"))) return
+          event.preventDefault()
+          const rect = event.currentTarget.getBoundingClientRect()
+          props.onFileMenu(node.file, rect.left + 20, rect.bottom)
+        }}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes("Files")) return
           e.preventDefault()

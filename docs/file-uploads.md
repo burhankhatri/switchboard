@@ -6,6 +6,8 @@ Workspace files up to 3 MiB remain in Git. Larger files stay in Storage, appear 
 
 Chat attachments are copied into Daytona and their temporary Storage copies deleted after the send succeeds. Failed transfers fail the send visibly and keep the staged objects for retry. Abandoned uploads expire after 24 hours and are removed in bounded batches by the existing lifecycle cron. Consumed metadata remains until expiry to catch objects recreated with a still-valid signed upload token. Retained workspace assets do not expire.
 
+Right-click a workspace file in the sidebar and choose **Delete**, then confirm. Storage files are removed from the private bucket and workspace listing; Git files are removed through a commit on the workspace branch. Failures stay visible for retry, and concurrent replacements are protected by a version check. Shared root files and folders have no Delete action. Existing sandbox copies disappear at the next hydration; a running agent may still have its local copy.
+
 ## Setup
 
 1. In Supabase, find the **Project URL** and the **legacy service_role key** under the project's API settings. The service-role key is different from the database password. Supabase Auth and the Data API are not needed for these Storage requests.

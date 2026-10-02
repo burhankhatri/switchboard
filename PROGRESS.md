@@ -54,6 +54,8 @@ folder gets both the workspace's own skills and the shared ones for free — no
 - `cloneSparse` in `packages/sandbox-git` (partial + sparse clone)
 
 **Workspaces**
+- Right-click workspace files to delete with confirmation: Git files receive an attributed deletion commit; Storage objects and asset references are removed. Membership, path and version checks protect deletions, and the tree, skills and viewer refresh after success.
+- File deletion verification: 600 tests pass (586 web + 14 sandbox-image), web typecheck clean. Live browser deletion verification remains pending.
 - Create from the UI → commits a scaffold folder (config + starter skill) to the private repo, then writes the row. Repo first: a failed commit leaves nothing behind
 - Join / leave; last owner cannot leave
 - Connections (env) — encrypted, owner-only writes, member-only name reads, **no endpoint returns a value**

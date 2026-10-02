@@ -12,10 +12,50 @@ import {
   listWorkspaceFiles,
   readWorkspaceFile,
   writeWorkspaceFile,
+  deleteWorkspaceFile,
 } from "@/lib/workspace-repo"
-import { signedDownloadUrl } from "@/lib/server/upload-storage"
+import { signedDownloadUrl, deleteStoredFiles } from "@/lib/server/upload-storage"
 
 type Ctx = { params: Promise<{ id: string }> }
+
+export async function DELETE(req: NextRequest, { params }: Ctx): Promise<Response> {
+  const { id } = await params
+  const [auth, workspace] = await Promise.all([
+    requireGitHubAuth(),
+    prisma.workspace.findFirst({ where: { id, archived: false }, select: { slug: true, path: true, baseBranch: true, members: { select: { userId: true } } } }),
+  ])
+  if (isGitHubAuthError(auth)) return auth
+  if (!workspace) return notFound("Workspace not found")
+  if (!workspace.members.some(member => member.userId === auth.userId)) return forbidden("Join this workspace first")
+  let body: { path?: unknown; sha?: unknown }
+  try { body = await req.json() } catch { return badRequest("Invalid deletion request") }
+  if (!body || typeof body.path !== "string" || typeof body.sha !== "string" || !body.sha || body.sha.length > 100) return badRequest("path and file version are required")
+  const path = body.path
+  if (!workspace.path || !path.startsWith(`${workspace.path}/`)) return forbidden("That file is not in this workspace")
+  if (path.length > 1024 || path.includes("\\") || /[\x00-\x1f\x7f]/.test(path) || path.split("/").some(part => !part || part === "." || part === "..")) return badRequest("Invalid path")
+  try {
+    const asset = await prisma.workspaceAsset.findUnique({ where: { workspaceId_path: { workspaceId: id, path } }, include: { upload: true } })
+    if (asset) {
+      if (asset.uploadId !== body.sha) return Response.json({ error: "This file changed. Reopen Delete to confirm the latest version." }, { status: 409 })
+      // Keep the reference on Storage failure so the user can retry deletion.
+      await deleteStoredFiles([asset.upload.objectPath])
+      const removed = await prisma.$transaction(async tx => {
+        const result = await tx.workspaceAsset.deleteMany({ where: { id: asset.id, uploadId: asset.uploadId } })
+        if (result.count) await tx.fileUpload.update({ where: { id: asset.uploadId }, data: { consumedAt: new Date(), expiresAt: new Date(Date.now() + 24 * 60 * 60_000) } })
+        return result.count
+      })
+      if (!removed) return Response.json({ error: "This file changed. Refresh the file list." }, { status: 409 })
+    } else {
+      const user = await prisma.user.findUnique({ where: { id: auth.userId }, select: { name: true } })
+      await deleteWorkspaceFile(auth.token, path, body.sha, `Delete ${path.split("/").pop()} from ${workspace.slug} (via Shared Agents by ${user?.name ?? auth.userId})`, workspace.baseBranch ?? "main")
+    }
+    return Response.json({ deleted: true, path })
+  } catch (error) {
+    const status = (error as { status?: number })?.status
+    if (status === 409 || status === 404) return Response.json({ error: error instanceof Error ? error.message : "Delete failed" }, { status })
+    return internalError(error)
+  }
+}
 
 /**
  * GET /api/workspaces/:id/files          -> the file tree a run would see
@@ -78,7 +118,7 @@ export async function GET(req: NextRequest, { params }: Ctx): Promise<Response> 
         downloadUrl: await signedDownloadUrl(asset.upload.objectPath, asset.upload.name), size: asset.upload.size,
       }, { headers: { "Cache-Control": "no-store" } })
     }
-    const file = await readWorkspaceFile(token, path)
+    const file = await readWorkspaceFile(token, path, workspace.baseBranch)
     return Response.json({ path, ...file })
   } catch (err) {
     return internalError(err)
