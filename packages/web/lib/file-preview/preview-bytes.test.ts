@@ -18,7 +18,7 @@ describe("previewMime", () => {
 })
 
 describe("fetchPreviewBytes", () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => { vi.unstubAllGlobals() })
 
   it("returns the file's bytes", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Uint8Array([80, 75, 3, 4]))))
@@ -26,7 +26,7 @@ describe("fetchPreviewBytes", () => {
   })
 
   it("refuses a file over the preview cap without downloading it", async () => {
-    const body = new ReadableStream({ pull: vi.fn() })
+    const body = new ReadableStream<Uint8Array>({ pull() {} })
     const cancel = vi.spyOn(body, "cancel")
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { headers: { "content-length": String(MAX_PREVIEW_BYTES + 1) } })))
     await expect(fetchPreviewBytes("/raw", new AbortController().signal)).rejects.toThrow(/too large to preview/)

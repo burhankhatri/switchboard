@@ -1,9 +1,7 @@
 import * as XLSX from "xlsx"
+import { MAX_COLUMNS, MAX_ROWS } from "./spreadsheet-limits"
 
-/** Wider than any real pricing sheet; beyond it the table stops being readable anyway. */
-export const MAX_COLUMNS = 200
-/** Bounds parse time and memory on sheets whose used range runs to row 1,048,576. */
-export const MAX_ROWS = 50_000
+export { MAX_COLUMNS, MAX_ROWS }
 
 export interface SheetModel {
   name: string
