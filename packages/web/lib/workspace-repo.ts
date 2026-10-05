@@ -408,6 +408,35 @@ export async function readWorkspaceFile(
 }
 
 /**
+ * Stream one file's bytes for previews and downloads.
+ *
+ * The raw media type has no 1 MB ceiling (the Contents JSON does) and skips the
+ * base64 round trip. It is not cached here: bodies can be megabytes, and the
+ * browser caches them per file version instead.
+ */
+export async function readWorkspaceFileRaw(
+  token: string,
+  path: string,
+  branch?: string | null
+): Promise<{ stream: ReadableStream<Uint8Array>; size: number | null }> {
+  if (path.includes("..") || path.startsWith("/")) {
+    throw new Error(`unsafe path: ${path}`)
+  }
+  const [owner, repo] = WORKSPACES_REPO.split("/")
+  const res = await ghFetch(
+    `${GH}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}${branch ? `?ref=${encodeURIComponent(branch)}` : ""}`,
+    { headers: { ...headers(repoAuth(token)), Accept: "application/vnd.github.raw" }, cache: "no-store" }
+  )
+  if (!res.ok || !res.body) {
+    await res.body?.cancel()
+    throw Object.assign(new Error(`Could not read ${path}: ${res.status}`), { status: res.status })
+  }
+  const header = res.headers.get("content-length")
+  const length = header === null ? NaN : Number(header)
+  return { stream: res.body, size: Number.isSafeInteger(length) && length >= 0 ? length : null }
+}
+
+/**
  * Write a file back to the workspaces repo.
  *
  * Saving commits — the repo stays the single source of truth, so an edit here
