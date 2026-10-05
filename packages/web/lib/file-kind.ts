@@ -33,12 +33,39 @@ const BY_EXTENSION: Record<string, FileKind> = {
  * noise, and saving it back would commit that noise over the real file.
  */
 const BINARY = new Set([
-  "pdf", "doc", "docx", "pages", "ppt", "pptx", "key", "xlsx", "xls", "numbers",
-  "png", "jpg", "jpeg", "gif", "webp", "heic", "ico",
+  "pdf", "doc", "docx", "docm", "pages", "ppt", "pptx", "pptm", "key",
+  "xlsx", "xlsm", "xlsb", "xltx", "xltm", "xls", "numbers", "ods", "odt", "odp",
+  "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "tif", "tiff", "heic", "ico",
   "zip", "gz", "tgz", "tar", "7z", "rar",
-  "mp3", "wav", "m4a", "mp4", "mov", "webm",
+  "mp3", "wav", "m4a", "ogg", "flac", "aac", "mp4", "mov", "webm", "mkv", "avi",
   "woff", "woff2", "ttf", "otf", "exe", "bin", "dmg",
 ])
+
+export type PreviewKind =
+  | "spreadsheet" | "csv" | "pdf" | "image" | "audio" | "video" | "docx" | "pptx"
+  | "zip" | "font" | "markdown" | "html" | "svg" | "none"
+
+/**
+ * How the viewer can show a file. Only formats a browser can actually render are
+ * listed — HEIC and TIFF are images, but Chrome cannot decode them, so they get
+ * "none" and a Download button rather than a broken image.
+ */
+const PREVIEW: Record<string, PreviewKind> = {
+  xlsx: "spreadsheet", xlsm: "spreadsheet", xlsb: "spreadsheet", xltx: "spreadsheet", xltm: "spreadsheet",
+  xls: "spreadsheet", ods: "spreadsheet", numbers: "spreadsheet",
+  csv: "csv", tsv: "csv",
+  pdf: "pdf",
+  png: "image", jpg: "image", jpeg: "image", gif: "image", webp: "image", avif: "image", bmp: "image", ico: "image",
+  mp3: "audio", wav: "audio", m4a: "audio", ogg: "audio", flac: "audio", aac: "audio",
+  mp4: "video", mov: "video", webm: "video",
+  docx: "docx", docm: "docx",
+  pptx: "pptx", pptm: "pptx",
+  zip: "zip",
+  ttf: "font", otf: "font", woff: "font", woff2: "font",
+  md: "markdown", mdx: "markdown", markdown: "markdown",
+  html: "html", htm: "html",
+  svg: "svg",
+}
 
 function extension(path: string): string {
   const name = path.split("/").pop() ?? ""
@@ -54,4 +81,8 @@ export function fileKind(path: string): FileKind {
 
 export function isBinaryFile(path: string): boolean {
   return BINARY.has(extension(path))
+}
+
+export function previewKind(path: string): PreviewKind {
+  return PREVIEW[extension(path)] ?? "none"
 }
