@@ -6,6 +6,8 @@ Workspace files up to 3 MiB remain in Git. Larger files stay in Storage, appear 
 
 Chat attachments are copied into Daytona and their temporary Storage copies deleted after the send succeeds. Failed transfers fail the send visibly and keep the staged objects for retry. Abandoned uploads expire after 24 hours and are removed in bounded batches by the existing lifecycle cron. Consumed metadata remains until expiry to catch objects recreated with a still-valid signed upload token. Retained workspace assets do not expire.
 
+Opening a workspace file previews it in the browser, whether it lives in Git or Storage: workbooks (xlsx, xlsm, xlsb, xls, ods, numbers) and CSV/TSV as tables with sheet tabs, PDFs, images, audio, video, Word documents, PowerPoint slide text, zip listings and fonts. Markdown, CSV, HTML and SVG open rendered, with **Edit** for the source. Every file has a Download button. Bytes come from `GET /api/workspaces/:id/files/raw`, which streams Git files from the workspace branch and redirects Storage assets to a 60-second signed URL; it always answers as an attachment so an uploaded page never renders on the app origin. Files over 25 MiB are offered as downloads only.
+
 Right-click a workspace file in the sidebar and choose **Delete**, then confirm. Storage files are removed from the private bucket and workspace listing; Git files are removed through a commit on the workspace branch. Failures stay visible for retry, and concurrent replacements are protected by a version check. Shared root files and folders have no Delete action. Existing sandbox copies disappear at the next hydration; a running agent may still have its local copy.
 
 ## Setup
