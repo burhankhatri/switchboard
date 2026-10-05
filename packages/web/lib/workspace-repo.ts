@@ -389,6 +389,12 @@ export async function readWorkspaceFile(
     const status = (err as { status?: number }).status
     throw new Error(`Could not read ${path}: ${status ?? "request failed"}`)
   }
+  // GitHub inlines blobs only up to 1 MB; past that it sends the sha without a
+  // body. The sha is what delete needs, and truncated keeps the editor read-only
+  // so an empty buffer can never be saved over the real file.
+  if (data.encoding === "none" && data.sha) {
+    return { content: "", truncated: true, sha: data.sha }
+  }
   if (data.encoding !== "base64" || typeof data.content !== "string") {
     throw new Error(`${path} is not a readable file`)
   }
