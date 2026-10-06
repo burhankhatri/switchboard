@@ -389,6 +389,12 @@ export async function readWorkspaceFile(
     const status = (err as { status?: number }).status
     throw new Error(`Could not read ${path}: ${status ?? "request failed"}`)
   }
+  // GitHub inlines blobs only up to 1 MB; past that it sends the sha without a
+  // body. The sha is what delete needs, and truncated keeps the editor read-only
+  // so an empty buffer can never be saved over the real file.
+  if (data.encoding === "none" && data.sha) {
+    return { content: "", truncated: true, sha: data.sha }
+  }
   if (data.encoding !== "base64" || typeof data.content !== "string") {
     throw new Error(`${path} is not a readable file`)
   }
@@ -399,6 +405,35 @@ export async function readWorkspaceFile(
     truncated,
     sha: data.sha ?? "",
   }
+}
+
+/**
+ * Stream one file's bytes for previews and downloads.
+ *
+ * The raw media type has no 1 MB ceiling (the Contents JSON does) and skips the
+ * base64 round trip. It is not cached here: bodies can be megabytes, and the
+ * browser caches them per file version instead.
+ */
+export async function readWorkspaceFileRaw(
+  token: string,
+  path: string,
+  branch?: string | null
+): Promise<{ stream: ReadableStream<Uint8Array>; size: number | null }> {
+  if (path.includes("..") || path.startsWith("/")) {
+    throw new Error(`unsafe path: ${path}`)
+  }
+  const [owner, repo] = WORKSPACES_REPO.split("/")
+  const res = await ghFetch(
+    `${GH}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}${branch ? `?ref=${encodeURIComponent(branch)}` : ""}`,
+    { headers: { ...headers(repoAuth(token)), Accept: "application/vnd.github.raw" }, cache: "no-store" }
+  )
+  if (!res.ok || !res.body) {
+    await res.body?.cancel()
+    throw Object.assign(new Error(`Could not read ${path}: ${res.status}`), { status: res.status })
+  }
+  const header = res.headers.get("content-length")
+  const length = header === null ? NaN : Number(header)
+  return { stream: res.body, size: Number.isSafeInteger(length) && length >= 0 ? length : null }
 }
 
 /**

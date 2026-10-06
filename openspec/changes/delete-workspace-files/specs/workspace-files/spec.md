@@ -11,6 +11,10 @@ The system SHALL offer a right-click Delete action on workspace file rows, confi
 - **WHEN** a member confirms deletion of a Git file
 - **THEN** an attributed deletion commit is made on the workspace branch and files and skills refresh
 
+#### Scenario: Delete a Git file too large to preview
+- **WHEN** a member confirms deletion of a Git file over GitHub's 1 MB inline limit
+- **THEN** its version is still resolved from the repo and it is deleted like any other Git file, while the viewer keeps it read-only
+
 #### Scenario: Cancel or backend failure
 - **WHEN** a member cancels, or the backing store fails to delete the file
 - **THEN** the file stays listed and failures are displayed with a retry option

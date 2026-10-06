@@ -33,4 +33,10 @@ describe("Git file deletion", () => {
     expect((await readWorkspaceFile("token", "workspaces/demo/file", "team/branch")).sha).toBe("team-sha")
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining("?ref=team%2Fbranch"), expect.anything())
   })
+  it("still reads the delete confirmation version of a file too large for GitHub to inline", async () => {
+    // GitHub's Contents API omits the body of any blob over 1 MB but still returns its sha.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ type: "file", size: 3033176, encoding: "none", content: "", sha: "big-sha" })))
+    const { readWorkspaceFile } = await import("./workspace-repo")
+    expect(await readWorkspaceFile("token", "workspaces/demo/chariot.xlsm", "main")).toEqual({ content: "", truncated: true, sha: "big-sha" })
+  })
 })

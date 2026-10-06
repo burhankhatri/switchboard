@@ -61,6 +61,8 @@ folder gets both the workspace's own skills and the shared ones for free — no
 **Workspaces**
 - Right-click workspace files to delete with confirmation: Git files receive an attributed deletion commit; Storage objects and asset references are removed. Membership, path and version checks protect deletions, and the tree, skills and viewer refresh after success.
 - File deletion verification: 600 tests pass (586 web + 14 sandbox-image), web typecheck clean. Live browser deletion verification remains pending.
+- Opening a workspace file previews it by format: spreadsheets (xlsx, xlsm, xlsb, xls, ods, numbers, csv, tsv) as tables with sheet tabs, PDF, images, audio, video, Word, PowerPoint slide text, zip listings, fonts, and rendered Markdown/HTML/SVG with an Edit toggle. Bytes come from a members-only raw route (Git streamed past the 1 MB Contents limit, Storage via signed redirect) served as an inert attachment; workbooks parse in a worker. `.xlsm` and other Office/OpenDocument formats are now binary, so Save can no longer commit decoded noise over them.
+- File preview verification: 632 tests pass (618 web + 14 sandbox-image), web typecheck clean. Live browser verification of the previews remains pending.
 - Create from the UI → commits a scaffold folder (config + starter skill) to the private repo, then writes the row. Repo first: a failed commit leaves nothing behind
 - Join / leave; last owner cannot leave
 - Connections (env) — encrypted, owner-only writes, member-only name reads, **no endpoint returns a value**
