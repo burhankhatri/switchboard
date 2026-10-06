@@ -147,11 +147,11 @@ describe.skipIf(!API_KEY)("sandbox-jobs (integration)", () => {
     expect(r.raw).toContain("starting")
   })
 
-  it("cancel() reaps a child that escaped the process group via setsid (cgroup)", async () => {
+  it("cancel() reaps a child that escaped the process group via setsid", async () => {
     // Regression guard for the RAM leak: an MCP-server-like child that calls
     // setsid() lands in its OWN process group, so a process-group kill misses
-    // it. cgroup membership is inherited through setsid, so cancel()'s
-    // cgroup.kill must still reap it. Requires cgroup-v2 + sudo in the image.
+    // it. Both cgroup membership and the per-job environment marker survive
+    // setsid, so cancellation must still reap it on read-only cgroup mounts.
     const jobs = createSandboxJobs(sandbox)
     const pidFile = "/tmp/sbj-escapee.pid"
     await sandbox.process.executeCommand(`rm -f ${pidFile}; true`)

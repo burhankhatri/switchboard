@@ -29,21 +29,24 @@ export interface JobHandle {
   readonly exitFile: string
   /**
    * Process-group id of the detached job (== leader pid, thanks to `setsid`).
-   * Used for liveness/crash detection (`ps` on the leader); NOT for killing.
+   * Used for liveness/crash detection and process-group termination.
    */
   readonly pgid: number
   /**
    * Absolute path to the job's own cgroup-v2 directory. Killing this cgroup is
    * the primary cancellation mechanism: it reaps EVERY descendant, including a
    * child that called `setsid()` and so escaped {@link pgid} (e.g. a daemonized
-   * MCP server) — which a process-group kill cannot. Requires cgroup-v2 and the
-   * privilege to `mkdir` under `/sys/fs/cgroup` (provided by the sandbox image).
+   * MCP server). Null when the sandbox cannot create a writable cgroup;
+   * cancellation then uses the inherited processTag and process-group kill.
    */
-  readonly cgroup: string
+  readonly cgroup: string | null
+  /** Exact environment entry inherited by this job's processes, including
+   * detached descendants. Absent only on legacy jobs. */
+  readonly processTag?: string
   /**
    * Optional process name used for a name-based sweep on cancel (`pkill -f`)
-   * as an additional backstop beyond the cgroup kill. Stored in meta for cold
-   * reattachment.
+   * on legacy, untagged jobs. Tagged jobs are cancelled by their own marker
+   * so other jobs running the same executable are unaffected.
    */
   readonly processName?: string
 }
@@ -102,9 +105,8 @@ export interface StartJobOptions {
   readonly env?: Record<string, string>
   /**
    * Optional process name for a name-based sweep on cancel (`pkill -f`).
-   * When set, cancel() will also run `pkill -9 -f <processName>` as an
-   * additional backstop to catch daemonized children that may escape
-   * even the cgroup kill (e.g. processes in other cgroup namespaces).
+   * Retained for compatibility with legacy jobs; new jobs use a unique
+   * inherited environment marker instead of matching executable names.
    */
   readonly processName?: string
   /**
@@ -126,7 +128,7 @@ export interface StartJobOptions {
  * File layout, one directory per job:
  * ```
  * <root>/<jobId>/
- *   meta.json     { jobId, pgid, processName, outputFile, exitFile, dir, createdAt, version }
+ *   meta.json     { jobId, pgid, cgroup, processTag, processName, outputFile, exitFile, dir, createdAt, version }
  *   output.log    combined stdout+stderr, byte-exact, append-only
  *   exit          integer $?, present ONLY once the process finishes
  * ```
@@ -144,10 +146,10 @@ export interface SandboxJobs {
   /**
    * Terminate the job and all its descendants. Sends SIGTERM first (graceful
    * shutdown — gives the process a chance to persist state), then after a
-   * 500ms wait kills the job cgroup (reaping even children that escaped the
-   * process group via setsid), then runs a name-based `pkill -f` sweep if a
-   * processName was provided. The cgroup is removed so page-cache charges
-   * don't accumulate.
+   * 500ms wait kills the job cgroup when available, tagged descendants, and
+   * the process group. Tags survive setsid and reparenting, but children that
+   * deliberately clear their environment require cgroup support. Legacy
+   * jobs retain their optional name-based sweep. Any cgroup is then removed.
    */
   cancel(handle: JobHandle): Promise<void>
   /**

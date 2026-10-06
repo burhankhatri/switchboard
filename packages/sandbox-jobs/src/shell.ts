@@ -24,11 +24,12 @@ export function cgroupPath(jobId: string): string {
 
 /**
  * Parse the PID printed by `... & echo $!`. The launcher prints exactly one
- * number on the last line; we take the last whitespace-delimited token.
+ * number. Reject diagnostics even if their last token happens to be numeric.
  */
 export function parsePid(output: string | undefined): number {
-  const pid = Number((output ?? "").trim().split(/\s+/).pop())
-  if (!Number.isInteger(pid) || pid < 1) {
+  const raw = (output ?? "").trim()
+  const pid = Number(raw)
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(pid) || pid < 1) {
     throw new Error(
       `sandbox-jobs: could not parse pid from ${JSON.stringify((output ?? "").slice(0, 200))}`
     )

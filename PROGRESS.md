@@ -42,6 +42,11 @@ folder gets both the workspace's own skills and the shared ones for free — no
 
 ## Done
 
+**Read-only cgroup startup repair (2026-10-06)**
+- Sandbox jobs use a writable per-job cgroup when available and otherwise start with an inherited process marker. Cancellation finds detached and reparented children by that marker and does not sweep other new jobs by executable name. The fallback requires readable process environments; descendants that clear their environment still require cgroup support.
+- Job metadata persists the cancellation mode for cold reconnection, while version-1 jobs remain attachable. Setup and metadata errors preserve their actual diagnostics; a failed metadata write cancels the launched job.
+- Verified with 19 runner tests, including real Linux startup/cancellation checks through WSL, 14 sandbox-image tests, and clean runner, SDK and web typechecks. The wider web suite passed 575 tests; its unchanged Bash-based Git-policy tests fail with this Windows/WSL setup. Live Daytona verification is blocked by the integration harness's JWT/organization configuration. Application deployment remains pending; the sandbox image does not need rebuilding.
+
 **Private uploads (2026-10-02)**
 - Files up to 25 MiB upload directly to private Supabase Storage, bypassing Vercel's request body limit. Workspace files up to 3 MiB are committed to Git; larger assets are hydrated before interactive and scheduled runs and excluded from Git staging.
 - Chat attachments transfer to Daytona before the agent starts. Upload ownership, workspace membership, size, path containment and symlink checks apply on the server; expired temporary objects are cleaned by the authenticated lifecycle cron.

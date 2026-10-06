@@ -16,17 +16,21 @@ One job = one process = one directory:
 
 ```
 <root>/<jobId>/
-  meta.json     { jobId, pgid, processName, outputFile, exitFile, dir, createdAt, version }
+  meta.json     { jobId, pgid, cgroup, processTag, processName, outputFile, exitFile, dir, createdAt, version }
   output.log    combined stdout+stderr, byte-exact, append-only
   exit          integer $?, present ONLY once the process finishes
 ```
 
-- **Detached + fully reapable.** Launched with `setsid` and placed in its own
-  cgroup-v2. `cancel()` writes the cgroup's `cgroup.kill`, which SIGKILLs
-  *every* descendant — including a child that re-sessions itself with `setsid()`
-  (e.g. a daemonized MCP server) and so escapes the process group. A
-  process-group kill alone misses those and leaks them. Requires cgroup-v2 and
-  privilege to create a cgroup (the sandbox image grants this via `sudo`).
+- **Detached + cancellable.** Launched with `setsid` and a unique inherited
+  `SWITCHBOARD_JOB_ID` environment marker. When a writable cgroup-v2 is
+  available, the job joins it and `cancel()` uses `cgroup.kill` to reap every
+  descendant. On read-only cgroup mounts, jobs still start: cancellation scans
+  `/proc/*/environ` for the exact marker and kills matching processes, including
+  children that detached with `setsid()` or were reparented. Both modes send
+  SIGTERM first, then SIGKILL after 500ms, and kill the process group as a
+  backstop. Tagged cancellation does not sweep other jobs by executable name.
+  The fallback requires readable process environments and GNU `grep -z`;
+  descendants that deliberately clear their environment need cgroup support.
 - **Real exit codes.** The wrapper records the true `$?`; completion is never
   guessed. A process killed before it could write `$?` (SIGKILL/OOM) is detected
   as `crashed` via process-group liveness.
@@ -51,7 +55,7 @@ wins on the things that actually bite:
 | **Incremental reads** | byte-offset `tail` → only new bytes, **O(n)** over a run | `getSessionCommandLogs` has **no offset param**: full-dump every poll (**O(n²)**), *or* a streaming callback that forces a held-open connection |
 | **Connectionless polling** | any cold caller reads the filesystem; nothing to keep alive | the streaming variant needs a live socket; the dump variant re-sends everything |
 | **Output fidelity** | `output.log` is **byte-exact**, so a byte cursor is reliable | the log stream is wrapped in control-byte framing (e.g. `\x01` markers) — not byte-exact, which breaks offset cursors |
-| **Cancellation** | `cgroup.kill` reaps the whole job cgroup, incl. `setsid()` escapees | no documented kill for an async session command — you shell out to `pkill` anyway |
+| **Cancellation** | `cgroup.kill` when available; otherwise an inherited job marker catches `setsid()` escapees | no documented kill for an async session command — you shell out to `pkill` anyway |
 | **Lifecycle to manage** | none — a dead process just leaves files; cleanup is `rm -rf <dir>` | a **session** outlives the command and must be torn down; deleting a live session reaps the process (a real footgun), and sessions accumulate |
 | **Isolation** | each job is its own process, dir, and cursor | a session is a **stateful shell** — env/cwd bleed across commands |
 | **Full-transcript retention** | the whole log until the disk fills | the daemon's log buffer may be capped (undocumented), which would break replay-from-zero |
@@ -104,5 +108,11 @@ const reattached = await jobs.attach(handle.jobId)
 ```bash
 npm run typecheck
 npx vitest run tests/parse.test.ts        # pure unit tests, instant
+npx vitest run tests/jobs.test.ts         # startup, cancellation, legacy metadata
+npx vitest run tests/jobs.local.test.ts   # real Linux processes, forced read-only cgroups
 DAYTONA_API_KEY=... npx vitest run        # + integration (creates a sandbox)
 ```
+
+On Windows, set `SBJ_LOCAL_WSL=1` to run the local Linux tests through an
+installed Ubuntu WSL distro with Python 3. A persistent executor keeps detached
+jobs alive between calls; no Daytona credentials are needed for these tests.
