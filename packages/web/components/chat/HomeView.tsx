@@ -12,6 +12,7 @@ import { MembersLine } from "@/components/workspaces/home/MembersLine"
 import { SinceBanner } from "@/components/workspaces/home/SinceBanner"
 import { JobsSection } from "@/components/workspaces/home/JobsSection"
 import { ActivityFeed } from "@/components/workspaces/home/ActivityFeed"
+import { SharedChatsSection } from "@/components/workspaces/home/SharedChatsSection"
 import { ColleagueChatDialog } from "@/components/workspaces/home/ColleagueChatDialog"
 import { useWorkspaceHome } from "@/lib/query/hooks/useWorkspaceHome"
 import { isChatVisibleForFilter } from "@/lib/chat-tree"
@@ -95,6 +96,11 @@ export function HomeView({
               jobs={home.jobs}
               onOpenChat={setReadingChat}
               onManage={(job) => void onManageJob(job.id, job.name)}
+            />
+            <SharedChatsSection
+              chats={home.sharedChats}
+              onOpenColleagueChat={setReadingChat}
+              onOpenOwnChat={onSelectChat}
             />
             <ActivityFeed workspaceId={active.id} firstPage={home.feed} onOpenChat={setReadingChat} />
           </>
