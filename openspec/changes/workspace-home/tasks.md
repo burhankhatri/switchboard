@@ -19,7 +19,7 @@
 
 ## 4. Home page UI (phase 1)
 
-- [ ] 4.1 Split `HomeView` into `components/workspaces/home/*` without behaviour change (refactor commit).
+- [x] 4.1 Split `HomeView` into `components/workspaces/home/*` without behaviour change (refactor commit).
 - [ ] 4.2 Brief section: render `HOME.md` via the existing file read and Markdown preview, Edit opens it in the file editor; missing file shows "Have the agent draft it", which starts a chat with a preset prompt.
 - [ ] 4.3 Jobs section: cards with health, schedule, author, last run; "Awaiting approval" group; non-authors see no edit/delete/run controls; links to runs and their chats.
 - [ ] 4.4 Activity feed with "Load older".
