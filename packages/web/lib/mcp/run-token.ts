@@ -29,6 +29,13 @@ export interface RunTokenClaims {
   workspaceId: string | null
   /** The chat this run belongs to, for attribution and rate limiting. */
   chatId: string | null
+  /**
+   * Set only for a scheduled run: the job and the run of it. What a run may do
+   * differs by kind — an unattended run gets no scheduler tool — and anything
+   * it writes is attributed to the job rather than to a person.
+   */
+  jobId?: string | null
+  jobRunId?: string | null
   /** Expiry, epoch ms. */
   exp: number
 }
@@ -102,6 +109,10 @@ export function verifyRunToken(token: string | null | undefined, now = Date.now(
     userId: claims.userId,
     workspaceId: typeof claims.workspaceId === "string" ? claims.workspaceId : null,
     chatId: typeof claims.chatId === "string" ? claims.chatId : null,
+    // Absent on tokens minted before these claims existed, which then read as
+    // an interactive run — what they were.
+    jobId: typeof claims.jobId === "string" ? claims.jobId : null,
+    jobRunId: typeof claims.jobRunId === "string" ? claims.jobRunId : null,
     exp: claims.exp,
   }
 }
