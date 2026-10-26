@@ -9,6 +9,7 @@ import {
   recordWorkspaceEvent,
   recordWorkspaceEventAsync,
   clampSummary,
+  filesCommittedSummary,
   SUMMARY_MAX,
 } from "./events"
 
@@ -65,6 +66,24 @@ describe("recordWorkspaceEvent", () => {
     await flush()
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()
+  })
+})
+
+describe("filesCommittedSummary", () => {
+  it("names a single file", () => {
+    expect(filesCommittedSummary("Updated", ["workspaces/leads/HOME.md"])).toBe("Updated HOME.md")
+  })
+
+  it("reads a new folder as a folder, not a .gitkeep", () => {
+    expect(filesCommittedSummary("Added", ["workspaces/leads/data/.gitkeep"])).toBe(
+      "Added folder data"
+    )
+  })
+
+  it("counts many files as one line", () => {
+    expect(filesCommittedSummary("Imported", ["a", "b", "c"], "exports")).toBe(
+      "Imported 3 files from exports"
+    )
   })
 })
 

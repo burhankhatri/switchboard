@@ -12,6 +12,7 @@ import { commitWorkspaceFiles } from "@/lib/workspace-repo"
 import { planFolderImport, IMPORT_MAX_FILES, IMPORT_MAX_REQUEST_BYTES } from "@/lib/workspace-import"
 import { importStagedWorkspaceFiles } from "@/lib/server/workspace-assets"
 import { UploadError, uploadErrorResponse } from "@/lib/server/file-uploads"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 type Ctx = { params: Promise<{ id: string }> }
 export const maxDuration = 300
@@ -63,11 +64,14 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
   try {
     const body: ImportBody = await req.json()
     if ("uploadFiles" in body) {
-      return Response.json(await importStagedWorkspaceFiles({
+      const folder = body.folder?.trim() || "files"
+      const result = await importStagedWorkspaceFiles({
         userId, token, workspaceId: id, base: workspace.path,
         branch: workspace.baseBranch ?? "main", slug: workspace.slug,
-        folder: body.folder?.trim() || "files", incoming: body.uploadFiles,
-      }))
+        folder, incoming: body.uploadFiles,
+      })
+      recordImport(id, userId, folder, result.committed)
+      return Response.json(result)
     }
     const incoming = body.files
     if (!Array.isArray(incoming) || incoming.length === 0) {
@@ -124,6 +128,7 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
       workspace.baseBranch ?? "main"
     )
 
+    recordImport(id, userId, folder, plan.files.length)
     return Response.json({ commit, committed, skipped: plan.skipped })
   } catch (err) {
     if (err instanceof UploadError) return uploadErrorResponse(err)
@@ -131,6 +136,17 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
     if (message.includes("pushed while the import")) return badRequest(message)
     return internalError(err)
   }
+}
+
+function recordImport(workspaceId: string, userId: string, folder: string, count: number): void {
+  if (count === 0) return
+  recordWorkspaceEventAsync({
+    workspaceId,
+    kind: "files_committed",
+    summary: `Imported ${committedCount(count)} from ${folder}`,
+    actorUserId: userId,
+    meta: { fileCount: count },
+  })
 }
 
 function committedCount(n: number): string {

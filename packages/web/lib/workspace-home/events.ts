@@ -50,6 +50,27 @@ export function clampSummary(text: string): string {
   return flat.length > SUMMARY_MAX ? `${flat.slice(0, SUMMARY_MAX - 1)}…` : flat
 }
 
+/**
+ * The feed line for one commit. One line per commit, never per file: an
+ * import of 200 files is one thing a colleague did, not 200.
+ */
+export function filesCommittedSummary(
+  verb: "Added" | "Updated" | "Deleted" | "Imported",
+  paths: string[],
+  from?: string
+): string {
+  if (paths.length === 1) {
+    const parts = paths[0].split("/")
+    const name = parts.pop() ?? paths[0]
+    // A new folder is a commit of its .gitkeep; nobody created a file by that
+    // name.
+    if (name === ".gitkeep") return `${verb} folder ${parts.pop() ?? ""}`.trim()
+    return `${verb} ${name}`
+  }
+  const count = `${paths.length} files`
+  return from ? `${verb} ${count} from ${from}` : `${verb} ${count}`
+}
+
 export async function recordWorkspaceEvent(input: WorkspaceEventInput): Promise<void> {
   if (!input.workspaceId) return
   try {
