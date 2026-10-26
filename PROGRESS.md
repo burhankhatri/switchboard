@@ -42,6 +42,23 @@ folder gets both the workspace's own skills and the shared ones for free — no
 
 ## Done
 
+**Workspace home page (2026-10-26)** — openspec change `workspace-home`
+- A member who built nothing can now see what a workspace does. Jobs and chats used to be listed per user, so a second member saw none of the first member's setup. Opening a workspace shows, in order: the `HOME.md` brief, what changed since your last visit, pinned widgets, every member's scheduled jobs with health in words, chats shared with the workspace, and an activity feed.
+- **Brief:** `HOME.md` in the workspace folder. If it is missing, home offers an agent draft (lands on the chat branch, so it shows after merge) or a hand-written starter committed directly.
+- **Jobs:** all of the workspace's jobs, from any author, as cards. Only the author gets controls. Others can read the prompt and the last run's chat.
+- **Chats:** private by default. Sharing to the workspace sits in the Share menu, makes no public link, and is read through a separate members-only route (`GET /api/workspaces/:id/chats/:chatId`) so owner routes stay owner-only. Scheduled-run chats are readable by members.
+- **Widgets:** stat, table, chart, file, job and note, as strict zod schemas: no markup, links http(s) only. They can be made by hand, by Pin to Home on an assistant message or a file, or by the agent through `pin_to_home` / `update_home_widget` on the run-scoped MCP endpoint. Every widget shows who or which job last wrote it, and is marked out of date after its job misses two runs. Cap of 40 per workspace.
+- **Scheduled runs** now receive the MCP endpoint, so a job can refresh its widgets. Their token carries the job and run, which limits them to the widget tools (no proposing more jobs).
+- **Feed:** a `WorkspaceEvent` row for each job lifecycle change, run outcome, commit, widget change, membership change and share. Links to private chats are dropped at read time.
+- **Verified:** 731 tests pass (717 web + 14 sandbox-image), web typecheck clean.
+- **Not verified:**
+  - the migration has not been applied
+  - the extended `scripts/e2e-workspace.mjs` (section 13) has not been run
+  - no browser run of the page, and no real job refreshing a widget through the MCP endpoint
+- **To deploy:**
+  1. apply `20261026120000_workspace_home` (additive)
+  2. optionally backfill the feed with `scripts/seed-workspace-events.mjs --dry-run`, then without `--dry-run`
+
 **Read-only cgroup startup repair (2026-10-06)**
 - Sandbox jobs use a writable per-job cgroup when available and otherwise start with an inherited process marker. Cancellation finds detached and reparented children by that marker and does not sweep other new jobs by executable name. The fallback requires readable process environments; descendants that clear their environment still require cgroup support.
 - Job metadata persists the cancellation mode for cold reconnection, while version-1 jobs remain attachable. Setup and metadata errors preserve their actual diagnostics; a failed metadata write cancels the launched job.

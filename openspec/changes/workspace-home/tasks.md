@@ -24,7 +24,7 @@
 - [x] 4.3 Jobs section: cards with health, schedule, author, last run; "Awaiting approval" group; non-authors see no edit/delete/run controls; links to runs and their chats.
 - [x] 4.4 Activity feed with "Load older".
 - [x] 4.5 Since-last-visit banner, hidden when empty.
-- [ ] 4.6 Update `docs`/PROGRESS and the `app-navigation` home-page wording if it no longer matches.
+- [x] 4.6 Update `docs`/PROGRESS and the `app-navigation` home-page wording if it no longer matches.
 
 ## 5. Sharing chats to the workspace
 
