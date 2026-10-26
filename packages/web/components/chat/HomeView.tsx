@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { useWorkspaceOverview } from "@/lib/query/hooks/useWorkspaceOverview"
 import { WorkspaceLauncher } from "@/components/workspaces/WorkspaceLauncher"
@@ -8,6 +9,11 @@ import { StartChatCard } from "@/components/workspaces/home/StartChatCard"
 import { ConnectedSection } from "@/components/workspaces/home/ConnectedSection"
 import { RecentChatsSection } from "@/components/workspaces/home/RecentChatsSection"
 import { MembersLine } from "@/components/workspaces/home/MembersLine"
+import { SinceBanner } from "@/components/workspaces/home/SinceBanner"
+import { JobsSection } from "@/components/workspaces/home/JobsSection"
+import { ActivityFeed } from "@/components/workspaces/home/ActivityFeed"
+import { ColleagueChatDialog } from "@/components/workspaces/home/ColleagueChatDialog"
+import { useWorkspaceHome } from "@/lib/query/hooks/useWorkspaceHome"
 import { isChatVisibleForFilter } from "@/lib/chat-tree"
 import { ALL_REPOSITORIES } from "@/lib/contexts"
 import type { Chat } from "@/lib/types"
@@ -20,6 +26,8 @@ interface HomeViewProps {
   onNewChat: () => unknown
   /** Start a chat with `prompt` waiting in the composer, unsent. */
   onNewChatWithPrompt: (prompt: string) => void | Promise<void>
+  /** Open one of your own jobs in the scheduled agents view. */
+  onManageJob: (jobId: string, jobName: string) => void | Promise<void>
 }
 
 /**
@@ -39,9 +47,12 @@ export function HomeView({
   onSelectChat,
   onNewChat,
   onNewChatWithPrompt,
+  onManageJob,
 }: HomeViewProps) {
   const { activeWorkspace: active, setActiveWorkspace: setActive, ready } = useWorkspace()
   const { data: overview } = useWorkspaceOverview(active?.id)
+  const { data: home } = useWorkspaceHome(active?.id)
+  const [readingChat, setReadingChat] = useState<string | null>(null)
 
   if (!ready) return null
 
@@ -76,11 +87,27 @@ export function HomeView({
         </header>
 
         <HomeBrief onDraftWithAgent={(prompt) => void onNewChatWithPrompt(prompt)} />
+        {home?.since && <SinceBanner since={home.since} onOpenChat={setReadingChat} />}
         <StartChatCard workspaceName={active.name} onNewChat={onNewChat} />
+        {home && (
+          <>
+            <JobsSection
+              jobs={home.jobs}
+              onOpenChat={setReadingChat}
+              onManage={(job) => void onManageJob(job.id, job.name)}
+            />
+            <ActivityFeed workspaceId={active.id} firstPage={home.feed} onOpenChat={setReadingChat} />
+          </>
+        )}
         <ConnectedSection connections={connections} />
         <RecentChatsSection chats={recent} onSelectChat={onSelectChat} />
         <MembersLine count={members.length} />
       </div>
+      <ColleagueChatDialog
+        workspaceId={active.id}
+        chatId={readingChat}
+        onClose={() => setReadingChat(null)}
+      />
     </div>
   )
 }

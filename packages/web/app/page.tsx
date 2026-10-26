@@ -702,6 +702,10 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
                     const id = await handleNewChat()
                     if (id) updateDraft(id, prompt)
                   }}
+                  onManageJob={async (jobId, jobName) => {
+                    await handleOpenScheduledJobs()
+                    handleNavigateToJob(jobId, jobName)
+                  }}
                 />
               ) : (
                 <ChatPanelWithPalette
