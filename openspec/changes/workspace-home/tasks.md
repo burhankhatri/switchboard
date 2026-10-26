@@ -47,7 +47,7 @@
 - [x] 7.2 `pin_to_home` and `update_home_widget` (by id or `key`) on the MCP endpoint: shared validator, membership re-checked per call, cross-workspace ids treated as not found, provenance from claims; tool descriptions tell the agent to put the widget key in any job prompt that refreshes it; tests in `scheduler-server.test.ts`.
 - [x] 7.3 `tools/list` by claims: interactive runs get all three tools, scheduled runs get the widget tools only; test.
 - [x] 7.4 Attach `schedulerMcpServer({ …, jobId, jobRunId })` in `_lib/scheduled.ts`; test that a scheduled workspace run's `mcpServers` includes it and a run without a reachable origin proceeds without it.
-- [ ] 7.5 Optional seed script for events from existing runs and memberships, idempotent on `(kind, runId)`.
+- [x] 7.5 Optional seed script for events from existing runs and memberships, idempotent on `(kind, runId)`.
 
 ## 8. Verification
 
