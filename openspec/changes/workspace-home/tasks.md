@@ -6,7 +6,7 @@
 
 - [x] 2.1 `recordWorkspaceEvent()` in `lib/workspace-home/events.ts`: fire-and-forget, never throws, freezes a display `summary`; unit tests for the no-throw contract.
 - [x] 2.2 Record job create / approve / enable-disable / delete in `api/scheduled-jobs` routes.
-- [ ] 2.3 Record run completed / failed in `cron/agent-lifecycle/_lib/scheduled.ts`.
+- [x] 2.3 Record run completed / failed in `cron/agent-lifecycle/_lib/scheduled.ts`.
 - [ ] 2.4 Record file commits (files, import, edit-text, delete routes, and run auto-push) as one event per commit with a file count.
 - [ ] 2.5 Record member join / leave / add / remove.
 - [ ] 2.6 `GET /api/workspaces/:id/events?before=` — gated, paginated, resolves chat links only for chats currently shared; tests for non-member 403 and hidden private-chat links.

@@ -32,6 +32,7 @@ import {
   type WorkspaceRuntime,
 } from "@/lib/workspace"
 import { workspaceRunEnv } from "@/lib/workspace-run-env"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 // =============================================================================
 // Job Execution
@@ -583,6 +584,19 @@ export async function finalizeScheduledRun(
     data: { consecutiveFailures: 0 },
   })
 
+  recordWorkspaceEventAsync({
+    workspaceId: job.workspaceId,
+    kind: "run_completed",
+    summary:
+      commitCount > 0
+        ? `${job.name} ran and committed ${commitCount} change${commitCount === 1 ? "" : "s"}${prUrl ? " for review" : ""}`
+        : `${job.name} ran`,
+    jobId: job.id,
+    runId: run.id,
+    chatId: run.chatId,
+    meta: { commitCount, prUrl },
+  })
+
   // 5. Prune old runs (keep last 50)
   const oldRuns = await prisma.scheduledJobRun.findMany({
     where: { jobId: run.jobId },
@@ -640,6 +654,21 @@ export async function failScheduledRun(
       consecutiveFailures: failures,
       enabled: failures < 3,
     },
+  })
+
+  // The auto-disable is the part a colleague most needs to hear: without it
+  // a job that stopped three weeks ago reads as merely quiet.
+  recordWorkspaceEventAsync({
+    workspaceId: job.workspaceId,
+    kind: "run_failed",
+    summary:
+      failures >= 3
+        ? `${job.name} failed ${failures} times in a row and was paused: ${error}`
+        : `${job.name} failed: ${error}`,
+    jobId: job.id,
+    runId: run.id,
+    chatId: run.chatId,
+    meta: { consecutiveFailures: failures },
   })
 
   // Delete sandbox now that run is complete
