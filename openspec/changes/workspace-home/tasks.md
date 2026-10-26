@@ -4,7 +4,7 @@
 
 ## 2. Events
 
-- [ ] 2.1 `recordWorkspaceEvent()` in `lib/workspace-home/events.ts`: fire-and-forget, never throws, freezes a display `summary`; unit tests for the no-throw contract.
+- [x] 2.1 `recordWorkspaceEvent()` in `lib/workspace-home/events.ts`: fire-and-forget, never throws, freezes a display `summary`; unit tests for the no-throw contract.
 - [ ] 2.2 Record job create / approve / enable-disable / delete in `api/scheduled-jobs` routes.
 - [ ] 2.3 Record run completed / failed in `cron/agent-lifecycle/_lib/scheduled.ts`.
 - [ ] 2.4 Record file commits (files, import, edit-text, delete routes, and run auto-push) as one event per commit with a file count.
