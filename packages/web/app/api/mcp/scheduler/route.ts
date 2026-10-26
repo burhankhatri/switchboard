@@ -4,6 +4,7 @@ import { randomUUID } from "crypto"
 import { prisma } from "@/lib/db/prisma"
 import { bearerFrom, verifyRunToken, type RunTokenClaims } from "@/lib/mcp/run-token"
 import { notifyAsync } from "@/lib/db/notifications"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 import {
   MAX_AGENT_JOBS_PER_WORKSPACE,
   MIN_INTERVAL_MINUTES,
@@ -200,6 +201,15 @@ async function createScheduledJob(
     body: `"${job.name}" — ${describeInterval(interval.minutes)}, in ${workspace.name}`,
     chatId: claims.chatId ?? undefined,
     workspaceId: workspace.id,
+  })
+
+  recordWorkspaceEventAsync({
+    workspaceId: workspace.id,
+    kind: "job_created",
+    summary: `Proposed ${job.name} (awaiting approval)`,
+    actorUserId: claims.userId,
+    jobId: job.id,
+    chatId: claims.chatId,
   })
 
   return {
