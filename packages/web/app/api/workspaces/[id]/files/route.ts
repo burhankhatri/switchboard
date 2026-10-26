@@ -129,6 +129,7 @@ export async function GET(req: NextRequest, { params }: Ctx): Promise<Response> 
     const file = await readWorkspaceFile(token, path, workspace.baseBranch)
     return Response.json({ path, ...file })
   } catch (err) {
+    if ((err as { status?: number }).status === 404) return notFound("File not found")
     return internalError(err)
   }
 }
