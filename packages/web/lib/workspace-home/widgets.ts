@@ -10,7 +10,19 @@ import { z } from "zod"
  * its own. Links must be http(s) and only open on click.
  */
 
-export const WIDGET_TYPES = ["stat", "table", "chart", "file", "job", "note"] as const
+export const WIDGET_TYPES = [
+  "summary",
+  "kpis",
+  "stat",
+  "table",
+  "chart",
+  "funnel",
+  "timeline",
+  "actions",
+  "file",
+  "job",
+  "note",
+] as const
 export type WidgetType = (typeof WIDGET_TYPES)[number]
 
 export const MAX_WIDGETS_PER_WORKSPACE = 40
@@ -19,6 +31,7 @@ export const MAX_TABLE_ROWS = 50
 export const MAX_TABLE_COLUMNS = 12
 export const MAX_CHART_SERIES = 6
 export const MAX_CHART_POINTS = 500
+export const MAX_TIMELINE_EVENTS = 30
 
 const text = (max: number) => z.string().trim().max(max)
 
@@ -40,19 +53,26 @@ const extras = {
   link: link.optional(),
 }
 
+/**
+ * How a point reads, carried by an icon as well as a colour. Left out, a point
+ * is neutral: the widget cannot know on its own whether a number is good news.
+ */
+const tone = z.enum(["good", "warn", "bad", "info"])
+
+const change = z
+  .object({
+    value: text(20).min(1),
+    direction: z.enum(["up", "down", "flat"]),
+  })
+  .strict()
+
 const cell = z.union([text(300), z.number().finite(), z.null()])
 
 export const statContent = z
   .object({
     value: z.union([text(40).min(1), z.number().finite()]),
     unit: text(20).optional(),
-    change: z
-      .object({
-        value: text(20).min(1),
-        direction: z.enum(["up", "down", "flat"]),
-      })
-      .strict()
-      .optional(),
+    change: change.optional(),
     ...extras,
   })
   .strict()
@@ -114,6 +134,90 @@ export const chartContent = z
     })
   })
 
+// The visual types keep every text field short on purpose. A home page that
+// is paragraphs is a document nobody reads; these limits are what make an
+// agent say it in a line.
+
+export const summaryContent = z
+  .object({
+    headline: text(240).min(1),
+    points: z
+      .array(z.object({ text: text(160).min(1), tone: tone.optional() }).strict())
+      .max(5)
+      .optional(),
+    asOf: text(40).optional(),
+  })
+  .strict()
+
+export const kpisContent = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            label: text(40).min(1),
+            value: z.union([text(24).min(1), z.number().finite()]),
+            unit: text(12).optional(),
+            change: change.optional(),
+            hint: text(80).optional(),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(6),
+    asOf: text(40).optional(),
+    ...extras,
+  })
+  .strict()
+
+export const funnelContent = z
+  .object({
+    steps: z
+      .array(z.object({ label: text(40).min(1), value: z.number().finite().min(0) }).strict())
+      .min(2)
+      .max(8),
+    ...extras,
+  })
+  .strict()
+
+export const timelineContent = z
+  .object({
+    events: z
+      .array(
+        z
+          .object({
+            date: text(24).min(1),
+            title: text(100).min(1),
+            detail: text(200).optional(),
+            who: text(40).optional(),
+            tone: tone.optional(),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(MAX_TIMELINE_EVENTS),
+  })
+  .strict()
+
+export const actionsContent = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            title: text(120).min(1),
+            detail: text(200).optional(),
+            owner: text(40).optional(),
+            urgency: z.enum(["now", "soon", "fyi"]).default("soon"),
+            since: text(24).optional(),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(10),
+  })
+  .strict()
+
 export const fileContent = z.object({ path: text(1024).min(1) }).strict()
 
 export const jobContent = z.object({ jobId: text(64).min(1) }).strict()
@@ -121,6 +225,11 @@ export const jobContent = z.object({ jobId: text(64).min(1) }).strict()
 export const noteContent = z.object({ markdown: text(8000).min(1) }).strict()
 
 const CONTENT: Record<WidgetType, z.ZodTypeAny> = {
+  summary: summaryContent,
+  kpis: kpisContent,
+  funnel: funnelContent,
+  timeline: timelineContent,
+  actions: actionsContent,
   stat: statContent,
   table: tableContent,
   chart: chartContent,
@@ -129,6 +238,12 @@ const CONTENT: Record<WidgetType, z.ZodTypeAny> = {
   note: noteContent,
 }
 
+export type SummaryContent = z.infer<typeof summaryContent>
+export type KpisContent = z.infer<typeof kpisContent>
+export type FunnelContent = z.infer<typeof funnelContent>
+export type TimelineContent = z.infer<typeof timelineContent>
+export type ActionsContent = z.infer<typeof actionsContent>
+export type Tone = z.infer<typeof tone>
 export type StatContent = z.infer<typeof statContent>
 export type TableContent = z.infer<typeof tableContent>
 export type ChartContent = z.infer<typeof chartContent>

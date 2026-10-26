@@ -75,6 +75,50 @@ describe("validateWidgetContent", () => {
   })
 })
 
+describe("visual types", () => {
+  it("accepts each in its documented shape", () => {
+    expect(
+      ok("summary", {
+        headline: "Two draft campaigns are waiting for Wayne to launch.",
+        points: [{ text: "62 people ready to email", tone: "good" }, { text: "No reply yet" }],
+        asOf: "26 Oct",
+      })
+    ).toBeTruthy()
+    expect(
+      ok("kpis", {
+        items: [
+          { label: "Opportunities", value: 18, change: { value: "+80%", direction: "up" } },
+          { label: "Reply rate", value: "1.82%", hint: "Best active campaign" },
+        ],
+      })
+    ).toBeTruthy()
+    expect(
+      ok("funnel", { steps: [{ label: "Qualified", value: 1620 }, { label: "Has email", value: 62 }] })
+    ).toBeTruthy()
+    expect(
+      ok("timeline", { events: [{ date: "25 Sep", title: "22 leads pushed", who: "Burhan", tone: "good" }] })
+    ).toBeTruthy()
+  })
+
+  it("defaults an action's urgency, so the agent can leave it out", () => {
+    expect(ok("actions", { items: [{ title: "Review the DFW draft" }] })).toEqual({
+      items: [{ title: "Review the DFW draft", urgency: "soon" }],
+    })
+  })
+
+  it("keeps their text short", () => {
+    expect(err("summary", { headline: "x".repeat(241) })).toMatch(/headline/)
+    expect(err("timeline", { events: [{ date: "1 Oct", title: "y".repeat(101) }] })).toMatch(/title/)
+    expect(err("kpis", { items: [] })).toMatch(/items/)
+    expect(err("funnel", { steps: [{ label: "Only one", value: 3 }] })).toMatch(/steps/)
+  })
+
+  it("rejects a tone or urgency outside the set", () => {
+    expect(err("summary", { headline: "h", points: [{ text: "t", tone: "red" }] })).toMatch(/tone/)
+    expect(err("actions", { items: [{ title: "t", urgency: "asap" }] })).toMatch(/urgency/)
+  })
+})
+
 describe("titles and keys", () => {
   it("requires a title", () => {
     expect(validateTitle("  ").ok).toBe(false)
