@@ -8,7 +8,7 @@
 - [x] 2.2 Record job create / approve / enable-disable / delete in `api/scheduled-jobs` routes.
 - [x] 2.3 Record run completed / failed in `cron/agent-lifecycle/_lib/scheduled.ts`.
 - [x] 2.4 Record file commits (files, import, edit-text, delete routes, and run auto-push) as one event per commit with a file count.
-- [ ] 2.5 Record member join / leave / add / remove.
+- [x] 2.5 Record member join / leave / add / remove.
 - [ ] 2.6 `GET /api/workspaces/:id/events?before=` — gated, paginated, resolves chat links only for chats currently shared; tests for non-member 403 and hidden private-chat links.
 
 ## 3. Home data

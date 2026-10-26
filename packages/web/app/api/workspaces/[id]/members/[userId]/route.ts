@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/api-helpers"
 import { logActivityAsync } from "@/lib/db/activity-log"
 import { notifyAsync } from "@/lib/db/notifications"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 type Ctx = { params: Promise<{ id: string; userId: string }> }
 
@@ -118,7 +119,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx): Promise<Respon
   try {
     const member = await prisma.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId: id, userId } },
-      select: { role: true },
+      select: { role: true, user: { select: { name: true, email: true } } },
     })
     if (!member) return Response.json({ removed: false })
 
@@ -132,6 +133,12 @@ export async function DELETE(_req: NextRequest, { params }: Ctx): Promise<Respon
     logActivityAsync(auth.userId, "workspace_member_removed", {
       workspaceSlug: g.workspace.slug,
       targetUserId: userId,
+    })
+    recordWorkspaceEventAsync({
+      workspaceId: id,
+      kind: "member_left",
+      summary: `Removed ${member.user.name ?? member.user.email ?? "a member"}`,
+      actorUserId: auth.userId,
     })
 
     // Losing access silently is worse than gaining it silently: the workspace

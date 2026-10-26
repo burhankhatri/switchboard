@@ -1,6 +1,7 @@
 import { prisma } from "./prisma"
 import { logActivityAsync } from "./activity-log"
 import { notifyAsync } from "./notifications"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 /**
  * Workspace invites for people who have not signed in yet.
@@ -88,6 +89,13 @@ export async function claimInvitesForLogin(
           }),
           prisma.workspaceInvite.delete({ where: { id: invite.id } }),
         ])
+
+        recordWorkspaceEventAsync({
+          workspaceId: invite.workspace.id,
+          kind: "member_joined",
+          summary: "Joined from an invite",
+          actorUserId: userId,
+        })
 
         claimed.push({
           workspaceId: invite.workspace.id,
