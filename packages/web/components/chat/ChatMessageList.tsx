@@ -1,4 +1,4 @@
-import { Fragment } from "react"
+import { Fragment, useCallback, useState } from "react"
 import { MoreHorizontal, GitBranch, GitBranchPlus, Trash2, ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Chat, Agent } from "@/lib/types"
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { LoadingState } from "@/components/ui/LoadingState"
 import { useModals } from "@/lib/contexts/ModalContext"
+import { PinToHomeDialog } from "@/components/workspaces/home/PinToHomeDialog"
+import type { Message } from "@/lib/types"
 
 interface ChatMessageListProps {
   chat: Chat
@@ -64,6 +66,9 @@ export function ChatMessageList({
   // the app shell, while the bubble also renders on the public share page,
   // which has no ModalProvider.
   const { openScheduledJobWithPrompt } = useModals()
+  const [pinning, setPinning] = useState<{ id: string; content: string } | null>(null)
+  // Stable, so memoised bubbles do not re-render on every list render.
+  const handlePin = useCallback((m: Message) => setPinning({ id: m.id, content: m.content }), [])
 
   return (
     <div className="relative flex-1 flex flex-col min-h-0">
@@ -100,6 +105,7 @@ export function ChatMessageList({
                     onOpenFile={onOpenFile}
                     onForcePush={git.handleForcePush}
                     onSchedule={openScheduledJobWithPrompt}
+                    onPin={chat.workspaceId ? handlePin : undefined}
                   />
                 </div>
               </Fragment>
@@ -234,6 +240,14 @@ export function ChatMessageList({
         >
           <ArrowDown className="h-4 w-4" />
         </button>
+      )}
+      {chat.workspaceId && (
+        <PinToHomeDialog
+          workspaceId={chat.workspaceId}
+          chatId={chat.id}
+          message={pinning}
+          onClose={() => setPinning(null)}
+        />
       )}
     </div>
   )

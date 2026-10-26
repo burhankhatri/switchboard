@@ -51,12 +51,14 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
       if (!chat) return badRequest("You can only pin from your own chats in this workspace")
       chatId = chat.id
       if (typeof body.sourceMessageId === "string") {
+        // A message that has only just streamed in can still carry a client
+        // id. The chat is the source that matters; the message link is a
+        // nicety, so an unknown id is dropped rather than refusing the pin.
         const message = await prisma.message.findFirst({
           where: { id: body.sourceMessageId, chatId },
           select: { id: true },
         })
-        if (!message) return badRequest("That message is not in the chat")
-        messageId = message.id
+        messageId = message?.id ?? null
       }
     }
 
