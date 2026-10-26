@@ -1,6 +1,6 @@
 ## 1. Schema
 
-- [ ] 1.1 Additive migration: `WorkspaceEvent` (indexed `(workspaceId, createdAt)`), `WorkspaceWidget` (with optional unique `(workspaceId, key)`), `WorkspaceMember.lastSeenAt`, `Chat.sharedToWorkspaceAt`; run with `DIRECT_URL`, regenerate the client.
+- [x] 1.1 Additive migration: `WorkspaceEvent` (indexed `(workspaceId, createdAt)`), `WorkspaceWidget` (with optional unique `(workspaceId, key)`), `WorkspaceMember.lastSeenAt`, `Chat.sharedToWorkspaceAt`; run with `DIRECT_URL`, regenerate the client.
 
 ## 2. Events
 
