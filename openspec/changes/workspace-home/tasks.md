@@ -51,7 +51,7 @@
 
 ## 8. Verification
 
-- [ ] 8.1 `npx tsc --noEmit -p tsconfig.json` clean and `npm run test` green after each group.
-- [ ] 8.2 Extend `scripts/e2e-workspace.mjs`: second member sees the first member's job, widgets and shared chat; cannot see an unshared chat; is refused after removal.
+- [x] 8.1 `npx tsc --noEmit -p tsconfig.json` clean and `npm run test` green after each group.
+- [x] 8.2 Extend `scripts/e2e-workspace.mjs`: second member sees the first member's job, widgets and shared chat; cannot see an unshared chat; is refused after removal.
 - [ ] 8.3 Real run: in a workspace with a tunnel origin, ask the agent to pin a chart, then run a job whose prompt refreshes it, and confirm the provenance names the job.
 - [ ] 8.4 Sync specs into `openspec/specs/` (new `workspace-home`, deltas to `agent-runs` and `workspace-management`) and update PROGRESS.md.
