@@ -6,6 +6,14 @@ import { bearerFrom, verifyRunToken, type RunTokenClaims } from "@/lib/mcp/run-t
 import { notifyAsync } from "@/lib/db/notifications"
 import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 import {
+  PIN_TO_HOME_TOOL,
+  UPDATE_HOME_WIDGET_TOOL,
+  pinToHome,
+  toolNamesForRun,
+  updateHomeWidget,
+  type ToolOutcome,
+} from "@/lib/mcp/home-tools"
+import {
   MAX_AGENT_JOBS_PER_WORKSPACE,
   MIN_INTERVAL_MINUTES,
   describeInterval,
@@ -21,12 +29,16 @@ import {
  * to stream, which is every call here — so the whole thing is stateless, which
  * is the only shape that survives a cold start between two tool calls.
  *
- * One tool, and it cannot start anything. `create_scheduled_job` writes a job
- * that is disabled and unapproved; a person approves it before it ever runs.
- * That is deliberate: the caller is an agent reading attacker-influenceable
- * text while holding workspace credentials, and a schedule is persistence —
- * without the gate, one injected page could leave behind a job that keeps
- * running long after the chat that created it is closed.
+ * Nothing here can start anything. `create_scheduled_job` writes a job that is
+ * disabled and unapproved; a person approves it before it ever runs. That is
+ * deliberate: the caller is an agent reading attacker-influenceable text while
+ * holding workspace credentials, and a schedule is persistence — without the
+ * gate, one injected page could leave behind a job that keeps running long
+ * after the chat that created it is closed.
+ *
+ * The home-page tools (lib/mcp/home-tools.ts) write only validated, inert
+ * content and are offered to scheduled runs too, which is how a job keeps a
+ * widget current. Which tools a run gets depends on whether it is scheduled.
  */
 
 const PROTOCOL_VERSION = "2025-06-18"
@@ -221,6 +233,23 @@ async function createScheduledJob(
   }
 }
 
+const ALL_TOOLS = [CREATE_JOB_TOOL, PIN_TO_HOME_TOOL, UPDATE_HOME_WIDGET_TOOL]
+
+const HANDLERS: Record<
+  string,
+  (claims: RunTokenClaims, args: Record<string, unknown>) => Promise<ToolOutcome>
+> = {
+  [CREATE_JOB_TOOL.name]: createScheduledJob,
+  [PIN_TO_HOME_TOOL.name]: pinToHome,
+  [UPDATE_HOME_WIDGET_TOOL.name]: updateHomeWidget,
+}
+
+const FAILURE_TEXT: Record<string, string> = {
+  [CREATE_JOB_TOOL.name]: "Could not create the job. Tell the user to add it manually.",
+  [PIN_TO_HOME_TOOL.name]: "Could not pin the widget. Tell the user to add it from the home page.",
+  [UPDATE_HOME_WIDGET_TOOL.name]: "Could not update the widget. Say so in your report.",
+}
+
 // =============================================================================
 // Handler
 // =============================================================================
@@ -263,21 +292,27 @@ export async function POST(req: NextRequest): Promise<Response> {
     case "ping":
       return result(body.id, {})
 
-    case "tools/list":
-      return result(body.id, { tools: [CREATE_JOB_TOOL] })
+    case "tools/list": {
+      const offered = toolNamesForRun(claims)
+      return result(body.id, { tools: ALL_TOOLS.filter((t) => offered.includes(t.name)) })
+    }
 
     case "tools/call": {
       const params = body.params ?? {}
-      if (params.name !== CREATE_JOB_TOOL.name) {
-        return rpcError(body.id, -32602, `Unknown tool: ${String(params.name)}`)
+      const name = String(params.name)
+      // Calling a tool the run was not offered is refused exactly like an
+      // unknown one; listing is not the only gate.
+      const handler = toolNamesForRun(claims).includes(name) ? HANDLERS[name] : undefined
+      if (!handler) {
+        return rpcError(body.id, -32602, `Unknown tool: ${name}`)
       }
       const args = (params.arguments ?? {}) as Record<string, unknown>
       try {
-        const outcome = await createScheduledJob(claims, args)
+        const outcome = await handler(claims, args)
         return outcome.ok ? toolText(body.id, outcome.text) : toolFailure(body.id, outcome.text)
       } catch (err) {
-        console.error("[mcp/scheduler] create_scheduled_job failed:", err)
-        return toolFailure(body.id, "Could not create the job. Tell the user to add it manually.")
+        console.error(`[mcp/scheduler] ${name} failed:`, err)
+        return toolFailure(body.id, FAILURE_TEXT[name] ?? "The tool failed. Tell the user.")
       }
     }
 

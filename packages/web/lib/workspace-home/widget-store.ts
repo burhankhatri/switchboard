@@ -147,7 +147,14 @@ export async function createWidget(
   }
 }
 
-export type WidgetRef = { id: string } | { key: string }
+/** By id, by key, or either — an agent may hold one or the other. */
+export type WidgetRef = { id: string } | { key: string } | { idOrKey: string }
+
+function refWhere(ref: WidgetRef): Prisma.WorkspaceWidgetWhereInput {
+  if ("id" in ref) return { id: ref.id }
+  if ("key" in ref) return { key: ref.key }
+  return { OR: [{ id: ref.idOrKey }, { key: ref.idOrKey }] }
+}
 
 export interface UpdateWidgetInput {
   title?: unknown
@@ -161,7 +168,7 @@ export async function updateWidget(
   actor: WidgetActor
 ): Promise<StoreResult<{ id: string }>> {
   const existing = await prisma.workspaceWidget.findFirst({
-    where: { workspaceId: workspace.id, ...("id" in ref ? { id: ref.id } : { key: ref.key }) },
+    where: { workspaceId: workspace.id, ...refWhere(ref) },
     select: { id: true, type: true, title: true },
   })
   if (!existing) return fail(404, "No such widget in this workspace")
