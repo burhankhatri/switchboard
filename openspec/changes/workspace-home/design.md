@@ -95,8 +95,10 @@ It runs `gateWorkspace` once, then these queries concurrently:
 
 The brief is fetched through the existing file read path. It is a GitHub call with an ETag cache, and folding it in would make the whole page wait on GitHub. That is the reason `/overview` already gives for leaving out the file tree. Older events come from `GET /api/workspaces/:id/events?before=<cursor>`.
 
-### 8. Shared chats reuse the read-only renderer from public share links
-`Chat.sharedToWorkspaceAt DateTime?`. When it is set, `GET /api/chats/:chatId` and its messages admit any current member of `chat.workspaceId`, with a fresh membership check on every request. All mutating chat routes keep their owner-only check unchanged. The client renders a non-owner's view with the same read-only components `/share/[shareId]` uses, with no composer.
+### 8. Colleagues read chats through a separate, read-only workspace route
+`Chat.sharedToWorkspaceAt DateTime?`. Members read a chat through a new `GET /api/workspaces/:id/chats/:chatId` rather than through `GET /api/chats/:chatId`. The route re-checks membership on every request, finds the chat only if it is in that workspace and is either shared or produced by a scheduled run, and returns the same sanitised payload as a public share link (`loadSanitizedChat`). Anything else returns 404, so the response never confirms that a private chat exists. The client renders it with the read-only message list that `/share/[shareId]` uses, with no composer.
+
+*Why not widen `GET /api/chats/:chatId`:* the owner routes then stay owner-only by construction. No route that sends, renames, branches or deletes can come to admit a member by sharing a helper with the read path. The same route also covers run chats, which are owned by the job's author.
 
 This is separate from `shareId` (a public link). Sharing to a workspace never creates a public link, and a public link never grants workspace visibility.
 
