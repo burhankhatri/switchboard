@@ -13,9 +13,9 @@
 
 ## 3. Home data
 
-- [ ] 3.1 `GET /api/workspaces/:id/home` — one `gateWorkspace`, concurrent reads of jobs (approved and awaiting approval, each with author and last run), widgets, first event page, shared chats; route tests.
-- [ ] 3.2 Job health (healthy / failing with count / paused) and schedule-in-words, reusing `describeInterval`; unit tests.
-- [ ] 3.3 Since-last-visit: read `lastSeenAt` (default now − 7 days), compute counts and up to five highlights (failures first), then update `lastSeenAt` debounced at 5 minutes; unit tests for first visit, nothing new, and the debounce.
+- [x] 3.1 `GET /api/workspaces/:id/home` — one `gateWorkspace`, concurrent reads of jobs (approved and awaiting approval, each with author and last run), widgets, first event page, shared chats; route tests.
+- [x] 3.2 Job health (healthy / failing with count / paused) and schedule-in-words, reusing `describeInterval`; unit tests.
+- [x] 3.3 Since-last-visit: read `lastSeenAt` (default now − 7 days), compute counts and up to five highlights (failures first), then update `lastSeenAt` debounced at 5 minutes; unit tests for first visit, nothing new, and the debounce.
 
 ## 4. Home page UI (phase 1)
 
