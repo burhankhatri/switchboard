@@ -28,7 +28,7 @@
 
 ## 5. Sharing chats to the workspace
 
-- [ ] 5.1 `POST`/`DELETE /api/chats/:chatId/workspace-share` — owner only, chat must have a workspace; records the share event.
+- [x] 5.1 `POST`/`DELETE /api/chats/:chatId/workspace-share` — owner only, chat must have a workspace; records the share event.
 - [x] 5.2 Read-only `GET /api/workspaces/:id/chats/:chatId` for current members: shared chats and scheduled-run chats in that workspace, sanitized like a public link, 404 otherwise; owner chat routes untouched; tests for non-member, scoping, sanitising (unshare and removed-member follow from the per-request check)
 - [ ] 5.3 "Share to workspace" toggle in the chat menu; read-only rendering for non-owners reusing the `/share/[shareId]` components; "Shared chats" list on home.
 

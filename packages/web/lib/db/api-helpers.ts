@@ -481,6 +481,7 @@ export async function getChatWithAuth(
   updatedAt: Date
   lastActiveAt: Date
   workspaceId: string | null
+  sharedToWorkspaceAt: Date | null
   workspace: WorkspaceRuntime | null
 } | null> {
   // The workspace is joined rather than fetched separately: every message send
