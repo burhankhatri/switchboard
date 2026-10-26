@@ -14,7 +14,8 @@ import { encode } from "next-auth/jwt"
 import { PrismaClient } from "@prisma/client"
 import { PrismaNeon } from "@prisma/adapter-neon"
 
-const BASE = "http://localhost:4000"
+// Another project's dev server can already hold 4000; E2E_BASE points the run elsewhere.
+const BASE = process.env.E2E_BASE ?? "http://localhost:4000"
 const prisma = new PrismaClient({ adapter: new PrismaNeon({ connectionString: process.env.DATABASE_URL }) })
 
 let pass = 0, fail = 0
