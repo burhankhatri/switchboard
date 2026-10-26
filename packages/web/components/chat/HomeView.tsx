@@ -13,6 +13,7 @@ import { SinceBanner } from "@/components/workspaces/home/SinceBanner"
 import { JobsSection } from "@/components/workspaces/home/JobsSection"
 import { ActivityFeed } from "@/components/workspaces/home/ActivityFeed"
 import { SharedChatsSection } from "@/components/workspaces/home/SharedChatsSection"
+import { WidgetGrid } from "@/components/workspaces/home/widgets/WidgetGrid"
 import { ColleagueChatDialog } from "@/components/workspaces/home/ColleagueChatDialog"
 import { useWorkspaceHome } from "@/lib/query/hooks/useWorkspaceHome"
 import { isChatVisibleForFilter } from "@/lib/chat-tree"
@@ -50,7 +51,7 @@ export function HomeView({
   onNewChatWithPrompt,
   onManageJob,
 }: HomeViewProps) {
-  const { activeWorkspace: active, setActiveWorkspace: setActive, ready } = useWorkspace()
+  const { activeWorkspace: active, setActiveWorkspace: setActive, ready, requestOpenFile } = useWorkspace()
   const { data: overview } = useWorkspaceOverview(active?.id)
   const { data: home } = useWorkspaceHome(active?.id)
   const [readingChat, setReadingChat] = useState<string | null>(null)
@@ -92,6 +93,13 @@ export function HomeView({
         <StartChatCard workspaceName={active.name} onNewChat={onNewChat} />
         {home && (
           <>
+            <WidgetGrid
+              workspaceId={active.id}
+              widgets={home.widgets}
+              jobs={home.jobs}
+              onOpenChat={setReadingChat}
+              onOpenFile={(path) => void requestOpenFile(path)}
+            />
             <JobsSection
               jobs={home.jobs}
               onOpenChat={setReadingChat}
