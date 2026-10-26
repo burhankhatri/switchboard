@@ -12,6 +12,10 @@ vi.mock("@/lib/db/api-helpers", () => ({
   badRequest: (error: string) => Response.json({ error }, { status: 400 }),
   internalError: () => Response.json({ error: "Delete failed" }, { status: 500 }),
 }))
+vi.mock("@/lib/workspace-home/events", () => ({
+  recordWorkspaceEventAsync: vi.fn(),
+  filesCommittedSummary: (verb: string, paths: string[]) => `${verb} ${paths.length}`,
+}))
 vi.mock("@/lib/db/prisma", () => ({ prisma: {
   workspace: { findFirst: mocks.workspace }, workspaceAsset: { findUnique: mocks.asset }, user: { findUnique: mocks.user },
   $transaction: (fn: (tx: unknown) => unknown) => fn({ workspaceAsset: { deleteMany: mocks.removeAsset }, fileUpload: { update: mocks.updateUpload } }),
