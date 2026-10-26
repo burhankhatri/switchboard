@@ -34,7 +34,7 @@
 
 ## 6. Widgets (phase 2)
 
-- [ ] 6.1 `lib/workspace-home/widgets.ts`: zod schemas for stat, table (≤50 rows), chart (line/bar, ≤6 series, ≤500 points), file, job, note; 64 KB and 40-per-workspace limits; http(s)-only link check; unit tests for each type and each limit.
+- [x] 6.1 `lib/workspace-home/widgets.ts`: zod schemas for stat, table (≤50 rows), chart (line/bar, ≤6 series, ≤500 points), file, job, note; 64 KB and 40-per-workspace limits; http(s)-only link check; unit tests for each type and each limit.
 - [ ] 6.2 Widget CRUD + reorder under `/api/workspaces/:id/widgets` — member-gated, shared validator, provenance fields set on every write, events for person-made create/update/delete; route tests.
 - [ ] 6.3 Widget renderers (recharts for charts, sanitised Markdown with raw HTML disabled for notes, existing previews for files, live status for jobs), missing-target and stale states, provenance line with links (chat link only when shared).
 - [ ] 6.4 Add-widget menu on home (note, file, job) and drag reorder.
