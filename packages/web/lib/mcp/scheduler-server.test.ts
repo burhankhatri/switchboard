@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { schedulerMcpServer } from "./scheduler-server"
+import { schedulerMcpServer, withSchedulerServer } from "./scheduler-server"
 import { verifyRunToken } from "./run-token"
 
 const ORIGINAL = { ...process.env }
@@ -77,5 +77,22 @@ describe("schedulerMcpServer", () => {
   it("offers nothing to a run with no workspace", () => {
     process.env.SANDBOX_CALLBACK_ORIGIN = "https://agents.example.com"
     expect(schedulerMcpServer({ ...run, workspaceId: null })).toBeNull()
+  })
+})
+
+describe("withSchedulerServer", () => {
+  const scheduledRun = { ...run, chatId: "run-chat", jobId: "j1", jobRunId: "r1" }
+
+  it("appends the endpoint to a scheduled run's servers, with the job in its token", () => {
+    process.env.SANDBOX_CALLBACK_ORIGIN = "https://agents.example.com"
+    const servers = withSchedulerServer([{ name: "github" }], scheduledRun)
+    expect(servers).toHaveLength(2)
+    const scheduler = servers[1] as { bearerToken: string }
+    expect(verifyRunToken(scheduler.bearerToken)).toMatchObject({ jobId: "j1", jobRunId: "r1" })
+  })
+
+  it("leaves the servers as they were when no origin is reachable", () => {
+    const base = [{ name: "github" }]
+    expect(withSchedulerServer(base, scheduledRun)).toEqual(base)
   })
 })

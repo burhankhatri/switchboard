@@ -22,6 +22,7 @@ import {
 } from "@/lib/agent-session"
 import { stripNullBytes, stripNullBytesDeep } from "@/lib/db/pg-sanitize"
 import { loadMcpConnections } from "@/lib/mcp/agent-servers"
+import { withSchedulerServer } from "@/lib/mcp/scheduler-server"
 
 import { getUserPushOptions } from "@/lib/git/push-options"
 import { gitTokenForRun } from "@/lib/git/repo-token"
@@ -215,6 +216,16 @@ export async function startJobExecution(
   } catch (err) {
     console.error(`[agent-lifecycle] loadMcpConnections failed for ${job.id}:`, err)
   }
+  // The app's own endpoint, so a job can refresh the home widgets it feeds.
+  // Its token names the job and run, which limits it to the widget tools and
+  // attributes what it writes to the job.
+  mcpServers = withSchedulerServer(mcpServers, {
+    userId: job.userId,
+    workspaceId: job.workspaceId,
+    chatId: chat.id,
+    jobId: job.id,
+    jobRunId: run.id,
+  })
 
   const bgSession = await createBackgroundAgentSession(sandbox, {
     workspaceId: job.workspaceId, userId: job.userId,
