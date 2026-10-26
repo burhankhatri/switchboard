@@ -67,13 +67,19 @@ export const UPDATE_HOME_WIDGET_TOOL = {
   description:
     "Replace the content (and optionally the title) of an existing home-page widget, by its key " +
     "or id. Use this from scheduled jobs to keep numbers current. The content must match the " +
-    "widget's existing type.\n\n" +
+    "widget's type; pass type as well to turn the widget into another kind where it already " +
+    "sits (a note that lists dates into a timeline, say) rather than pinning a duplicate.\n\n" +
     CONTENT_GUIDE,
   inputSchema: {
     type: "object",
     properties: {
       widget: { type: "string", description: "The widget's key (preferred) or id." },
       title: { type: "string" },
+      type: {
+        type: "string",
+        enum: [...WIDGET_TYPES],
+        description: "Only to change the widget's kind; content must then be in the new shape.",
+      },
       content: { type: "object" },
     },
     required: ["widget"],
@@ -155,7 +161,7 @@ export async function updateHomeWidget(
   const result = await updateWidget(
     ws.workspace,
     { idOrKey: args.widget.trim() },
-    { title: args.title, content: args.content },
+    { title: args.title, content: args.content, type: args.type },
     actorFrom(claims)
   )
   if (!result.ok) {

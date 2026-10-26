@@ -159,6 +159,12 @@ function refWhere(ref: WidgetRef): Prisma.WorkspaceWidgetWhereInput {
 export interface UpdateWidgetInput {
   title?: unknown
   content?: unknown
+  /**
+   * A different type, with content for it. Lets a widget become the shape it
+   * should have been (a note listing dates into a timeline) where it already
+   * sits, instead of a near-duplicate pinned at the bottom.
+   */
+  type?: unknown
 }
 
 export async function updateWidget(
@@ -179,12 +185,17 @@ export async function updateWidget(
     if (!title.ok) return fail(400, title.error)
     data.title = title.value
   }
+  const retype = input.type !== undefined && input.type !== existing.type
+  if (retype && input.content === undefined) {
+    return fail(400, "Changing a widget's type needs content in the new type's shape")
+  }
   if (input.content !== undefined) {
-    const checked = validateWidgetContent(existing.type, input.content)
+    const checked = validateWidgetContent(retype ? input.type : existing.type, input.content)
     if (!checked.ok) return fail(400, checked.error)
     const refError = await checkReferences(workspace, checked.value.type, checked.value.content)
     if (refError) return fail(400, refError)
     data.content = checked.value.content as Prisma.InputJsonValue
+    if (retype) data.type = checked.value.type
   }
   if (Object.keys(data).length === 0) return fail(400, "Nothing to update")
 

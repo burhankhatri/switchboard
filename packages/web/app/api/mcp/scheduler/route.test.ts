@@ -141,6 +141,31 @@ describe("update_home_widget", () => {
     expect(m.event).not.toHaveBeenCalled()
   })
 
+  it("turns a widget into another type in place, given content for it", async () => {
+    m.widgetFindFirst.mockResolvedValue({ id: "w1", type: "note", title: "What happened" })
+    const res = await call(interactive, "tools/call", {
+      name: "update_home_widget",
+      arguments: {
+        widget: "w1",
+        type: "timeline",
+        content: { events: [{ date: "25 Sep", title: "22 leads pushed" }] },
+      },
+    })
+    expect(res.result.isError).toBe(false)
+    expect(m.update.mock.calls[0][0].data).toMatchObject({ type: "timeline" })
+  })
+
+  it("refuses a type change without content to match", async () => {
+    m.widgetFindFirst.mockResolvedValue({ id: "w1", type: "note", title: "What happened" })
+    const res = await call(interactive, "tools/call", {
+      name: "update_home_widget",
+      arguments: { widget: "w1", type: "timeline" },
+    })
+    expect(res.result.isError).toBe(true)
+    expect(res.result.content[0].text).toMatch(/needs content/)
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
   it("treats a widget from another workspace as missing", async () => {
     m.widgetFindFirst.mockResolvedValue(null)
     const res = await call(interactive, "tools/call", {
