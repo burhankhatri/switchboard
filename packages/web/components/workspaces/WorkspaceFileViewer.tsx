@@ -168,6 +168,9 @@ export function WorkspaceFileViewer() {
       )
       writeCachedFile(wsId, openFile, { content, sha: res.sha, truncated: false })
       qc.invalidateQueries({ queryKey: ["workspace-files", wsId] })
+      // Any save may be the brief; the home page should show it on return
+      // rather than after its stale window.
+      qc.invalidateQueries({ queryKey: ["workspace-brief", wsId] })
     },
     // The draft stays on disk, so a rejected save never costs the edit.
     onError: () => setSaved(false),

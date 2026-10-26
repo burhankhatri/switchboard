@@ -698,6 +698,10 @@ function HomePageContent({ isMobile }: HomePageContentProps) {
                   chats={chats}
                   onSelectChat={handleSelectChat}
                   onNewChat={handleNewChat}
+                  onNewChatWithPrompt={async (prompt) => {
+                    const id = await handleNewChat()
+                    if (id) updateDraft(id, prompt)
+                  }}
                 />
               ) : (
                 <ChatPanelWithPalette

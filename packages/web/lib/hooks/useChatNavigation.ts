@@ -53,7 +53,8 @@ interface UseChatNavigationOptions {
 interface UseChatNavigationResult {
   /** Tree-ordered chat id list matching the sidebar (ignores collapsed state). */
   treeOrderedChatIds: string[]
-  handleNewChat: () => Promise<void>
+  /** Resolves to the new draft chat's id, or null when none was started. */
+  handleNewChat: () => Promise<string | null>
   handleSelectChat: (chatId: string) => void | Promise<void>
   /**
    * Change the sidebar repo filter and ensure a chat from the newly filtered
@@ -127,12 +128,12 @@ export function useChatNavigation({
   )
 
   // Handler for new chat - uses current chat's repo/branch if available, otherwise repo filter
-  const handleNewChat = useCallback(async () => {
+  const handleNewChat = useCallback(async (): Promise<string | null> => {
     if (!session) {
       modals.setSignInModalOpen(true)
-      return
+      return null
     }
-    if (!await closeOpenFile()) return
+    if (!await closeOpenFile()) return null
     // Switch to chat view
     sidebar.setViewMode("chat")
     sidebar.setSelectedScheduledJob(null) // Clear selected job when switching to chat
@@ -176,6 +177,7 @@ export function useChatNavigation({
     if (newChatId) {
       window.history.pushState(null, "", ROUTES.newChat.build())
     }
+    return newChatId
   }, [session, modals, closeOpenFile, sidebar, displayCurrentChat, repos, startNewChat, activeWorkspace])
 
   // Handler for opening scheduled jobs view

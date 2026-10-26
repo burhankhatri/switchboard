@@ -3,6 +3,7 @@
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { useWorkspaceOverview } from "@/lib/query/hooks/useWorkspaceOverview"
 import { WorkspaceLauncher } from "@/components/workspaces/WorkspaceLauncher"
+import { HomeBrief } from "@/components/workspaces/home/HomeBrief"
 import { StartChatCard } from "@/components/workspaces/home/StartChatCard"
 import { ConnectedSection } from "@/components/workspaces/home/ConnectedSection"
 import { RecentChatsSection } from "@/components/workspaces/home/RecentChatsSection"
@@ -16,7 +17,9 @@ interface HomeViewProps {
   isMobile: boolean
   chats: Chat[]
   onSelectChat: (chatId: string) => void | Promise<void>
-  onNewChat: () => void | Promise<void>
+  onNewChat: () => unknown
+  /** Start a chat with `prompt` waiting in the composer, unsent. */
+  onNewChatWithPrompt: (prompt: string) => void | Promise<void>
 }
 
 /**
@@ -30,7 +33,13 @@ interface HomeViewProps {
  * Everything here is already loaded for the sidebar, so it costs no extra
  * request: the overview is the same cache entry the Connections panel reads.
  */
-export function HomeView({ isMobile, chats, onSelectChat, onNewChat }: HomeViewProps) {
+export function HomeView({
+  isMobile,
+  chats,
+  onSelectChat,
+  onNewChat,
+  onNewChatWithPrompt,
+}: HomeViewProps) {
   const { activeWorkspace: active, setActiveWorkspace: setActive, ready } = useWorkspace()
   const { data: overview } = useWorkspaceOverview(active?.id)
 
@@ -66,6 +75,7 @@ export function HomeView({ isMobile, chats, onSelectChat, onNewChat }: HomeViewP
           </p>
         </header>
 
+        <HomeBrief onDraftWithAgent={(prompt) => void onNewChatWithPrompt(prompt)} />
         <StartChatCard workspaceName={active.name} onNewChat={onNewChat} />
         <ConnectedSection connections={connections} />
         <RecentChatsSection chats={recent} onSelectChat={onSelectChat} />

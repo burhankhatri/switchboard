@@ -12,7 +12,7 @@ export function StartChatCard({
   onNewChat,
 }: {
   workspaceName: string
-  onNewChat: () => void | Promise<void>
+  onNewChat: () => unknown
 }) {
   return (
     <button
