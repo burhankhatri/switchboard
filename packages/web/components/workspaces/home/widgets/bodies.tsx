@@ -172,25 +172,31 @@ export function TableBody({ content }: { content: TableContent }) {
                   }
                   const max = maxima[c]
                   const n = max !== null ? amountOf(cell) : null
+                  const shown = typeof cell === "number" ? cell.toLocaleString() : cell
                   return (
                     <td
                       key={c}
                       className={cn(
-                        "relative px-2.5 py-2 align-top text-ink",
+                        "px-2.5 py-2 align-top text-ink",
                         max !== null && "text-right tabular-nums whitespace-nowrap"
                       )}
                     >
-                      {max !== null && n !== null && (
-                        <span
-                          aria-hidden
-                          className="absolute inset-y-1.5 right-1 rounded-[3px]"
-                          style={{
-                            width: `max(2px, calc(${(n / max) * 100}% - 0.5rem))`,
-                            background: "color-mix(in oklab, var(--series-1) 14%, transparent)",
-                          }}
-                        />
+                      {max !== null && n !== null ? (
+                        // A short track beside the number rather than a fill
+                        // behind it: behind, a full bar read as a highlighted
+                        // cell and a tiny one as a stray rule.
+                        <span className="inline-flex items-center justify-end gap-2">
+                          <span aria-hidden className="h-1.5 w-12 overflow-hidden rounded-full bg-inset">
+                            <span
+                              className="block h-full rounded-full bg-[var(--series-1)]"
+                              style={{ width: n === 0 ? 0 : `${Math.max((n / max) * 100, 4)}%` }}
+                            />
+                          </span>
+                          {shown}
+                        </span>
+                      ) : (
+                        shown
                       )}
-                      <span className="relative">{typeof cell === "number" ? cell.toLocaleString() : cell}</span>
                     </td>
                   )
                 })}

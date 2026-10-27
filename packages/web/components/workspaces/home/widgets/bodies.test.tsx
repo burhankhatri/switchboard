@@ -81,7 +81,8 @@ describe("widget bodies", () => {
       />
     )
     expect(html).toContain("rounded-full")
-    expect(html).toContain("color-mix")
+    // The 2.80% row is the column's largest, so its bar is full.
+    expect(html).toContain("width:100%")
   })
 
   it("shows a long table's first rows and offers the rest", () => {
