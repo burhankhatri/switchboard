@@ -1,14 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { Plus } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { useWorkspaceOverview } from "@/lib/query/hooks/useWorkspaceOverview"
 import { WorkspaceLauncher } from "@/components/workspaces/WorkspaceLauncher"
-import { HomeBrief } from "@/components/workspaces/home/HomeBrief"
-import { StartChatCard } from "@/components/workspaces/home/StartChatCard"
 import { ConnectedSection } from "@/components/workspaces/home/ConnectedSection"
 import { RecentChatsSection } from "@/components/workspaces/home/RecentChatsSection"
-import { MembersLine } from "@/components/workspaces/home/MembersLine"
 import { SinceBanner } from "@/components/workspaces/home/SinceBanner"
 import { JobsSection } from "@/components/workspaces/home/JobsSection"
 import { ActivityFeed } from "@/components/workspaces/home/ActivityFeed"
@@ -77,20 +75,29 @@ export function HomeView({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className={cn("mx-auto w-full max-w-[52rem]", isMobile ? "p-4 pb-safe" : "px-6 py-10")}>
-        <header>
-          <h1 className={cn("font-display tracking-tight", isMobile ? "text-2xl" : "text-3xl")}>
-            {active.name}
-          </h1>
-          <p className="mt-1.5 text-sm text-ink-2">
-            Its skills, scripts and connections load on every run. Ask for the task —
-            there is nothing to set up.
-          </p>
+      <div className={cn("mx-auto w-full max-w-[60rem]", isMobile ? "p-4 pb-safe" : "px-8 py-10")}>
+        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <h1 className={cn("font-display tracking-tight", isMobile ? "text-2xl" : "text-[34px] leading-tight")}>
+              {active.name}
+            </h1>
+            <p className="mt-1 text-[13px] text-ink-3">
+              {members.length} {members.length === 1 ? "member" : "members"}
+              {connections.length > 0 &&
+                ` · ${connections.length} ${connections.length === 1 ? "connection" : "connections"}`}
+              {home && home.jobs.length > 0 && ` · ${home.jobs.length} scheduled`}
+            </p>
+          </div>
+          <button
+            onClick={() => void onNewChat()}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[13px] font-medium text-primary-foreground shadow-hairline hover:opacity-90 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            New chat
+          </button>
         </header>
 
-        <HomeBrief onDraftWithAgent={(prompt) => void onNewChatWithPrompt(prompt)} />
         {home?.since && <SinceBanner since={home.since} onOpenChat={setReadingChat} />}
-        <StartChatCard workspaceName={active.name} onNewChat={onNewChat} />
         {home && (
           <>
             <WidgetGrid
@@ -99,6 +106,7 @@ export function HomeView({
               jobs={home.jobs}
               onOpenChat={setReadingChat}
               onOpenFile={(path) => void requestOpenFile(path)}
+              onAskAgent={(prompt) => void onNewChatWithPrompt(prompt)}
             />
             <JobsSection
               jobs={home.jobs}
@@ -115,7 +123,6 @@ export function HomeView({
         )}
         <ConnectedSection connections={connections} />
         <RecentChatsSection chats={recent} onSelectChat={onSelectChat} />
-        <MembersLine count={members.length} />
       </div>
       <ColleagueChatDialog
         workspaceId={active.id}

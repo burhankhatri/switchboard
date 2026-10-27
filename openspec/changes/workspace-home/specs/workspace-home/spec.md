@@ -8,8 +8,9 @@ last looked — written so a member who did not build any of it can follow it.
 ### Requirement: An open workspace lands on its home page
 The system SHALL show the workspace home page in the centre pane when a member
 has a workspace open and no chat, file or scheduled agents view in that pane.
-The page SHALL show, in order: the brief, the since-last-visit summary, the
-start-a-chat action, widgets, the workspace's jobs, and recent activity.
+The page SHALL show, in order: a header with the start-a-chat action, the
+since-last-visit summary, the workspace summary, widgets, the workspace's jobs,
+and recent activity.
 
 #### Scenario: Opening a workspace
 - **WHEN** a member opens a workspace with no chat selected
@@ -26,26 +27,25 @@ start-a-chat action, widgets, the workspace's jobs, and recent activity.
 - **WHEN** a signed-in user who is not a member requests a workspace's home data
 - **THEN** the request is rejected with 403
 
-### Requirement: The brief is HOME.md in the workspace folder
-The system SHALL render `HOME.md` at the root of the workspace folder as the
-brief at the top of the home page, and SHALL treat it as an ordinary workspace
-file for editing and committing.
+### Requirement: A summary widget leads the home page
+The system SHALL show the workspace's summary widget first on the home page,
+above every other widget wherever it was pinned: one headline sentence on where
+things stand and up to five short points, each optionally marked good, watch,
+problem or note by an icon and a colour together. The summary SHALL be written
+by the agent or by a member, and SHALL NOT be read from a file in the
+repository.
 
-#### Scenario: A workspace with a brief
-- **WHEN** the workspace folder contains `HOME.md`
-- **THEN** it is shown rendered, with an Edit action that opens it in the file
-  editor, where saving commits as for any other file
+#### Scenario: A workspace without a summary
+- **WHEN** a workspace has no summary widget
+- **THEN** the home page shows an empty summary with two actions: one starts a
+  chat whose composer holds a prompt asking the agent to pin a summary, key
+  numbers and anything waiting on a person; the other opens an editor for a
+  headline and points
 
-#### Scenario: A workspace without a brief
-- **WHEN** the workspace folder has no `HOME.md`
-- **THEN** the home page offers to have the agent draft one, which starts a chat
-  asking the agent to write `HOME.md` from the workspace's skills, scripts,
-  connections and jobs in plain language
-
-#### Scenario: The agent updates the brief
-- **WHEN** a run changes `HOME.md` and its changes reach the workspace branch
-- **THEN** the home page shows the new brief on next load, because the repo is
-  the brief's only source
+#### Scenario: The agent keeps it current
+- **WHEN** a chat or a scheduled run updates the widget keyed "summary"
+- **THEN** the home page shows the new summary on next load, with its
+  provenance, without a commit or a merge
 
 ### Requirement: Every member sees the workspace's jobs
 The system SHALL list every approved scheduled job bound to the workspace on its
@@ -91,23 +91,37 @@ removed; a member joining or leaving; a chat shared to the workspace.
 - **THEN** the widget's provenance changes, but no feed event is added, so a
   daily refresh does not bury everything else
 
+#### Scenario: A burst of the same change
+- **WHEN** one member pins, updates or removes several widgets, or commits
+  several file changes, within two hours with nothing else in between
+- **THEN** the feed shows them as one line with the count, which expands to the
+  individual events; runs are never folded together
+
 #### Scenario: A long history
 - **WHEN** a workspace has more events than the first page shows
 - **THEN** older events load on request, newest first
 
 ### Requirement: Widgets are typed cards, never markup
-The system SHALL support home widgets of exactly these types: stat, table,
-chart, file, job and note. A widget's content SHALL be structured data checked
-against its type's schema on every write; no widget type SHALL accept HTML,
-script or a URL the browser loads automatically.
+The system SHALL support home widgets of exactly these types: summary, kpis,
+stat, table, chart, funnel, timeline, actions, file, job and note. A widget's
+content SHALL be structured data checked against its type's schema on every
+write; no widget type SHALL accept HTML, script or a URL the browser loads
+automatically. A widget SHALL never scroll inside its card: content longer
+than the card shows its first part and a control to show the rest.
 
 #### Scenario: Each type
 - **WHEN** a widget is shown
-- **THEN** a stat shows a label, a value and an optional change and note; a table
-  shows up to 50 rows of named columns; a chart shows a line or bar chart of up
-  to 500 points across up to 6 series; a file shows a preview of a workspace file
-  by path; a job shows the live status of one workspace job; a note shows
-  Markdown rendered without raw HTML
+- **THEN** a stat shows a label, a value and an optional change and note; kpis
+  show up to six labelled values with optional changes in one card; a table
+  shows up to 50 rows of named columns, with a column named Status shown as
+  pills and columns of amounts shown with inline bars; a chart shows a line or
+  bar chart of up to 500 points across up to 6 series; a funnel shows up to
+  eight steps as bars with the share carried from each step to the next; a
+  timeline shows up to 30 dated events on a line, newest first; actions show up
+  to ten items marked now, soon or FYI with who each waits on; a file shows a
+  preview of a workspace file by path; a job shows the live status of one
+  workspace job; a note shows Markdown rendered without raw HTML, images or
+  comments
 
 #### Scenario: Invalid content
 - **WHEN** a write supplies content that does not match its type's schema, or
@@ -130,7 +144,8 @@ home page, from the home page itself, from a chat message, and from a workspace
 file. Every change SHALL be attributed to the member who made it.
 
 #### Scenario: Adding by hand
-- **WHEN** a member adds a note, file or job widget from the home page
+- **WHEN** a member adds a summary, number, note, file or job widget from the
+  home page
 - **THEN** it appears on home for every member
 
 #### Scenario: Pinning from a chat

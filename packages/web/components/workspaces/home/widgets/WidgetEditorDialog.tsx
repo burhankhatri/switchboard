@@ -8,8 +8,8 @@ import type { HomeJob } from "@/lib/workspace-home/home"
 import type { WidgetDto } from "@/lib/workspace-home/widget-dto"
 import type { RepoFile } from "@/lib/workspace-repo"
 
-/** Types a person can make from scratch; tables and charts come from pins and agents. */
-export type HandMadeType = "note" | "stat" | "file" | "job"
+/** Types a person can make from scratch; the data-heavy ones come from pins and agents. */
+export type HandMadeType = "summary" | "note" | "stat" | "file" | "job"
 
 export type EditorTarget =
   | { mode: "create"; type: HandMadeType; preset?: { title?: string; content?: Record<string, unknown> } }
@@ -19,6 +19,11 @@ const inputCls =
   "w-full rounded-md border border-line-strong bg-field px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-primary"
 
 const TYPE_NAME: Record<string, string> = {
+  summary: "summary",
+  kpis: "numbers",
+  funnel: "funnel",
+  timeline: "timeline",
+  actions: "to-do list",
   note: "note",
   stat: "number",
   file: "file",
@@ -46,6 +51,8 @@ export function WidgetEditorDialog({
 
   const [title, setTitle] = useState("")
   const [markdown, setMarkdown] = useState("")
+  const [headline, setHeadline] = useState("")
+  const [points, setPoints] = useState("")
   const [value, setValue] = useState("")
   const [unit, setUnit] = useState("")
   const [note, setNote] = useState("")
@@ -57,7 +64,15 @@ export function WidgetEditorDialog({
   useEffect(() => {
     if (!target) return
     const c = existing ?? preset?.content ?? {}
-    setTitle(target.mode === "edit" ? target.widget.title : (preset?.title ?? ""))
+    setTitle(
+      target.mode === "edit"
+        ? target.widget.title
+        : (preset?.title ?? (target.type === "summary" ? "Where things stand" : ""))
+    )
+    setHeadline(typeof c.headline === "string" ? c.headline : "")
+    setPoints(
+      Array.isArray(c.points) ? (c.points as { text: string }[]).map((p) => p.text).join("\n") : ""
+    )
     setMarkdown(typeof c.markdown === "string" ? c.markdown : "")
     setValue(c.value !== undefined ? String(c.value) : "")
     setUnit(typeof c.unit === "string" ? c.unit : "")
@@ -79,13 +94,36 @@ export function WidgetEditorDialog({
     retry: false,
   })
 
-  // Tables and charts are edited by whatever produced them; by hand, only the
+  // Data-heavy types are edited by whatever produced them; by hand, only the
   // title. Their other fields would be a spreadsheet editor nobody asked for.
-  const titleOnly = type === "table" || type === "chart"
+  const titleOnly =
+    type === "table" ||
+    type === "chart" ||
+    type === "kpis" ||
+    type === "funnel" ||
+    type === "timeline" ||
+    type === "actions"
 
   const buildContent = (): unknown => {
     if (titleOnly) return undefined
     switch (type) {
+      case "summary": {
+        // A point that survives an edit keeps the tone the agent gave it.
+        const before = new Map(
+          ((existing?.points as { text: string; tone?: string }[] | undefined) ?? []).map((p) => [p.text, p.tone])
+        )
+        const list = points
+          .split("\n")
+          .map((l) => l.replace(/^\s*[-*•]\s*/, "").trim())
+          .filter(Boolean)
+          .slice(0, 5)
+          .map((text) => (before.get(text) ? { text, tone: before.get(text) } : { text }))
+        return {
+          ...(existing ?? {}),
+          headline: headline.trim(),
+          ...(list.length ? { points: list } : { points: undefined }),
+        }
+      }
       case "note":
         return { markdown }
       case "stat": {
@@ -139,6 +177,28 @@ export function WidgetEditorDialog({
               <span className="mb-1 block text-[12px] text-ink-2">Title</span>
               <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
             </label>
+
+            {type === "summary" && (
+              <>
+                <label className="block">
+                  <span className="mb-1 block text-[12px] text-ink-2">Where things stand, in one sentence</span>
+                  <textarea
+                    className={`${inputCls} min-h-16`}
+                    value={headline}
+                    onChange={(e) => setHeadline(e.target.value)}
+                    maxLength={240}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[12px] text-ink-2">Key points, one per line (up to 5)</span>
+                  <textarea
+                    className={`${inputCls} min-h-24`}
+                    value={points}
+                    onChange={(e) => setPoints(e.target.value)}
+                  />
+                </label>
+              </>
+            )}
 
             {type === "note" && (
               <label className="block">

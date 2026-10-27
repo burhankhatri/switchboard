@@ -4,12 +4,12 @@ A workspace is shared, but most of what happens in it is not. Chats and schedule
 
 ## What Changes
 
-- **Workspace home.** Opening a workspace with no chat open shows a home page for every member: a plain-language brief, what is running, pinned widgets, and recent activity. It replaces the current `HomeView` body (new-chat button, connections, own recent chats).
-- **The brief is `HOME.md`.** A Markdown file in the workspace folder, rendered at the top of home. It is committed like any other file, so the agent can write it ("update the workspace brief with what we just built") and members can edit it. A missing file shows a prompt to have the agent draft one.
+- **Workspace home.** Opening a workspace with no chat open shows a home page for every member: a summary of where things stand, what is running, pinned widgets, and recent activity. It replaces the current `HomeView` body (new-chat button, connections, own recent chats).
+- **A summary widget leads the page.** One headline sentence and up to five marked points, written by the agent (key `"summary"`) or by a member. It replaces the first design's `HOME.md` brief, which only appeared after the agent's chat branch was merged and rendered its template comments as text.
 - **Scheduled jobs are visible to every member.** Home lists all of the workspace's approved jobs, whoever created them, with schedule in words, author, last run and health. Editing, deleting and running a job stay with its author; this change grants visibility, not control.
 - **Workspace activity feed.** One timeline per workspace: jobs created/approved/failing, runs finished, files committed, widgets pinned, members joined, chats shared. Backed by a new append-only `WorkspaceEvent` table written at the points those things already happen.
 - **Chats stay private, with opt-in sharing to the workspace.** A chat's owner can share it to the workspace; members can then read it (read-only) from home and the feed. Unsharing removes access.
-- **Home widgets.** Cards of a fixed set of types — stat, table, chart, file, job, note — described by validated JSON, never HTML or script. Created three ways: by hand from home, by "Pin to Home" on a chat message or workspace file, or by the agent through new `pin_to_home` and `update_home_widget` tools on the existing run-scoped MCP endpoint. Agent-created widgets appear immediately; every widget shows who or which run last updated it, linking to that chat or run.
+- **Home widgets.** Cards of a fixed set of types — summary, kpis, stat, table, chart, funnel, timeline, actions, file, job, note — described by validated JSON, never HTML or script. Created three ways: by hand from home, by "Pin to Home" on a chat message or workspace file, or by the agent through new `pin_to_home` and `update_home_widget` tools on the existing run-scoped MCP endpoint. Agent-created widgets appear immediately; every widget shows who or which run last updated it, linking to that chat or run.
 - **"Since you were last here."** Home records when each member last opened it and summarises the events since then as counts and highlights (runs, failures, new widgets, shared chats). Deterministic — no model call.
 
 Not in this change: AI-written catch-up summaries and an emailed weekly digest (both need a server-side model call, and the deployment's only Anthropic credential is a personal subscription — see PROGRESS.md "Known risks"); widgets that query a connection live (needs the credential broker); free-form HTML widgets; a builder/operator view mode.
@@ -17,7 +17,7 @@ Not in this change: AI-written catch-up summaries and an emailed weekly digest (
 ## Capabilities
 
 ### New Capabilities
-- `workspace-home`: the home page of an open workspace — the `HOME.md` brief, the workspace jobs list, the activity feed, home widgets (types, creation, provenance, agent tools), and the since-last-visit summary.
+- `workspace-home`: the home page of an open workspace — the summary, the workspace jobs list, the activity feed, home widgets (types, creation, provenance, agent tools), and the since-last-visit summary.
 
 ### Modified Capabilities
 - `agent-runs`: the run-scoped MCP endpoint gains widget tools, and scheduled runs must receive that endpoint so a job can refresh its widgets.

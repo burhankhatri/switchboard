@@ -20,7 +20,7 @@
 ## 4. Home page UI (phase 1)
 
 - [x] 4.1 Split `HomeView` into `components/workspaces/home/*` without behaviour change (refactor commit).
-- [x] 4.2 Brief section: render `HOME.md` via the existing file read and Markdown preview, Edit opens it in the file editor; missing file shows "Have the agent draft it", which starts a chat with a preset prompt.
+- [x] 4.2 ~~Brief section rendering `HOME.md`~~ — replaced by the summary widget in 9.4.
 - [x] 4.3 Jobs section: cards with health, schedule, author, last run; "Awaiting approval" group; non-authors see no edit/delete/run controls; links to runs and their chats.
 - [x] 4.4 Activity feed with "Load older".
 - [x] 4.5 Since-last-visit banner, hidden when empty.
@@ -55,3 +55,12 @@
 - [x] 8.2 Extend `scripts/e2e-workspace.mjs`: second member sees the first member's job, widgets and shared chat; cannot see an unshared chat; is refused after removal.
 - [ ] 8.3 Real run: in a workspace with a tunnel origin, ask the agent to pin a chart, then run a job whose prompt refreshes it, and confirm the provenance names the job.
 - [ ] 8.4 Sync specs into `openspec/specs/` (new `workspace-home`, deltas to `agent-runs` and `workspace-management`) and update PROGRESS.md.
+
+## 9. Visual home (after the first real use)
+
+- [x] 9.1 Widget types summary, kpis, funnel, timeline, actions: zod schemas with short text caps; tests.
+- [x] 9.2 `update_home_widget` accepts `type` to change a widget in place; content checked against the new type; tests.
+- [x] 9.3 Tool description: lead with a summary, prefer visual types, notes only for what has no other shape; Status columns and amounts explained.
+- [x] 9.4 Summary leads the grid; empty summary offers "Ask the agent" (prefilled prompt) and "Write it yourself"; `HOME.md` brief, start-chat card and members line removed; compact header with New chat.
+- [x] 9.5 Renderers for the new types; tables with status pills and inline bars; no inner scrolling — notes, tables and timelines collapse with "show more"; note Markdown sized for a card, comments and images dropped; tests.
+- [x] 9.6 Feed folds a burst of the same change by one member into one expandable line; runs never fold; tests.

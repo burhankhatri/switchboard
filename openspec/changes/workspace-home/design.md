@@ -23,8 +23,8 @@ See proposal.md for why. The constraints that shape the approach:
 
 ## Decisions
 
-### 1. The brief lives in the repo; widgets live in the database
-`HOME.md` is prose that changes rarely and benefits from history, review and agent editing through the normal file path. It needs no new storage, and the file viewer already renders Markdown.
+### 1. Widgets live in the database, and so does the summary
+The first version kept a brief in the repo as `HOME.md`, on the reasoning that prose changes rarely and benefits from history and review. In use it failed both people it was for. The agent writes files on its chat branch, so a brief it drafted did not appear until someone merged that branch; until then home showed the template, HTML comments and all, as text. And a page of Markdown headings was the "too texty" home the non-technical member could not read. The summary is now a widget (decision 10), refreshed in place like every other.
 
 Widgets are data that refreshes on every run. If they were stored in the repo, each refresh would be a commit, scheduled refreshes would sit on unmerged `autoPR` branches, and the 1 MB Contents limit would apply to reading them. A `WorkspaceWidget` row is updated in place.
 
@@ -85,7 +85,7 @@ Chat links in events are resolved at read time against `Chat.sharedToWorkspaceAt
 
 The summary is grouped counts by `kind`, plus up to five highlights. Failures come first, then shares, then the newest.
 
-### 7. One `GET /api/workspaces/:id/home` request; the brief is fetched separately
+### 7. One `GET /api/workspaces/:id/home` request
 It runs `gateWorkspace` once, then these queries concurrently:
 - jobs, with each job's last run and author
 - widgets
@@ -93,7 +93,7 @@ It runs `gateWorkspace` once, then these queries concurrently:
 - shared chats (up to 10)
 - the since-summary
 
-The brief is fetched through the existing file read path. It is a GitHub call with an ETag cache, and folding it in would make the whole page wait on GitHub. That is the reason `/overview` already gives for leaving out the file tree. Older events come from `GET /api/workspaces/:id/events?before=<cursor>`.
+Nothing on home is read from GitHub, so the page never waits on it. Older events come from `GET /api/workspaces/:id/events?before=<cursor>`.
 
 ### 8. Colleagues read chats through a separate, read-only workspace route
 `Chat.sharedToWorkspaceAt DateTime?`. Members read a chat through a new `GET /api/workspaces/:id/chats/:chatId` rather than through `GET /api/chats/:chatId`. The route re-checks membership on every request, finds the chat only if it is in that workspace and is either shared or produced by a scheduled run, and returns the same sanitised payload as a public share link (`loadSanitizedChat`). Anything else returns 404, so the response never confirms that a private chat exists. The client renders it with the read-only message list that `/share/[shareId]` uses, with no composer.
@@ -110,6 +110,15 @@ This is separate from `shareId` (a public link). Sharing to a workspace never cr
 
 The member sees the proposed widget, can edit its title and type, and saves. The server validates it like any other write and stores `sourceChatId`/`sourceMessageId`. No model call is involved.
 
+### 10. Visual widget types, and the agent told to prefer them
+The first home page an agent built from six types was eight cards of paragraphs: a timeline as bullets, a to-do list as a numbered note, stats whose notes were cut off. With nothing else to reach for, everything that was not one number or a table became Markdown. Five types give those shapes a structure — summary, kpis, funnel, timeline, actions — with every text field capped short, and the tool description now says to lead with a summary and use a note only for what has no other shape.
+
+Tone (good, watch, problem, note) is shown by an icon and a colour together, and text stays in the ink tokens; the change on a number stays neutral because the widget cannot know whether up is good. A table needs no new fields to look like data: a column named Status renders as pills and a column of amounts gets inline bars.
+
+`update_home_widget` can change a widget's type, given content in the new shape. Without it the agent could only rebuild a page by pinning duplicates under the old notes, since it has no tool to delete.
+
+No card scrolls inside itself. Long notes, tables and timelines show their first part and a "show more" control: a scroll box inside the scrolling page trapped the wheel and, in the table, slid rows under the header.
+
 ## Risks / Trade-offs
 
 - **[Risk] Prompt-injected content shown to colleagues who trust it.** A run reading a hostile web page could pin a misleading "note". → Content is inert (Decision 2), every widget carries its source (Decision 3), any member can remove a widget, and removal is recorded in the feed. Text injection itself is not prevented. This is the accepted trade-off for not requiring approval, as the user chose.
@@ -117,7 +126,7 @@ The member sees the proposed widget, can edit its title and type, and saves. The
 - **[Risk] Event volume from busy jobs.** A job running every 15 minutes writes about 100 events a day. → Routine widget refreshes write no event. Run events are cheap rows. Retention is an open question, because it does not change the design.
 - **[Risk] Scheduled runs gain an MCP server they never had.** A misconfigured origin could now print a warning on every cron tick. → `schedulerMcpServer` already returns null and warns when there is no reachable origin. The run proceeds without tools, which is today's behaviour.
 - **[Trade-off] Any member can rearrange or remove anyone's widgets.** This was chosen over owner-only so a non-technical member can curate their own view of the workspace. Attribution and feed entries make changes visible.
-- **[Trade-off] The brief can be stale.** `HOME.md` is only as current as whoever last asked the agent to update it. The jobs list and widgets beneath it are live.
+- **[Trade-off] The summary can be stale.** It is only as current as the last chat or job that updated it. Its provenance line says when, and a job can keep it current by key.
 
 ## Migration Plan
 
