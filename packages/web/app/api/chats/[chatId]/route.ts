@@ -74,6 +74,7 @@ interface ChatWithMessagesResponse {
   planModeEnabled: boolean
   displayName: string | null
   shareId: string | null
+  sharedToWorkspaceAt: number | null
   status: string
   archived: boolean
   pinned: boolean
@@ -190,6 +191,7 @@ export async function GET(
       planModeEnabled: chat.planModeEnabled,
       displayName: chat.displayName,
       shareId: chat.shareId,
+      sharedToWorkspaceAt: chat.sharedToWorkspaceAt?.getTime() ?? null,
       status: chat.status,
       archived: chat.archived,
       pinned: chat.pinned,
@@ -327,6 +329,7 @@ export async function PATCH(
       planModeEnabled: updatedChat.planModeEnabled,
       displayName: updatedChat.displayName,
       shareId: updatedChat.shareId,
+      sharedToWorkspaceAt: updatedChat.sharedToWorkspaceAt?.getTime() ?? null,
       status: updatedChat.status,
       archived: updatedChat.archived,
       pinned: updatedChat.pinned,

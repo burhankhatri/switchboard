@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, memo } from "react"
-import { GitMerge, FileText, AlertTriangle, CalendarClock } from "lucide-react"
+import { GitMerge, FileText, AlertTriangle, CalendarClock, Pin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LoadingState } from "@/components/ui/LoadingState"
 import type { Message } from "@/lib/types"
@@ -30,11 +30,16 @@ interface MessageBubbleProps {
    * Omitted there, so no button appears.
    */
   onSchedule?: (prompt: string) => void
+  /**
+   * Called to pin this answer to the workspace home page. Omitted outside a
+   * workspace chat, and on the share page and run views, so no button appears.
+   */
+  onPin?: (message: Message) => void
 }
 
 // Memoized MessageBubble to prevent re-renders when parent (ChatPanel) re-renders
 // due to input changes. Only re-render when message content actually changes.
-export const MessageBubble = memo(function MessageBubble({ message, isStreaming, isMobile = false, repo, onOpenFile, onForcePush, onSchedule }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, isStreaming, isMobile = false, repo, onOpenFile, onForcePush, onSchedule, onPin }: MessageBubbleProps) {
   const isUser = message.role === "user"
   const hasUploadedFiles = isUser && message.uploadedFiles && message.uploadedFiles.length > 0
 
@@ -42,6 +47,12 @@ export const MessageBubble = memo(function MessageBubble({ message, isStreaming,
   // thing worth repeating every week is the instruction; the answer is the
   // output of running it once.
   const canSchedule = isUser && !!onSchedule && !!message.content?.trim()
+
+  // The reverse of scheduling: what is worth showing colleagues is the
+  // answer, once it has finished arriving.
+  const canPin =
+    !isUser && !!onPin && !isStreaming && !message.isError &&
+    message.messageType !== "git-operation" && !!message.content?.trim()
 
   return (
     <div
@@ -100,7 +111,23 @@ export const MessageBubble = memo(function MessageBubble({ message, isStreaming,
             )}
           </div>
         ) : (
-          <AssistantContent message={message} isStreaming={isStreaming} isMobile={isMobile} repo={repo} onOpenFile={onOpenFile} onForcePush={onForcePush} />
+          <div className="group min-w-0">
+            <AssistantContent message={message} isStreaming={isStreaming} isMobile={isMobile} repo={repo} onOpenFile={onOpenFile} onForcePush={onForcePush} />
+            {canPin && (
+              <button
+                type="button"
+                onClick={() => onPin!(message)}
+                title="Show this on the workspace home page"
+                className={cn(
+                  "mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer",
+                  isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
+                )}
+              >
+                <Pin className="h-3 w-3" />
+                Pin to home
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -118,7 +145,8 @@ export const MessageBubble = memo(function MessageBubble({ message, isStreaming,
     prevProps.repo === nextProps.repo &&
     // Not a stable callback in every caller - some pass undefined, some pass
     // a context action - and whether the button renders at all depends on it.
-    prevProps.onSchedule === nextProps.onSchedule
+    prevProps.onSchedule === nextProps.onSchedule &&
+    prevProps.onPin === nextProps.onPin
     // Note: onOpenFile and onForcePush are stable callbacks from parent
   )
 })

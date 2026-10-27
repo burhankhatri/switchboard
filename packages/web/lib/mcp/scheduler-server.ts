@@ -40,6 +40,9 @@ export function schedulerMcpServer(params: {
   userId: string
   workspaceId: string | null | undefined
   chatId: string | null | undefined
+  /** A scheduled run's job and run; changes which tools the endpoint offers. */
+  jobId?: string | null
+  jobRunId?: string | null
 }): AgentMcpServer | null {
   if (!params.workspaceId) return null
 
@@ -62,6 +65,8 @@ export function schedulerMcpServer(params: {
       userId: params.userId,
       workspaceId: params.workspaceId,
       chatId: params.chatId ?? null,
+      jobId: params.jobId ?? null,
+      jobRunId: params.jobRunId ?? null,
     })
   } catch (err) {
     // Missing signing secret. Loud in the log, silent for the run.
@@ -74,4 +79,17 @@ export function schedulerMcpServer(params: {
     url: `${origin}/api/mcp/scheduler`,
     bearerToken,
   }
+}
+
+/**
+ * The run's MCP servers with this app's own endpoint appended when it can be
+ * offered. Interactive and scheduled runs both go through this, so a run
+ * without a reachable origin proceeds with exactly the servers it had.
+ */
+export function withSchedulerServer<T>(
+  servers: T[],
+  params: Parameters<typeof schedulerMcpServer>[0]
+): (T | AgentMcpServer)[] {
+  const scheduler = schedulerMcpServer(params)
+  return scheduler ? [...servers, scheduler] : servers
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma"
 import { requireAuth, isAuthError, forbidden, badRequest } from "@/lib/db/api-helpers"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -56,6 +57,12 @@ export async function DELETE(_req: Request, { params }: Ctx): Promise<Response> 
 
   await prisma.workspaceMember.delete({
     where: { workspaceId_userId: { workspaceId: id, userId } },
+  })
+  recordWorkspaceEventAsync({
+    workspaceId: id,
+    kind: "member_left",
+    summary: "Left the workspace",
+    actorUserId: userId,
   })
   return Response.json({ joined: false })
 }

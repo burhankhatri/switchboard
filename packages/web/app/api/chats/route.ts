@@ -41,6 +41,7 @@ interface ChatResponse {
   planModeEnabled: boolean
   displayName: string | null
   shareId: string | null
+  sharedToWorkspaceAt: number | null
   status: string
   archived: boolean
   pinned: boolean
@@ -103,6 +104,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       planModeEnabled: chat.planModeEnabled,
       displayName: chat.displayName,
       shareId: chat.shareId,
+      sharedToWorkspaceAt: chat.sharedToWorkspaceAt?.getTime() ?? null,
       status: chat.status,
       archived: chat.archived,
       pinned: chat.pinned,
@@ -254,6 +256,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       planModeEnabled: chat.planModeEnabled,
       displayName: chat.displayName,
       shareId: chat.shareId,
+      sharedToWorkspaceAt: chat.sharedToWorkspaceAt?.getTime() ?? null,
       status: chat.status,
       archived: chat.archived,
       pinned: chat.pinned,

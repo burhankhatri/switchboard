@@ -6,6 +6,8 @@ import { MobileBottomSheet } from "./ui/MobileBottomSheet"
 import { cn } from "@/lib/utils"
 import { SLASH_COMMANDS, ABORT_COMMAND, type SlashCommand } from "@switchboard/common"
 import { useShareChat } from "@/lib/hooks/useShareChat"
+import { useWorkspaceShareChat } from "@/lib/hooks/useWorkspaceShareChat"
+import { WorkspaceShareToggle } from "@/components/chat/WorkspaceShareToggle"
 import type { Chat } from "@/lib/types"
 import type { SlashCommandType } from "./SlashCommandMenu"
 
@@ -175,6 +177,7 @@ export function MobileCommandsMenu({
 function ShareSheet({ chat, onBack }: { chat: Chat; onBack: () => void }) {
   const { shareId, busy, copied, shareUrl, enableShare, revokeShare, copyLink } =
     useShareChat(chat.id, chat.shareId)
+  const workspaceShare = useWorkspaceShareChat(chat.id, chat.workspaceId, chat.sharedToWorkspaceAt)
 
   return (
     <div className="px-4 py-3">
@@ -185,6 +188,17 @@ function ShareSheet({ chat, onBack }: { chat: Chat; onBack: () => void }) {
         <ChevronLeft className="h-4 w-4" />
         Back
       </button>
+
+      {chat.workspaceId && (
+        <div className="mt-3 border-b border-border pb-4">
+          <WorkspaceShareToggle
+            size="md"
+            shared={workspaceShare.shared}
+            busy={workspaceShare.busy}
+            onToggle={() => void workspaceShare.toggle()}
+          />
+        </div>
+      )}
 
       {shareId ? (
         <>

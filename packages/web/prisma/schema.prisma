@@ -75,6 +75,9 @@ model User {
   notifications Notification[]
   pushSubscriptions PushSubscription[]
   workspaceInvitesSent WorkspaceInvite[]
+  workspaceEvents      WorkspaceEvent[]
+  widgetsCreated       WorkspaceWidget[] @relation("WidgetCreatedBy")
+  widgetsUpdated       WorkspaceWidget[] @relation("WidgetUpdatedBy")
 }
 
 // =============================================================================
@@ -173,6 +176,11 @@ model Chat {
   // unguessable and distinct from `id` so the private id never leaks.
   shareId String? @unique
 
+  /// When set, every current member of `workspaceId` may READ this chat. Kept
+  /// apart from `shareId` on purpose: sharing with colleagues must never mint a
+  /// public link, and a public link must never stand in for membership.
+  sharedToWorkspaceAt DateTime?
+
   // Branching support
   parentChatId String?
   parentChat   Chat?   @relation("ChatBranches", fields: [parentChatId], references: [id], onDelete: SetNull)
@@ -204,6 +212,7 @@ model Chat {
   @@index([userId, lastActiveAt])
   @@index([userId, archived])
   @@index([workspaceId, updatedAt])
+  @@index([workspaceId, sharedToWorkspaceAt])
 }
 
 // =============================================================================
@@ -262,6 +271,8 @@ model Workspace {
   connections   WorkspaceConnection[]
   notifications Notification[]
   assets        WorkspaceAsset[]
+  events        WorkspaceEvent[]
+  widgets       WorkspaceWidget[]
 
   @@index([archived, name])
 }
@@ -317,6 +328,10 @@ model WorkspaceMember {
   role String @default("member")
 
   joinedAt DateTime @default(now())
+
+  /// When this member last looked at the workspace's home page. Null until
+  /// their first visit, which the home page treats as "the last 7 days".
+  lastSeenAt DateTime?
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -792,4 +807,90 @@ model WorkspaceInvite {
 
   @@unique([workspaceId, githubLogin])
   @@index([githubLogin])
+}
+
+/// Something that happened in a workspace, for its activity feed.
+///
+/// Distinct from ActivityLog (per-user, admin-facing audit) and Notification
+/// (per-recipient inbox with read state): this is one shared timeline per
+/// workspace that every member reads.
+///
+/// The subject ids are plain columns, not relations. A feed must keep reading
+/// correctly after the job, run, chat or widget it mentions is deleted, which
+/// is also why `summary` is frozen at write time instead of being joined.
+model WorkspaceEvent {
+  id          String @id @default(cuid())
+  workspaceId String
+
+  /// "job_created" | "job_approved" | "job_enabled" | "job_disabled" |
+  /// "job_deleted" | "run_completed" | "run_failed" | "files_committed" |
+  /// "widget_created" | "widget_updated" | "widget_removed" |
+  /// "member_joined" | "member_left" | "chat_shared"
+  kind String
+
+  /// Who did it, when a person did. Null for a scheduled run, which is
+  /// attributed through `jobId` instead.
+  actorUserId String?
+
+  jobId    String?
+  runId    String?
+  chatId   String?
+  widgetId String?
+
+  summary String
+
+  /// Small kind-specific extras, e.g. { fileCount } for files_committed.
+  meta Json?
+
+  createdAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User?     @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+}
+
+/// A card on a workspace's home page.
+///
+/// Stored here rather than in the workspace folder because a widget's data is
+/// refreshed by scheduled runs, whose commits land on unmerged auto-PR
+/// branches: a widget kept in the repo would never update until someone
+/// merged. `content` is validated against the widget's type on every write
+/// (lib/workspace-home/widgets.ts) and is never rendered as markup.
+model WorkspaceWidget {
+  id          String @id @default(cuid())
+  workspaceId String
+
+  /// Optional stable name such as "weekly-leads", so a job prompt can say
+  /// which widget to refresh in words a person can read.
+  key String?
+
+  /// "stat" | "table" | "chart" | "file" | "job" | "note"
+  type    String
+  title   String
+  content Json
+
+  /// Ascending display order on the home page.
+  position Int @default(0)
+
+  /// "manual" | "pin" | "agent"
+  createdVia  String
+  createdById String?
+
+  // Provenance of the CURRENT content, rewritten on every content write.
+  updatedById     String?
+  sourceChatId    String?
+  sourceMessageId String?
+  sourceJobId     String?
+  sourceRunId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation("WidgetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?     @relation("WidgetUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, position])
 }

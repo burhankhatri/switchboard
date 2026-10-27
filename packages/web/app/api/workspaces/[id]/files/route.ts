@@ -15,6 +15,7 @@ import {
   deleteWorkspaceFile,
 } from "@/lib/workspace-repo"
 import { signedDownloadUrl, deleteStoredFiles } from "@/lib/server/upload-storage"
+import { recordWorkspaceEventAsync, filesCommittedSummary } from "@/lib/workspace-home/events"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -49,6 +50,13 @@ export async function DELETE(req: NextRequest, { params }: Ctx): Promise<Respons
       const user = await prisma.user.findUnique({ where: { id: auth.userId }, select: { name: true } })
       await deleteWorkspaceFile(auth.token, path, body.sha, `Delete ${path.split("/").pop()} from ${workspace.slug} (via Shared Agents by ${user?.name ?? auth.userId})`, workspace.baseBranch ?? "main")
     }
+    recordWorkspaceEventAsync({
+      workspaceId: id,
+      kind: "files_committed",
+      summary: filesCommittedSummary("Deleted", [path]),
+      actorUserId: auth.userId,
+      meta: { fileCount: 1, path },
+    })
     return Response.json({ deleted: true, path })
   } catch (error) {
     const status = (error as { status?: number })?.status
@@ -121,6 +129,7 @@ export async function GET(req: NextRequest, { params }: Ctx): Promise<Response> 
     const file = await readWorkspaceFile(token, path, workspace.baseBranch)
     return Response.json({ path, ...file })
   } catch (err) {
+    if ((err as { status?: number }).status === 404) return notFound("File not found")
     return internalError(err)
   }
 }
@@ -189,6 +198,13 @@ export async function PUT(req: NextRequest, { params }: Ctx): Promise<Response> 
       body.sha ?? "",
       `Update ${path.split("/").pop()} in ${workspace.slug} (via Shared Agents by ${user?.name ?? userId})`
     )
+    recordWorkspaceEventAsync({
+      workspaceId: id,
+      kind: "files_committed",
+      summary: filesCommittedSummary(body.sha ? "Updated" : "Added", [path]),
+      actorUserId: userId,
+      meta: { fileCount: 1, path },
+    })
     return Response.json({ path, sha })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Save failed"

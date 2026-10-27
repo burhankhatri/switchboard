@@ -193,7 +193,13 @@ export function ChatHeader({
         style={isDesktopApp ? { WebkitAppRegion: "no-drag" } as React.CSSProperties : undefined}
       >
         <FolderSyncButton repo={chat.repo} />
-        <ShareButton key={chat.id} chatId={chat.id} initialShareId={chat.shareId} />
+        <ShareButton
+          key={chat.id}
+          chatId={chat.id}
+          initialShareId={chat.shareId}
+          workspaceId={chat.workspaceId}
+          initialSharedToWorkspaceAt={chat.sharedToWorkspaceAt}
+        />
         {onOpenCommandPalette && (
           <button
             onClick={onOpenCommandPalette}

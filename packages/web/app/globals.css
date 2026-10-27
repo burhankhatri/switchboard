@@ -191,6 +191,16 @@
   --accent-tint: rgba(224, 122, 43, 0.10);
   --accent-ink: #b45309;
   --green: #15803d;
+  /* Chart series, in this order and never cycled: the order is what keeps
+     adjacent series apart under colour-vision deficiency. Validated against
+     the light surface; three slots sit under 3:1, so charts always carry a
+     legend and a table view. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
   --radius-chip: 6px;
   /* Elevation is carried by a hairline, not a drop shadow. Only things that
      genuinely float above the page — dialogs, menus — get a soft shadow, and
@@ -210,6 +220,13 @@
 }
 
 .dark {
+  /* Same hues, stepped for the dark surface rather than flipped. */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
   --background: transparent;
   --foreground: oklch(0.97 0 0);
   --card: rgba(15, 15, 20, 0.25);

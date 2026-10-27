@@ -7,6 +7,7 @@ import {
   clearPushFailureMessages,
   createPushFailedMessage,
 } from "@/lib/db/git-messages"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 /** Client-notification payload for a push that advanced the remote. */
 export interface PushInfo {
@@ -106,6 +107,19 @@ export async function autoPushChat(params: {
       `cd ${repoPath} && git rev-parse --short HEAD 2>/dev/null || echo ""`
     )
     const commitSha = headRes.result.trim() || undefined
+
+    // Names the branch, never the chat: the chat may be private, and the feed
+    // is read by everyone in the workspace.
+    if (chat?.workspaceId && commits > 0) {
+      recordWorkspaceEventAsync({
+        workspaceId: chat.workspaceId,
+        kind: "files_committed",
+        summary: `Agent committed ${commits} change${commits === 1 ? "" : "s"} to ${branch}`,
+        actorUserId: userId,
+        chatId,
+        meta: { commitCount: commits, branch },
+      })
+    }
 
     return { branch, commits, commitSha }
   } catch (err) {

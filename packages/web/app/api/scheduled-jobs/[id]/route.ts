@@ -13,6 +13,8 @@ import { addMinutes, addYears } from "date-fns"
 import { toScheduledJobResponse, UUID_RE } from "@/lib/scheduled-jobs/types"
 import { cleanupSmitheryConnections } from "@/lib/mcp/connections"
 import { WORKSPACE_RUNTIME_SELECT, type WorkspaceRuntime } from "@/lib/workspace"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
+import { jobTransitionEvents } from "@/lib/workspace-home/job-events"
 
 // =============================================================================
 // Helper: Get job with auth check
@@ -270,6 +272,15 @@ export async function PATCH(
       },
     })
 
+    for (const event of jobTransitionEvents(job, updatedJob)) {
+      recordWorkspaceEventAsync({
+        workspaceId: updatedJob.workspaceId,
+        actorUserId: userId,
+        jobId: id,
+        ...event,
+      })
+    }
+
     return Response.json(toScheduledJobResponse(updatedJob))
   } catch (error) {
     return internalError(error)
@@ -292,7 +303,7 @@ export async function DELETE(
     const { id } = await params
     const job = await prisma.scheduledJob.findUnique({
       where: { id },
-      select: { userId: true },
+      select: { userId: true, workspaceId: true, name: true, isDraft: true },
     })
 
     if (!job || job.userId !== userId) {
@@ -322,6 +333,18 @@ export async function DELETE(
     await prisma.scheduledJob.delete({
       where: { id },
     })
+
+    // A cancelled draft never appeared in the feed, so its removal must not
+    // either.
+    if (!job.isDraft) {
+      recordWorkspaceEventAsync({
+        workspaceId: job.workspaceId,
+        kind: "job_deleted",
+        summary: `Deleted ${job.name}`,
+        actorUserId: userId,
+        jobId: id,
+      })
+    }
 
     return new Response(null, { status: 204 })
   } catch (error) {

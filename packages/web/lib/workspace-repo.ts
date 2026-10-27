@@ -387,7 +387,9 @@ export async function readWorkspaceFile(
     )
   } catch (err) {
     const status = (err as { status?: number }).status
-    throw new Error(`Could not read ${path}: ${status ?? "request failed"}`)
+    // The status is kept so a caller can tell "no such file" from a failure;
+    // the home page treats a missing HOME.md as an empty state, not an error.
+    throw Object.assign(new Error(`Could not read ${path}: ${status ?? "request failed"}`), { status })
   }
   // GitHub inlines blobs only up to 1 MB; past that it sends the sha without a
   // body. The sha is what delete needs, and truncated keeps the editor read-only

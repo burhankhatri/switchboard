@@ -183,6 +183,10 @@ export interface Chat {
    *  /share/<shareId> without auth. Null/undefined = private. */
   shareId?: string | null
 
+  /** Epoch ms when the owner shared this chat with its workspace's members
+   *  (read-only). Null/undefined = only the owner can see it. */
+  sharedToWorkspaceAt?: number | null
+
   /** When true, the chat is hidden from the main sidebar list and shown in the
    *  "Archived" section instead. Archiving preserves everything (including the
    *  share link); it is reversible, unlike deletion. */

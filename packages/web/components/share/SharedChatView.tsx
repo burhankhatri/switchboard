@@ -64,39 +64,50 @@ export function SharedChatView({ chat }: SharedChatViewProps) {
 
       {/* Messages */}
       <main className="flex-1 min-h-0 overflow-y-auto py-6 px-6">
-        <div className="max-w-3xl mx-auto w-full space-y-6">
-          {chat.messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-12">
-              This chat has no messages yet.
-            </p>
-          ) : (
-            chat.messages.map((message, index) => {
-              // A divider marks where the inherited parent history ends and this
-              // branch's own conversation begins.
-              const isBranchStart =
-                !message.inherited && !!chat.messages[index - 1]?.inherited
-              return (
-                <Fragment key={message.id}>
-                  {isBranchStart && <BranchDivider />}
-                  <div className={cn(message.inherited && "opacity-60")}>
-                    <MessageBubble
-                      // SharedMessage carries the same fields MessageBubble reads;
-                      // JSONB tool data is already sanitized server-side.
-                      message={message as unknown as Message}
-                      repo={chat.repo ?? undefined}
-                      // No onOpenFile / onForcePush: file references render as text.
-                    />
-                  </div>
-                </Fragment>
-              )
-            })
-          )}
-          {/* Branch with no own messages yet: the divider goes after the
-              inherited history so it's clear the conversation continues below. */}
-          {chat.messages.length > 0 &&
-            chat.messages[chat.messages.length - 1]?.inherited && <BranchDivider />}
-        </div>
+        <SharedChatMessages chat={chat} />
       </main>
+    </div>
+  )
+}
+
+/**
+ * The read-only message list, without any page chrome. Also used inside the
+ * app to show a colleague's chat, which must render exactly as a public link
+ * does: no file links, no actions.
+ */
+export function SharedChatMessages({ chat }: { chat: SharedChat }) {
+  return (
+    <div className="max-w-3xl mx-auto w-full space-y-6">
+      {chat.messages.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-12">
+          This chat has no messages yet.
+        </p>
+      ) : (
+        chat.messages.map((message, index) => {
+          // A divider marks where the inherited parent history ends and this
+          // branch's own conversation begins.
+          const isBranchStart =
+            !message.inherited && !!chat.messages[index - 1]?.inherited
+          return (
+            <Fragment key={message.id}>
+              {isBranchStart && <BranchDivider />}
+              <div className={cn(message.inherited && "opacity-60")}>
+                <MessageBubble
+                  // SharedMessage carries the same fields MessageBubble reads;
+                  // JSONB tool data is already sanitized server-side.
+                  message={message as unknown as Message}
+                  repo={chat.repo ?? undefined}
+                  // No onOpenFile / onForcePush: file references render as text.
+                />
+              </div>
+            </Fragment>
+          )
+        })
+      )}
+      {/* Branch with no own messages yet: the divider goes after the
+          inherited history so it's clear the conversation continues below. */}
+      {chat.messages.length > 0 &&
+        chat.messages[chat.messages.length - 1]?.inherited && <BranchDivider />}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
   normalizeGithubLogin,
   isValidGithubLogin,
 } from "@/lib/db/workspace-invites"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -217,6 +218,12 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
       workspaceSlug: g.workspace.slug,
       targetUserId: user.id,
       role,
+    })
+    recordWorkspaceEventAsync({
+      workspaceId: id,
+      kind: "member_joined",
+      summary: `Added ${user.name ?? user.email ?? "a member"}`,
+      actorUserId: auth.userId,
     })
 
     // Membership is immediate — there is no invite to accept, which is the

@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Share2, Copy, Check, Loader2, Globe, Link2Off } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useShareChat } from "@/lib/hooks/useShareChat"
+import { useWorkspaceShareChat } from "@/lib/hooks/useWorkspaceShareChat"
+import { WorkspaceShareToggle } from "./WorkspaceShareToggle"
 import {
   Popover,
   PopoverTrigger,
@@ -23,12 +25,22 @@ interface ShareButtonProps {
   chatId: string
   /** Current share token from the chat row (null/undefined = not shared). */
   initialShareId?: string | null
+  /** The chat's workspace; without one there is nobody to share with. */
+  workspaceId?: string | null
+  initialSharedToWorkspaceAt?: number | null
 }
 
-export function ShareButton({ chatId, initialShareId }: ShareButtonProps) {
+export function ShareButton({
+  chatId,
+  initialShareId,
+  workspaceId,
+  initialSharedToWorkspaceAt,
+}: ShareButtonProps) {
   const [open, setOpen] = useState(false)
   const { shareId, busy, copied, shareUrl, enableShare, revokeShare, copyLink } =
     useShareChat(chatId, initialShareId)
+  const workspaceShare = useWorkspaceShareChat(chatId, workspaceId, initialSharedToWorkspaceAt)
+  const sharedAnywhere = !!shareId || workspaceShare.shared
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -36,20 +48,35 @@ export function ShareButton({ chatId, initialShareId }: ShareButtonProps) {
         <button
           className={cn(
             "flex h-7 w-7 items-center justify-center rounded-md transition-colors cursor-pointer",
-            shareId
+            sharedAnywhere
               ? "text-green-500 hover:bg-green-500/10"
               : "text-muted-foreground hover:bg-accent hover:text-foreground"
           )}
-          title={shareId ? "Chat is shared publicly" : "Share chat"}
+          title={
+            shareId
+              ? "Chat is shared publicly"
+              : workspaceShare.shared
+                ? "Chat is shared with the workspace"
+                : "Share chat"
+          }
           aria-label="Share chat"
         >
           <Share2 className="h-4 w-4" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
+        {workspaceId && (
+          <div className="mb-3 border-b border-border pb-3">
+            <WorkspaceShareToggle
+              shared={workspaceShare.shared}
+              busy={workspaceShare.busy}
+              onToggle={() => void workspaceShare.toggle()}
+            />
+          </div>
+        )}
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Globe className="h-4 w-4 text-muted-foreground" />
-          Share chat
+          {workspaceId ? "Public link" : "Share chat"}
         </div>
 
         {shareId ? (

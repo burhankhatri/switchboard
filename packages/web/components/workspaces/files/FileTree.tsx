@@ -2,13 +2,15 @@
 
 import { useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
-import { ChevronRight, Trash2 } from "lucide-react"
+import { ChevronRight, Pin, Trash2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { buildFileTree, childrenOf, type FileNode, type TreeFile } from "@/lib/file-tree"
 import { formatBytes } from "@/lib/format-bytes"
 import { writeCachedFile, clearWorkspaceFile } from "@/lib/workspace-file-cache"
 import { workspaceSkillsKey } from "@/lib/query/hooks/useWorkspaceSkills"
+import { workspaceHomeKey } from "@/lib/query/hooks/useWorkspaceHome"
+import { notify } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 import { FileIcon, FolderIcon, SkillsFolderIcon } from "./FileIcon"
 import { DeleteFileDialog } from "./DeleteFileDialog"
@@ -45,6 +47,24 @@ export function FileTree(props: FileTreeProps) {
   const showMenu = (file: TreeFile, x: number, y: number) => {
     if (activeWorkspace && file.path.startsWith(`${activeWorkspace.path}/`)) setMenu({ path: file.path, x, y })
   }
+  // No dialog: a file widget's only content is the path, and its title is the
+  // file name, which can be renamed from the home page afterwards.
+  const pinFile = async (path: string) => {
+    const wsId = activeWorkspace?.id
+    if (!wsId) return
+    try {
+      const r = await fetch(`/api/workspaces/${wsId}/widgets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "file", title: path.split("/").pop(), content: { path }, via: "pin" }),
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Could not pin it")
+      void qc.invalidateQueries({ queryKey: workspaceHomeKey(wsId) })
+      notify({ title: "Pinned to the home page" })
+    } catch (err) {
+      notify({ title: err instanceof Error ? err.message : "Could not pin it" })
+    }
+  }
   const root = buildFileTree(props.files)
   return (
     <>
@@ -58,6 +78,9 @@ export function FileTree(props: FileTreeProps) {
         <button tabIndex={-1} aria-hidden style={{ position: "fixed", left: menu?.x ?? 0, top: menu?.y ?? 0, width: 1, height: 1, pointerEvents: "none", opacity: 0 }} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" sideOffset={0} onCloseAutoFocus={event => event.preventDefault()}>
+        <DropdownMenuItem onSelect={() => { if (menu) void pinFile(menu.path) }}>
+          <Pin className="mr-2 h-4 w-4" />Pin to home
+        </DropdownMenuItem>
         <DropdownMenuItem className="text-destructive" onSelect={() => { if (menu) setDeletePath(menu.path) }}>
           <Trash2 className="mr-2 h-4 w-4" />Delete
         </DropdownMenuItem>

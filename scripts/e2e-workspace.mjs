@@ -14,7 +14,8 @@ import { encode } from "next-auth/jwt"
 import { PrismaClient } from "@prisma/client"
 import { PrismaNeon } from "@prisma/adapter-neon"
 
-const BASE = "http://localhost:4000"
+// Another project's dev server can already hold 4000; E2E_BASE points the run elsewhere.
+const BASE = process.env.E2E_BASE ?? "http://localhost:4000"
 const prisma = new PrismaClient({ adapter: new PrismaNeon({ connectionString: process.env.DATABASE_URL }) })
 
 let pass = 0, fail = 0
@@ -545,6 +546,79 @@ check("a traversal path is refused", r.status === 400, `status ${r.status} ${JSO
 
 r = await call(`/api/workspaces/${ws.id}/import`, { method: "POST", body: JSON.stringify({ files: [] }) })
 check("an empty import is refused", r.status === 400, `status ${r.status}`)
+
+// ── 13. the workspace home page, seen by a colleague ───────────────────────
+// The reason it exists: a second member used to see none of what the first
+// had set up, because jobs and chats were listed per user.
+console.log("\n13. workspace home")
+const colleague = await prisma.user.create({ data: { name: "Home Colleague" } })
+// Added directly: the owner-add route resolves a GitHub handle, which a
+// throwaway user does not have.
+await prisma.workspaceMember.create({ data: { workspaceId: ws.id, userId: colleague.id, role: "member" } })
+const callC = api(await cookieFor(colleague.id))
+
+r = await call("/api/scheduled-jobs", {
+  method: "POST",
+  body: JSON.stringify({ name: "Home e2e job", prompt: "Count leads.", workspaceId: ws.id, intervalMinutes: 10080 }),
+})
+const homeJobId = r.body?.id
+r = await callC(`/api/workspaces/${ws.id}/home`)
+check("GET /home works for a member", r.status === 200, `status ${r.status}`)
+const seenJob = r.body?.jobs?.find((j) => j.id === homeJobId)
+check("a colleague sees the owner's job", !!seenJob)
+check("…without its controls", seenJob?.canManage === false, String(seenJob?.canManage))
+check("…with its schedule in words", seenJob?.schedule === "Every week", String(seenJob?.schedule))
+check("the job's creation is in the feed", r.body?.feed?.events?.some((e) => e.kind === "job_created" && e.jobId === homeJobId))
+
+const ownerChat = await prisma.chat.create({
+  data: { userId: user.id, workspaceId: ws.id, repo: ws.repo, baseBranch: "main", displayName: "Lead research" },
+})
+r = await callC(`/api/workspaces/${ws.id}/chats/${ownerChat.id}`)
+check("a private chat is invisible to a colleague", r.status === 404, `status ${r.status}`)
+r = await callC(`/api/chats/${ownerChat.id}/workspace-share`, { method: "POST" })
+check("only the owner can share it", r.status === 404, `status ${r.status}`)
+r = await call(`/api/chats/${ownerChat.id}/workspace-share`, { method: "POST" })
+check("the owner shares it with the workspace", r.status === 200 && !!r.body?.sharedToWorkspaceAt, `status ${r.status}`)
+r = await callC(`/api/workspaces/${ws.id}/chats/${ownerChat.id}`)
+check("the colleague can now read it", r.status === 200 && r.body?.displayName === "Lead research", `status ${r.status}`)
+check("sharing made no public link", (await prisma.chat.findUnique({ where: { id: ownerChat.id } }))?.shareId === null)
+r = await callC(`/api/workspaces/${ws.id}/home`)
+check("it is listed under shared chats", r.body?.sharedChats?.some((c) => c.id === ownerChat.id))
+r = await call(`/api/chats/${ownerChat.id}/workspace-share`, { method: "DELETE" })
+r = await callC(`/api/workspaces/${ws.id}/chats/${ownerChat.id}`)
+check("unsharing hides it again", r.status === 404, `status ${r.status}`)
+
+r = await call(`/api/workspaces/${ws.id}/widgets`, {
+  method: "POST",
+  body: JSON.stringify({ type: "note", title: "Status", content: { markdown: "Campaign B paused" } }),
+})
+check("a member pins a note", r.status === 201, `status ${r.status} ${JSON.stringify(r.body).slice(0, 120)}`)
+const widgetId = r.body?.widget?.id
+r = await call(`/api/workspaces/${ws.id}/widgets`, {
+  method: "POST",
+  body: JSON.stringify({ type: "note", title: "x", content: { markdown: "y", html: "<img src=x onerror=alert(1)>" } }),
+})
+check("markup in a widget is refused", r.status === 400, `status ${r.status}`)
+r = await callC(`/api/workspaces/${ws.id}/widgets/${widgetId}`, {
+  method: "PATCH",
+  body: JSON.stringify({ content: { markdown: "Campaign B resumes Nov 3" } }),
+})
+check("any member can edit it", r.status === 200, `status ${r.status}`)
+r = await callC(`/api/workspaces/${ws.id}/home`)
+const seenWidget = r.body?.widgets?.find((w) => w.id === widgetId)
+check("the edit shows on home", seenWidget?.content?.markdown === "Campaign B resumes Nov 3")
+check("…attributed to the colleague", seenWidget?.updatedBy?.id === colleague.id)
+
+await prisma.workspaceMember.delete({ where: { workspaceId_userId: { workspaceId: ws.id, userId: colleague.id } } })
+r = await callC(`/api/workspaces/${ws.id}/home`)
+check("a removed member is refused at the next request", r.status === 403, `status ${r.status}`)
+r = await callC(`/api/workspaces/${ws.id}/widgets/${widgetId}`, { method: "DELETE" })
+check("…and cannot remove widgets", r.status === 403, `status ${r.status}`)
+
+if (homeJobId) await prisma.scheduledJob.delete({ where: { id: homeJobId } }).catch(() => {})
+await prisma.chat.delete({ where: { id: ownerChat.id } }).catch(() => {})
+await prisma.workspaceWidget.deleteMany({ where: { workspaceId: ws.id } }).catch(() => {})
+await prisma.user.delete({ where: { id: colleague.id } }).catch(() => {})
 
 // ── 8. unauth ─────────────────────────────────────────────────────────────
 console.log("\n8. auth gate")

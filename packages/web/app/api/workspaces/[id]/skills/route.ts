@@ -17,6 +17,7 @@ import {
   skillSlug,
   type SkillSummary,
 } from "@/lib/workspace-skills"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -161,6 +162,13 @@ export async function POST(req: NextRequest, { params }: Ctx): Promise<Response>
       "",
       `Add ${slug} skill to ${workspace.slug} (via Shared Agents by ${user?.name ?? auth.userId})`
     )
+    recordWorkspaceEventAsync({
+      workspaceId: id,
+      kind: "files_committed",
+      summary: `Added skill ${title}`,
+      actorUserId: auth.userId,
+      meta: { fileCount: 1, path },
+    })
 
     return Response.json(
       { skill: { slug, name: title, description, path, extraFiles: 0 } },

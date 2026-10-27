@@ -18,6 +18,18 @@ describe("run tokens", () => {
     expect(parsed).toMatchObject(claims)
   })
 
+  it("carries the job and run of a scheduled run", () => {
+    const parsed = verifyRunToken(mintRunToken({ ...claims, jobId: "j1", jobRunId: "r1" }))
+    expect(parsed).toMatchObject({ jobId: "j1", jobRunId: "r1" })
+  })
+
+  it("reads a token without job claims as an interactive run", () => {
+    // Tokens minted before the job claims existed must keep verifying, and
+    // must not be mistaken for an unattended run.
+    const parsed = verifyRunToken(mintRunToken(claims))
+    expect(parsed).toMatchObject({ jobId: null, jobRunId: null })
+  })
+
   it("carries a null workspace for a run outside one", () => {
     const parsed = verifyRunToken(mintRunToken({ userId: "u1", workspaceId: null, chatId: null }))
     expect(parsed).toMatchObject({ userId: "u1", workspaceId: null, chatId: null })

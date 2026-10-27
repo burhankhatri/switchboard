@@ -106,7 +106,20 @@ export async function getSharedChat(shareId: string): Promise<SharedChat | null>
     select: { id: true, displayName: true, repo: true, parentChatId: true },
   })
   if (!chat) return null
+  return loadSanitizedChat(chat)
+}
 
+/**
+ * The read-only, sanitized form of a chat the caller is already allowed to
+ * see. Shared by the public link and the workspace view so both strip the same
+ * things.
+ */
+export async function loadSanitizedChat(chat: {
+  id: string
+  displayName: string | null
+  repo: string
+  parentChatId: string | null
+}): Promise<SharedChat> {
   // When this chat was branched from a parent, replay the parent's conversation
   // ahead of this chat's own messages so viewers see the full branch context —
   // mirroring the owner's in-app view. Flagged `inherited` so the client renders

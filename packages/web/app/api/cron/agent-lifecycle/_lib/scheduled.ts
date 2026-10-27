@@ -22,6 +22,7 @@ import {
 } from "@/lib/agent-session"
 import { stripNullBytes, stripNullBytesDeep } from "@/lib/db/pg-sanitize"
 import { loadMcpConnections } from "@/lib/mcp/agent-servers"
+import { withSchedulerServer } from "@/lib/mcp/scheduler-server"
 
 import { getUserPushOptions } from "@/lib/git/push-options"
 import { gitTokenForRun } from "@/lib/git/repo-token"
@@ -32,6 +33,7 @@ import {
   type WorkspaceRuntime,
 } from "@/lib/workspace"
 import { workspaceRunEnv } from "@/lib/workspace-run-env"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 // =============================================================================
 // Job Execution
@@ -214,6 +216,16 @@ export async function startJobExecution(
   } catch (err) {
     console.error(`[agent-lifecycle] loadMcpConnections failed for ${job.id}:`, err)
   }
+  // The app's own endpoint, so a job can refresh the home widgets it feeds.
+  // Its token names the job and run, which limits it to the widget tools and
+  // attributes what it writes to the job.
+  mcpServers = withSchedulerServer(mcpServers, {
+    userId: job.userId,
+    workspaceId: job.workspaceId,
+    chatId: chat.id,
+    jobId: job.id,
+    jobRunId: run.id,
+  })
 
   const bgSession = await createBackgroundAgentSession(sandbox, {
     workspaceId: job.workspaceId, userId: job.userId,
@@ -583,6 +595,19 @@ export async function finalizeScheduledRun(
     data: { consecutiveFailures: 0 },
   })
 
+  recordWorkspaceEventAsync({
+    workspaceId: job.workspaceId,
+    kind: "run_completed",
+    summary:
+      commitCount > 0
+        ? `${job.name} ran and committed ${commitCount} change${commitCount === 1 ? "" : "s"}${prUrl ? " for review" : ""}`
+        : `${job.name} ran`,
+    jobId: job.id,
+    runId: run.id,
+    chatId: run.chatId,
+    meta: { commitCount, prUrl },
+  })
+
   // 5. Prune old runs (keep last 50)
   const oldRuns = await prisma.scheduledJobRun.findMany({
     where: { jobId: run.jobId },
@@ -640,6 +665,21 @@ export async function failScheduledRun(
       consecutiveFailures: failures,
       enabled: failures < 3,
     },
+  })
+
+  // The auto-disable is the part a colleague most needs to hear: without it
+  // a job that stopped three weeks ago reads as merely quiet.
+  recordWorkspaceEventAsync({
+    workspaceId: job.workspaceId,
+    kind: "run_failed",
+    summary:
+      failures >= 3
+        ? `${job.name} failed ${failures} times in a row and was paused: ${error}`
+        : `${job.name} failed: ${error}`,
+    jobId: job.id,
+    runId: run.id,
+    chatId: run.chatId,
+    meta: { consecutiveFailures: failures },
   })
 
   // Delete sandbox now that run is complete

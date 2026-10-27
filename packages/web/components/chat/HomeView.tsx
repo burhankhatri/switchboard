@@ -1,9 +1,19 @@
 "use client"
 
-import { ArrowRight, MessageSquare, Plug, Plus, Users } from "lucide-react"
+import { useState } from "react"
+import { Plus } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { useWorkspaceOverview } from "@/lib/query/hooks/useWorkspaceOverview"
 import { WorkspaceLauncher } from "@/components/workspaces/WorkspaceLauncher"
+import { ConnectedSection } from "@/components/workspaces/home/ConnectedSection"
+import { RecentChatsSection } from "@/components/workspaces/home/RecentChatsSection"
+import { SinceBanner } from "@/components/workspaces/home/SinceBanner"
+import { JobsSection } from "@/components/workspaces/home/JobsSection"
+import { ActivityFeed } from "@/components/workspaces/home/ActivityFeed"
+import { SharedChatsSection } from "@/components/workspaces/home/SharedChatsSection"
+import { WidgetGrid } from "@/components/workspaces/home/widgets/WidgetGrid"
+import { ColleagueChatDialog } from "@/components/workspaces/home/ColleagueChatDialog"
+import { useWorkspaceHome } from "@/lib/query/hooks/useWorkspaceHome"
 import { isChatVisibleForFilter } from "@/lib/chat-tree"
 import { ALL_REPOSITORIES } from "@/lib/contexts"
 import type { Chat } from "@/lib/types"
@@ -13,18 +23,11 @@ interface HomeViewProps {
   isMobile: boolean
   chats: Chat[]
   onSelectChat: (chatId: string) => void | Promise<void>
-  onNewChat: () => void | Promise<void>
-}
-
-/** "3 days ago" is more useful here than a timestamp nobody reads. */
-function ago(ts: number): string {
-  const mins = Math.round((Date.now() - ts) / 60_000)
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.round(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  return days === 1 ? "yesterday" : `${days}d ago`
+  onNewChat: () => unknown
+  /** Start a chat with `prompt` waiting in the composer, unsent. */
+  onNewChatWithPrompt: (prompt: string) => void | Promise<void>
+  /** Open one of your own jobs in the scheduled agents view. */
+  onManageJob: (jobId: string, jobName: string) => void | Promise<void>
 }
 
 /**
@@ -38,9 +41,18 @@ function ago(ts: number): string {
  * Everything here is already loaded for the sidebar, so it costs no extra
  * request: the overview is the same cache entry the Connections panel reads.
  */
-export function HomeView({ isMobile, chats, onSelectChat, onNewChat }: HomeViewProps) {
-  const { activeWorkspace: active, setActiveWorkspace: setActive, ready } = useWorkspace()
+export function HomeView({
+  isMobile,
+  chats,
+  onSelectChat,
+  onNewChat,
+  onNewChatWithPrompt,
+  onManageJob,
+}: HomeViewProps) {
+  const { activeWorkspace: active, setActiveWorkspace: setActive, ready, requestOpenFile } = useWorkspace()
   const { data: overview } = useWorkspaceOverview(active?.id)
+  const { data: home } = useWorkspaceHome(active?.id)
+  const [readingChat, setReadingChat] = useState<string | null>(null)
 
   if (!ready) return null
 
@@ -63,100 +75,60 @@ export function HomeView({ isMobile, chats, onSelectChat, onNewChat }: HomeViewP
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className={cn("mx-auto w-full max-w-[52rem]", isMobile ? "p-4 pb-safe" : "px-6 py-10")}>
-        <header>
-          <h1 className={cn("font-display tracking-tight", isMobile ? "text-2xl" : "text-3xl")}>
-            {active.name}
-          </h1>
-          <p className="mt-1.5 text-sm text-ink-2">
-            Its skills, scripts and connections load on every run. Ask for the task —
-            there is nothing to set up.
-          </p>
+      <div className={cn("mx-auto w-full max-w-[60rem]", isMobile ? "p-4 pb-safe" : "px-8 py-10")}>
+        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <h1 className={cn("font-display tracking-tight", isMobile ? "text-2xl" : "text-[34px] leading-tight")}>
+              {active.name}
+            </h1>
+            <p className="mt-1 text-[13px] text-ink-3">
+              {members.length} {members.length === 1 ? "member" : "members"}
+              {connections.length > 0 &&
+                ` · ${connections.length} ${connections.length === 1 ? "connection" : "connections"}`}
+              {home && home.jobs.length > 0 && ` · ${home.jobs.length} scheduled`}
+            </p>
+          </div>
+          <button
+            onClick={() => void onNewChat()}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[13px] font-medium text-primary-foreground shadow-hairline hover:opacity-90 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            New chat
+          </button>
         </header>
 
-        {/* The one thing this screen is for, so it looks like it: a thin muted
-            row read as a disabled input and people went looking elsewhere. */}
-        <button
-          onClick={() => void onNewChat()}
-          className={cn(
-            "group mt-6 flex w-full items-center gap-4 rounded-2xl border border-line-strong bg-surface",
-            "px-5 py-5 text-left shadow-hairline transition-colors",
-            "hover:border-primary/60 hover:bg-hover cursor-pointer"
-          )}
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Plus className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-base font-medium text-ink">Start a new chat</span>
-            <span className="block truncate text-sm text-ink-3">
-              Ask {active.name} to do something — its skills and connections are ready.
-            </span>
-          </span>
-          <ArrowRight className="h-5 w-5 shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5" />
-        </button>
-
-        {connections.length > 0 && (
-          <section className="mt-8">
-            <h2 className="text-[11px] uppercase tracking-wide text-ink-3">Connected</h2>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {connections.map((c) => (
-                <div
-                  key={c.id}
-                  className="rounded-xl border border-line bg-surface p-3 shadow-hairline"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Plug className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span className="truncate text-[13px] font-medium text-ink">{c.name}</span>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-ink-3">
-                    {c.description ?? c.baseUrl ?? (c.kind === "mcp" ? "MCP server" : "REST API")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
+        {home?.since && <SinceBanner since={home.since} onOpenChat={setReadingChat} />}
+        {home && (
+          <>
+            <WidgetGrid
+              workspaceId={active.id}
+              widgets={home.widgets}
+              jobs={home.jobs}
+              onOpenChat={setReadingChat}
+              onOpenFile={(path) => void requestOpenFile(path)}
+              onAskAgent={(prompt) => void onNewChatWithPrompt(prompt)}
+            />
+            <JobsSection
+              jobs={home.jobs}
+              onOpenChat={setReadingChat}
+              onManage={(job) => void onManageJob(job.id, job.name)}
+            />
+            <SharedChatsSection
+              chats={home.sharedChats}
+              onOpenColleagueChat={setReadingChat}
+              onOpenOwnChat={onSelectChat}
+            />
+            <ActivityFeed workspaceId={active.id} firstPage={home.feed} onOpenChat={setReadingChat} />
+          </>
         )}
-
-        <section className="mt-8">
-          <h2 className="text-[11px] uppercase tracking-wide text-ink-3">Recent chats</h2>
-          {recent.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-3">
-              Nothing yet. Whatever you ask runs with everything above already wired in.
-            </p>
-          ) : (
-            <ul className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface shadow-hairline">
-              {recent.map((c) => (
-                <li key={c.id}>
-                  <button
-                    onClick={() => void onSelectChat(c.id)}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-hover cursor-pointer"
-                  >
-                    <MessageSquare className="h-3.5 w-3.5 shrink-0 text-ink-3" />
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
-                      {c.displayName || "Untitled"}
-                    </span>
-                    <span className="shrink-0 text-[11px] tabular-nums text-ink-3">
-                      {ago(c.lastActiveAt ?? c.createdAt)}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {members.length > 0 && (
-          <section className="mt-8 flex items-center gap-2 text-[12px] text-ink-3">
-            <Users className="h-3.5 w-3.5 shrink-0" />
-            <span>
-              {members.length === 1
-                ? "Just you so far — add teammates by GitHub username."
-                : `${members.length} people share this workspace.`}
-            </span>
-          </section>
-        )}
+        <ConnectedSection connections={connections} />
+        <RecentChatsSection chats={recent} onSelectChat={onSelectChat} />
       </div>
+      <ColleagueChatDialog
+        workspaceId={active.id}
+        chatId={readingChat}
+        onClose={() => setReadingChat(null)}
+      />
     </div>
   )
 }

@@ -12,6 +12,7 @@ import { addMinutes, addYears } from "date-fns"
 import { toScheduledJobResponse, UUID_RE } from "@/lib/scheduled-jobs/types"
 import { NEW_REPOSITORY } from "@/lib/types"
 import { WORKSPACE_RUNTIME_SELECT, type WorkspaceRuntime } from "@/lib/workspace"
+import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
 
 // =============================================================================
 // Constants
@@ -195,6 +196,18 @@ export async function POST(req: NextRequest): Promise<Response> {
         approvedAt: now,
       },
     })
+
+    // Drafts are announced when they are finished, by the PATCH that clears
+    // isDraft.
+    if (!job.isDraft) {
+      recordWorkspaceEventAsync({
+        workspaceId: job.workspaceId,
+        kind: "job_created",
+        summary: `Set up ${job.name}`,
+        actorUserId: userId,
+        jobId: job.id,
+      })
+    }
 
     return Response.json(toScheduledJobResponse(job), { status: 201 })
   } catch (error) {

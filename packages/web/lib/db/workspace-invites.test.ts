@@ -13,6 +13,7 @@ vi.mock("@/lib/db/prisma", () => ({
 
 const { logActivityAsync } = vi.hoisted(() => ({ logActivityAsync: vi.fn() }))
 vi.mock("@/lib/db/activity-log", () => ({ logActivityAsync }))
+vi.mock("@/lib/workspace-home/events", () => ({ recordWorkspaceEventAsync: vi.fn() }))
 
 const { notifyAsync } = vi.hoisted(() => ({ notifyAsync: vi.fn() }))
 vi.mock("@/lib/db/notifications", () => ({ notifyAsync }))
