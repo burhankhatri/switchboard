@@ -1,16 +1,22 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { Clock, GripVertical, MoreHorizontal } from "lucide-react"
+import { Clock, MoreHorizontal } from "lucide-react"
 import type { HomeJob } from "@/lib/workspace-home/home"
 import type { WidgetDto } from "@/lib/workspace-home/widget-dto"
 import type {
+  ActionsContent,
   ChartContent,
   FileContent,
+  FunnelContent,
   JobContent,
+  KpisContent,
   NoteContent,
   StatContent,
+  SummaryContent,
   TableContent,
+  TimelineContent,
+  WidgetType,
 } from "@/lib/workspace-home/widgets"
 import {
   DropdownMenu,
@@ -22,11 +28,27 @@ import {
 import { cn } from "@/lib/utils"
 import { ago } from "../time"
 import { FileBody, JobBody, NoteBody, StatBody, TableBody } from "./bodies"
+import { ActionsBody, FunnelBody, KpisBody, SummaryBody, TimelineBody } from "./visuals"
 
 const ChartBody = dynamic(() => import("./ChartBody"), {
   ssr: false,
-  loading: () => <div className="h-52 animate-pulse rounded-lg bg-inset" />,
+  loading: () => <div className="h-60 animate-pulse rounded-lg bg-inset" />,
 })
+
+/**
+ * Types that need the page's width to read: a row of numbers, a table, a
+ * chart's x-axis, a timeline's dates beside its titles. The rest sit two up.
+ */
+const FULL_WIDTH: ReadonlySet<string> = new Set<WidgetType>([
+  "summary",
+  "kpis",
+  "table",
+  "chart",
+  "timeline",
+  "actions",
+])
+
+export const isFullWidth = (type: string) => FULL_WIDTH.has(type)
 
 /**
  * "Updated by Weekly Lead Run · 2h ago": who or what wrote what the card says
@@ -48,7 +70,7 @@ function Provenance({
       ? `${widget.updatedBy?.name ?? "a member"}'s agent`
       : (widget.updatedBy?.name ?? "a member")
   return (
-    <p className="mt-3 flex items-center gap-1.5 text-[11px] text-ink-3">
+    <p className="mt-auto flex items-center gap-1.5 pt-4 text-[11px] text-ink-3">
       <span className="min-w-0 truncate">
         Updated by{" "}
         {chatId ? (
@@ -96,25 +118,35 @@ export function WidgetCard({
   dragProps: React.HTMLAttributes<HTMLDivElement> & { draggable: boolean }
   dragging: boolean
 }) {
-  const wide = widget.type === "table" || widget.type === "chart"
+  const hero = widget.type === "summary"
   return (
     <div
       {...dragProps}
       className={cn(
-        "group flex flex-col rounded-2xl border border-line bg-surface p-4 shadow-hairline",
-        wide && "sm:col-span-2",
+        "group flex min-w-0 flex-col rounded-2xl border border-line bg-surface shadow-hairline transition-shadow hover:shadow-raised",
+        hero ? "p-6 sm:p-7" : "p-5",
+        isFullWidth(widget.type) && "sm:col-span-2",
         dragging && "opacity-40"
       )}
     >
-      <div className="mb-2 flex items-center gap-1.5">
-        <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
-        <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{widget.title}</h3>
+      <div className={cn("flex items-center gap-2", hero ? "mb-3" : "mb-4")}>
+        <h3
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            hero
+              ? "text-[11px] font-medium uppercase tracking-wide text-ink-3"
+              : "text-[13px] font-medium text-ink"
+          )}
+          title={widget.title}
+        >
+          {widget.title}
+        </h3>
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="rounded-md p-1 text-ink-3 hover:bg-hover cursor-pointer"
+            className="rounded-md p-1 text-ink-3 opacity-60 transition-opacity hover:bg-hover hover:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 cursor-pointer"
             aria-label={`Options for ${widget.title}`}
           >
-            <MoreHorizontal className="h-3.5 w-3.5" />
+            <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={onEdit}>Edit</DropdownMenuItem>
@@ -129,7 +161,12 @@ export function WidgetCard({
         </DropdownMenu>
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
+        {widget.type === "summary" && <SummaryBody content={widget.content as SummaryContent} />}
+        {widget.type === "kpis" && <KpisBody content={widget.content as KpisContent} />}
+        {widget.type === "funnel" && <FunnelBody content={widget.content as FunnelContent} />}
+        {widget.type === "timeline" && <TimelineBody content={widget.content as TimelineContent} />}
+        {widget.type === "actions" && <ActionsBody content={widget.content as ActionsContent} />}
         {widget.type === "stat" && <StatBody content={widget.content as StatContent} />}
         {widget.type === "table" && <TableBody content={widget.content as TableContent} />}
         {widget.type === "chart" && <ChartBody content={widget.content as ChartContent} />}
