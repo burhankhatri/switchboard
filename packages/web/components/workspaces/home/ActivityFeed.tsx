@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   AlertTriangle,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   FileText,
   LayoutGrid,
   Loader2,
@@ -13,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import type { FeedEvent } from "@/lib/workspace-home/feed"
+import { groupFeed, type FeedGroup } from "@/lib/workspace-home/feed-groups"
 import { cn } from "@/lib/utils"
 import { ago } from "./time"
 
@@ -65,6 +67,46 @@ export function FeedItem({
   )
 }
 
+function GroupItem({
+  group,
+  onOpenChat,
+}: {
+  group: FeedGroup
+  onOpenChat: (chatId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  if (group.events.length === 1) return <FeedItem event={group.head} onOpenChat={onOpenChat} />
+  const Icon = ICON[group.head.kind] ?? CalendarClock
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-start gap-2.5 px-3.5 py-2.5 text-left hover:bg-hover cursor-pointer"
+      >
+        <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-3" />
+        <span className="min-w-0 flex-1 text-[13px] leading-snug text-ink">
+          <span className="font-medium">{group.head.actor?.name ?? "Someone"} · </span>
+          {group.summary}
+          <ChevronDown
+            className={cn("ml-1 inline h-3.5 w-3.5 text-ink-3 transition-transform", open && "rotate-180")}
+          />
+        </span>
+        <span className="shrink-0 text-[11px] tabular-nums text-ink-3">{ago(group.head.createdAt)}</span>
+      </button>
+      {open && (
+        <ul className="pb-2 pl-10 pr-3.5">
+          {group.events.map((e) => (
+            <li key={e.id} className="py-0.5 text-[12px] text-ink-2">
+              {e.summary}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export function ActivityFeed({
   workspaceId,
   firstPage,
@@ -103,11 +145,12 @@ export function ActivityFeed({
     }
   }
 
-  const events = [...firstPage.events, ...older]
+  const events = useMemo(() => [...firstPage.events, ...older], [firstPage.events, older])
+  const groups = useMemo(() => groupFeed(events), [events])
 
   return (
-    <section className="mt-8">
-      <h2 className="text-[11px] uppercase tracking-wide text-ink-3">Activity</h2>
+    <section className="mt-10">
+      <h2 className="text-[11px] font-medium uppercase tracking-wide text-ink-3">Activity</h2>
       {events.length === 0 ? (
         <p className="mt-2 text-sm text-ink-3">
           Nothing recorded yet. Runs, file changes and shared chats show up here.
@@ -115,9 +158,9 @@ export function ActivityFeed({
       ) : (
         <div className="mt-2 overflow-hidden rounded-xl border border-line bg-surface shadow-hairline">
           <ul className="divide-y divide-line">
-            {events.map((e) => (
-              <li key={e.id}>
-                <FeedItem event={e} onOpenChat={onOpenChat} />
+            {groups.map((g) => (
+              <li key={g.id}>
+                <GroupItem group={g} onOpenChat={onOpenChat} />
               </li>
             ))}
           </ul>
