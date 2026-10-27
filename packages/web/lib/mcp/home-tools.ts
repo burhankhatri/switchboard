@@ -6,6 +6,7 @@ import {
   MAX_CHART_SERIES,
   MAX_TABLE_COLUMNS,
   MAX_TABLE_ROWS,
+  MAX_TIMELINE_EVENTS,
   MAX_WIDGETS_PER_WORKSPACE,
   WIDGET_TYPES,
 } from "@/lib/workspace-home/widgets"
@@ -23,15 +24,30 @@ import {
 
 export type ToolOutcome = { ok: true; text: string } | { ok: false; text: string }
 
+// The first home page an agent built from the bare catalogue was eight cards of
+// paragraphs. The guide steers toward shapes a glance can read, and says so
+// plainly, because the model follows what the tool description tells it.
 const CONTENT_GUIDE =
+  "How to compose a home page: it is read in seconds by people who never open a chat, so show, " +
+  "don't tell. Lead with one summary (key \"summary\"), then kpis, then charts, funnels, " +
+  "timelines and actions; use a table only for a list people scan; use note only for what has " +
+  "no other shape, and keep it under 60 words. Every text field is one short line. Put the date " +
+  "range in titles or asOf. tone is good|warn|bad|info and marks how a point reads.\n\n" +
   "content depends on type, and must contain only these fields:\n" +
+  "- summary: { headline: one sentence on where things stand, points?: [{ text, tone? }] (max 5), asOf? }\n" +
+  '- kpis: { items: [{ label, value: number|string, unit?, change?: { value: "+18%", direction: "up"|"down"|"flat" }, hint? }] (1–6), asOf?, note?, link? } — prefer this to several stat widgets\n' +
   '- stat: { value: number|string, unit?, change?: { value: "+18%", direction: "up"|"down"|"flat" }, note?, link? }\n' +
+  "- funnel: { steps: [{ label, value: number }] (2–8, largest first), note?, link? } — a pipeline; conversion between steps is shown for you\n" +
+  `- timeline: { events: [{ date: "25 Sep", title, detail?, who?, tone? }] (newest first, max ${MAX_TIMELINE_EVENTS}) }\n` +
+  '- actions: { items: [{ title, detail?, owner?: who it waits on, urgency?: "now"|"soon"|"fyi", since? }] (max 10) } — what needs a person\n' +
   `- table: { columns: string[] (max ${MAX_TABLE_COLUMNS}), rows: (string|number|null)[][] (max ${MAX_TABLE_ROWS}, one cell per column), note?, link? }\n` +
   `- chart: { kind: "line"|"bar", labels: string[], series: [{ name, values: (number|null)[] }] (max ${MAX_CHART_SERIES} series, ${MAX_CHART_POINTS} points in total, one value per label), yLabel?, note?, link? }\n` +
   "- file: { path } — a file inside this workspace folder, repo-relative\n" +
   "- job: { jobId } — a scheduled job in this workspace\n" +
   "- note: { markdown } — plain Markdown; HTML is not rendered\n" +
-  "note is one short line of context; link must be an http(s) URL."
+  "The optional note field on other types is one short line of context; link must be an " +
+  'http(s) URL. In a table, a column named "Status" shows as coloured pills and numeric ' +
+  "columns get inline bars, so keep numbers as numbers or plain percentages."
 
 export const PIN_TO_HOME_TOOL = {
   name: "pin_to_home",
