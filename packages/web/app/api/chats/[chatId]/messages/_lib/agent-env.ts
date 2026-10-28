@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma"
 import { decrypt } from "@/lib/db/encryption"
 import { workspaceRunEnv } from "@/lib/workspace-run-env"
+import { consumeApprovalEnv } from "@/lib/server/approvals"
 import { NEW_REPOSITORY } from "@/lib/types"
 import { getEnvForModel, type CustomEndpoint } from "@switchboard/common"
 import type { Agent } from "@/lib/agent-session"
@@ -75,5 +76,10 @@ export async function buildAgentEnv(params: {
     )
   }
 
-  return { ...systemEnv, ...userEnv, ...workspaceEnv }
+  // An approval the person clicked since the last turn rides into this one and
+  // is spent by it. Set by the platform alone: a user or workspace variable of
+  // the same name would let the gate be bypassed by configuration.
+  const approvalEnv = await consumeApprovalEnv(prisma, chat.id)
+
+  return { ...systemEnv, ...userEnv, ...workspaceEnv, ...approvalEnv }
 }

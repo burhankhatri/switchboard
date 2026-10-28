@@ -42,6 +42,22 @@ folder gets both the workspace's own skills and the shared ones for free — no
 
 ## Done
 
+**Agent reliability, write receipts and the approval gate (2026-10-28)** — plan
+`docs/plans/shared-agents-improvements-2026-10.md`
+- Measured from the first two months of transcripts (38 chats, 537 tool calls): blank replies after provider errors, "did you do it" questions, a $0.50 placeholder budget that tripped mid-work, 20 sandbox-caused tool failures, free models doing the sloppy turns, and a workspace skill that told agents to enrol contacts around the Lead Engine.
+- **Blank turns:** a turn that ends in error or in silence persists `Agent stopped: <reason>` with the fix where known, flagged `isError`, in both finalizers.
+- **Write receipts:** shell tool calls are classified at parse time (HTTP verb, `--apply`, scripts that write by default; Instantly's POST-shaped lists excluded). Each write is listed under the reply with what the response reported and recorded once per turn as an `external_write` feed event.
+- **Budgets:** OpenCode $5/day from the ledger (twice the heaviest real day), an 80% line in the composer, a notification at 20 minutes before the 25-minute stop.
+- **Doc-only auto-merge:** after a successful push, an agent branch that changed only `campaigns/**`, `LEARNINGS.md`, `HOME.md` or skill `reference/**` inside its workspace is merged into the base branch through GitHub's merges API (`branch_merged` feed event); anything else waits for review.
+- **Models:** OpenCode's free models are hidden once the shared key exists; GLM-5.2 stays the default. The four-week Claude experiment on write turns waits on the org-billed Anthropic key.
+- **Approval gate:** `request_approval` MCP tool (interactive runs only) → Approve/Decline above the composer → `SWITCHBOARD_APPROVAL` in the next turn's env, single use; `ChatApproval` table.
+- **Sandbox image:** `jq`, `python3-requests`, `python-is-python3`, and `/tmp/opencode` + `/tmp/logs` owned by `daytona`. Needs a snapshot rebuild.
+- **agent-workspaces** (`burhankhatri/agent-workspaces`): `push_to_instantly.py --apply` calls `POST /api/leads/push` (chain=false, pushed=false), `--counts` gives one screen, `wait_job.py` waits for enrichment with backoff, `lead-engine-api/SKILL.md` is generated from the `gtm-lead-engine` repo by `scripts/sync_workspace_skill.py`, every skill description is under 300 characters, the pricing-bot guide is written, `--apply` requires `SWITCHBOARD_APPROVAL`.
+- **Verified:** 791 web + 17 sandbox-image tests, web typecheck clean; the write classifier replayed over the 150 stored messages tags the 09-25 draft, the 09-25 and 10-01 pushes, the 10-01 enrichment and skip, and nothing in read-only chats. 143 workspace tests pass.
+- **Not verified:** no browser run of the approval banner or the writes line; no real turn through `request_approval`; the doc-only merge against the live GitHub repo; the snapshot rebuild.
+- **To deploy:** the `20261028120000_chat_approvals` migration applies on build (additive); `npm run build:snapshot` for the image.
+- **Still open from the plan:** 2.7's body shrink (SKILL.md files are still 11-26 KB; only descriptions were cut), `instantly_report.py --brief`, the `watch_job` MCP variant of 2.4, and the 2.9 experiment.
+
 **Workspace home page (2026-10-26)** — openspec change `workspace-home`
 - A member who built nothing can now see what a workspace does. Jobs and chats used to be listed per user, so a second member saw none of the first member's setup. Opening a workspace shows, in order: the `HOME.md` brief, what changed since your last visit, pinned widgets, every member's scheduled jobs with health in words, chats shared with the workspace, and an activity feed.
 - **Brief:** `HOME.md` in the workspace folder. If it is missing, home offers an agent draft (lands on the chat branch, so it shows after merge) or a hand-written starter committed directly.

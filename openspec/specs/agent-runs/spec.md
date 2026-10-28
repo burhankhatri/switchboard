@@ -196,3 +196,35 @@ leaves the branch for a person to merge. A merge is recorded as a
 #### Scenario: GitHub reports a conflict
 - **WHEN** the merges API answers 409
 - **THEN** the push is still reported as a success and the branch is left as it is
+
+### Requirement: A write needs a click
+An interactive run SHALL be offered a `request_approval` tool on the run-scoped
+MCP endpoint. Calling it records a pending approval on the chat (action, count,
+campaign), parks the chat as awaiting input and notifies the owner; the agent is
+told to end the turn. The owner approves or declines from the chat. The next
+turn on that chat receives the oldest approved, unspent approval's id as
+`SWITCHBOARD_APPROVAL` in the agent's environment and marks it used. The
+variable is set by the platform only; user and workspace variables cannot
+supply it. Scheduled runs are not offered the tool. The workspace scripts that
+write (`push_to_instantly.py --apply`, `create_campaign.py --apply`) refuse
+without the variable.
+
+#### Scenario: The agent wants to push
+- **WHEN** the agent calls `request_approval` with "add leads to campaign", 16
+  and a campaign, then ends the turn
+- **THEN** the chat shows an Approve button with that line, and
+  `push_to_instantly.py --apply` run in that same turn exits non-zero naming the
+  tool
+
+#### Scenario: The owner approves
+- **WHEN** the owner clicks Approve and sends the next message
+- **THEN** that turn's environment carries `SWITCHBOARD_APPROVAL` once, the
+  approval is marked used, and a later turn does not receive it again
+
+#### Scenario: A double click
+- **WHEN** a decision is posted for an approval that is no longer pending
+- **THEN** the request is refused with 400 and nothing changes
+
+#### Scenario: An agent that keeps asking
+- **WHEN** three requests are already pending on the chat
+- **THEN** a fourth is refused and the agent is told to stop

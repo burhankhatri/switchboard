@@ -10,6 +10,7 @@ export interface NotificationItem {
     | "workspace_member_removed"
     | "agent_needs_input"
     | "agent_long_turn"
+    | "approval_requested"
     | "scheduled_job_proposed"
   title: string
   body: string | null

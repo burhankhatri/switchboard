@@ -199,5 +199,7 @@ export async function updateHomeWidget(
  */
 export function toolNamesForRun(claims: Pick<RunTokenClaims, "jobId">): string[] {
   const widgets = [PIN_TO_HOME_TOOL.name, UPDATE_HOME_WIDGET_TOOL.name]
-  return claims.jobId ? widgets : ["create_scheduled_job", ...widgets]
+  // request_approval needs a person in the chat to click; a scheduled run has
+  // none, and would only park itself forever.
+  return claims.jobId ? widgets : ["create_scheduled_job", "request_approval", ...widgets]
 }

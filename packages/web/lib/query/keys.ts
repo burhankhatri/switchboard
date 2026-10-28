@@ -12,6 +12,7 @@ export const queryKeys = {
     list: () => [...queryKeys.chats.all, "list"] as const,
     detail: (chatId: string) => [...queryKeys.chats.all, "detail", chatId] as const,
     messages: (chatId: string) => [...queryKeys.chats.detail(chatId), "messages"] as const,
+    approvals: (chatId: string) => [...queryKeys.chats.detail(chatId), "approvals"] as const,
   },
 
   // Settings

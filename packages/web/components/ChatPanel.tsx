@@ -10,6 +10,7 @@ import {
   ChatMessageList,
 } from "./chat"
 import { cn } from "@/lib/utils"
+import { ApprovalBanner } from "./chat/ApprovalBanner"
 import type { Chat, Settings, CredentialFlags } from "@/lib/types"
 import { NEW_REPOSITORY, agentSupportsPlanMode } from "@/lib/types"
 import type { SlashCommandType } from "./SlashCommandMenu"
@@ -287,6 +288,7 @@ export function ChatPanel({ chat, settings, credentialFlags, showClaudeLimitDial
           ? (hasQueued ? "px-[27px] pt-0 pb-3 pb-safe" : "px-[27px] py-3 pb-safe")
           : (hasQueued ? "px-[31px] pt-0 pb-4" : "px-[31px] pb-4 pt-2")
       )}>
+        <ApprovalBanner chatId={chat.id} isMobile={isMobile} />
         {chatInput}
       </div>
 

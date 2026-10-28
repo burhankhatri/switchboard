@@ -13,6 +13,7 @@ import {
   updateHomeWidget,
   type ToolOutcome,
 } from "@/lib/mcp/home-tools"
+import { REQUEST_APPROVAL_TOOL, requestApproval } from "@/lib/mcp/approval-tools"
 import {
   MAX_AGENT_JOBS_PER_WORKSPACE,
   MIN_INTERVAL_MINUTES,
@@ -233,19 +234,21 @@ async function createScheduledJob(
   }
 }
 
-const ALL_TOOLS = [CREATE_JOB_TOOL, PIN_TO_HOME_TOOL, UPDATE_HOME_WIDGET_TOOL]
+const ALL_TOOLS = [CREATE_JOB_TOOL, REQUEST_APPROVAL_TOOL, PIN_TO_HOME_TOOL, UPDATE_HOME_WIDGET_TOOL]
 
 const HANDLERS: Record<
   string,
   (claims: RunTokenClaims, args: Record<string, unknown>) => Promise<ToolOutcome>
 > = {
   [CREATE_JOB_TOOL.name]: createScheduledJob,
+  [REQUEST_APPROVAL_TOOL.name]: requestApproval,
   [PIN_TO_HOME_TOOL.name]: pinToHome,
   [UPDATE_HOME_WIDGET_TOOL.name]: updateHomeWidget,
 }
 
 const FAILURE_TEXT: Record<string, string> = {
   [CREATE_JOB_TOOL.name]: "Could not create the job. Tell the user to add it manually.",
+  [REQUEST_APPROVAL_TOOL.name]: "Could not record the request. Do not perform the write; tell the user.",
   [PIN_TO_HOME_TOOL.name]: "Could not pin the widget. Tell the user to add it from the home page.",
   [UPDATE_HOME_WIDGET_TOOL.name]: "Could not update the widget. Say so in your report.",
 }
