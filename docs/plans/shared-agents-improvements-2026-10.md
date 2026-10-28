@@ -2,126 +2,140 @@
 
 Scope: the GTM Lead Engine and Pricing Bot workspaces as run through Switchboard
 (`packages/web`, `packages/sdk`, the `burhankhatri/agent-workspaces` repo). This
-is an investigation and a plan, not a code change. Every number below was
-measured on 2026-10-28 from the Neon database that `packages/web/.env.local`
-points at (read-only), the
-`agent-workspaces` repo at `2585d59`, this repo at `a60c021`, and Instantly's
-audit log (read-only). Nothing was sent, pushed, enriched or changed.
+began as an investigation and a plan; section 2b records what shipped. Every
+number in sections 0 and 1 was measured on 2026-10-28 from the **production**
+database (Supabase, the `DIRECT_URL` in Vercel's production env, read-only),
+the `agent-workspaces` repo at `2585d59`, this repo at `a60c021`, and
+Instantly's audit log (read-only). Nothing was sent, pushed, enriched or changed.
+
+The first version of this plan was measured against the Neon database that
+`packages/web/.env.local` points at. That is a copy taken around 2026-10-05
+plus one local-dev chat: 38 chats and 150 messages against production's 53 and
+423. Every section-0 and section-1 number below was recomputed from production
+with the same metric definitions (the script reproduces the published Neon
+figures exactly when run on the Neon export). Where a conclusion changed, it
+says so.
 
 ## 0. The question, and the verdict
-
-> **Correction (2026-10-28, after deploy).** The database read for this plan
-> (`packages/web/.env.local`, Neon) is not production. Production is the
-> Supabase database in Vercel's env: 53 chats and 423 messages against the 38
-> and 150 counted here, with activity through 2026-10-28. Every number in
-> sections 0 and 1 is therefore a subset. The one conclusion this overturns is
-> the last row of the table below: production holds Wayne's chat `cmuwx5cs`
-> (GLM-5.2) running `push_to_instantly.py --campaign 9e8897c8… --apply
-> --include-pushed` on 2026-10-06 18:03 UTC and again on 2026-10-12, plus
-> Python heredocs posting to Instantly on 10-12, 10-13 and 10-14. The 1,016
-> contacts were enrolled by a Switchboard agent after all, through the old
-> script's direct `/leads/add` call, which 2.3 has since removed. The
-> remaining measurements should be recomputed against Supabase before the
-> 2.9 experiment is judged.
 
 Burhan's hypothesis: *shared-agents is defaulted at GLM, and the way it accesses
 data is not optimised; the agents need to be considerably better.*
 
-**Verdict (is-it-bs): partly right, and the two named causes are not the ones
-that hurt users most.**
+**Verdict (is-it-bs): right on both counts, and more so than the first,
+stale measurement said.** Long jobs killing turns, not blank replies, is what
+hurt users most.
 
-| Claim | Finding |
+| Claim | Finding (production) |
 |---|---|
-| "Defaulted at GLM" | **True.** `DEFAULT_HARNESS` is OpenCode on `opencode-go/glm-5.2` (`packages/web/lib/default-harness.ts:8`, `packages/common/src/agents.ts:464`); all 4 workspaces in the DB carry `model = opencode-go/glm-5.2`. But GLM-5.2 ran only 34 of the 77 assistant turns on record. 25 turns ran on the **free** `opencode/big-pickle` (an older default-model bug saved the first model in the list, see `default-model.ts:5-10`), 9 on Claude, 4 on `nemotron-3-ultra-free`, 5 on GLM-5.1. |
-| "Data access is not optimised" | **True, but second-order.** The agents re-read 15-26 KB skill files on every turn (31 skill loads + 22 raw `Read SKILL.md` in 46 tool-using turns), re-fetch the 120 KB campaign list (16 times across chats) and the 442 KB lead store (9 dry runs across chats, 3 inside one chat), and poll long jobs inside a single turn (one turn died at the 25-minute limit after 1,602 s of polling). Total model spend across the whole history is **$5.69**, so cost is not the problem; turn length, the $0.50/day shared cap and lost context are. |
-| "The agents are poor" | **Mixed.** GLM-5.2 turns were careful: honest zero counts, three refusals to print the token, every push preceded by a preview and a yes. What users actually hit was **harness reliability** (Wayne's first three messages got three blank replies; six Claude Code chats errored with no reply), **not knowing whether an action happened** (four "did you create / did you put / did you update" questions), **stale and contradictory skills**, and **environment friction** (about 20 of the 54 failed tool calls were `jq`/`python`/`requests` missing or a root-owned `/tmp/opencode`). |
-| "A teammate's Switchboard agent enrolled 1,016 contacts" (background given to this task) | **Wrong as first written; see the correction above. In production it is supported.** The text that follows was measured against the stale Neon copy. **Not supported by Switchboard's records (Neon copy).** The DB has no chat, no scheduled run (0 runs ever) and no chat deletion on 6, 12, 14 or 15 October. Instantly's audit log shows campaign `9e8897c8` created by an API key on 2026-10-06 18:08 UTC and filled by API in batches of 42, 61, 401, 173 and 323 (6, 12, 14, 15 Oct), every row `from_api: true` with no user. The same key also removed the 16 leads Switchboard had pushed into draft `7c08d5fb` on 13 Oct. The field mapping (`place_id`, `maps_link`, `contact_source`) is `push_to_instantly.py`'s, which anyone with the workspaces repo can run locally. The bypass is real; attributing it to Switchboard is not. |
+| "Defaulted at GLM" | **True, and it is most of what users saw.** `DEFAULT_HARNESS` is OpenCode on `opencode-go/glm-5.2` (`packages/web/lib/default-harness.ts:8`). GLM-5.2 ran **181 of 224** assistant turns (81%) and 2,426 of 2,722 tool calls. Free models ran 32 turns, Claude 6. *(The Neon copy said 34 of 77 and made the free models look like the main problem; they were not.)* |
+| "Data access is not optimised" | **True, and first-order.** A tool-using turn makes 18 tool calls on average (median 13, max 71); 20% of commands repeat inside the same turn. Across chats the Instantly campaign list was fetched 120 times and the lead store read 159 times. GLM-5.2 read 108.2M cached tokens against 6.0M fresh input (18:1): the prompt and skills are re-read on every step. Spend was **$47.50**, $46.40 of it GLM-5.2. *(The Neon copy said $5.69 and called this second-order.)* |
+| "The agents are poor" | **Mixed, with one dominant failure.** **17 turns were killed at the 25-minute limit**, 15 of them Wayne's and 16 of them sleeping or polling a job. Seven replies were blank. 114 tool outputs show an environment failure, 69 of them the pricing bot's Chrome driver. On the other side: every push was asked for in the turn, GLM-5.2's failed-call rate (8.1%) is well under big-pickle's (13.8%), and agents found and fixed real bugs in their own scripts. |
+| "A teammate's Switchboard agent enrolled 1,016 contacts" | **Supported.** Wayne's GLM-5.2 chat `cmuwx5cs` ran `push_to_instantly.py --apply` into campaign `9e8897c8` five times with results that match Instantly's audit log one for one (42, 61, 401, 173, 323). Wayne asked for each push in that turn. The script then called Instantly's `/leads/add` directly, so no address was verified, no CRM record was written and no lead was stamped `pushed`. *(The Neon copy had none of these chats, and the first version of this plan said the enrolment happened outside Switchboard. That was wrong.)* |
 
-Judgment on the ask: **JUSTIFIED** for a plan; **SIMPLIFY** the model part
-(drop the free models, keep GLM-5.2, run a bounded Claude experiment on the
-write paths) rather than a wholesale model swap.
+Judgment on the ask: **JUSTIFIED** for a plan. The model question moves from
+SIMPLIFY to **EXPERIMENT**: GLM-5.2 is the agent users actually experienced, so
+a bounded Claude trial on long and write turns (2.9) is worth running, judged on
+the criterion there.
 
 ## 1. What was measured
 
-### Corpus
+### Corpus (production, 2026-08-18 to 2026-10-28)
 
 | | |
 |---|---|
-| Chats | 38 (gtm-lead-engine 17, pricing-bot 8, marketing-automation 6, smartclusive 2, none 5) |
-| Users | Burhan 31 chats, Wayne 4, Abdul Rehman 2, stclair-github 0 |
-| Messages | 150 (73 user, 77 assistant); 46 assistant turns used tools |
-| Tool calls | 537: Bash 310, Read 78, Edit 75, skill 31, Write 11, Grep 10, pin_to_home 9, other 13 |
-| Per tool-using turn | mean 11.7, median 8, max 52 |
-| Failed tool calls | 54 (10%) |
-| Repeated commands inside one turn | 164 (30%), mostly Edit/Read loops in the 38-52 call turns |
-| Scheduled jobs / runs | 0 / 0 |
-| Spend (TokenUsage ledger) | GLM-5.2 $4.04 (33 rows, 511K in, 47K out, 10.0M cache reads), Opus 4.8 $0.75, Opus 5.5 $0.56, GLM-5.1 $0.32, big-pickle $0 (385K in, 89K out, 11.1M cache reads) |
+| Chats | 53 (gtm-lead-engine 28, pricing-bot 12, marketing-automation 6, none 5, smartclusive 2); 10 have no messages |
+| Users | Burhan 39 chats, Wayne 11, Abdul Rehman 2, stclair-github 1. Wayne's chats hold 136 of the 224 assistant turns (61%), 77 of them in pricing-bot |
+| Messages | 423 (199 user, 224 assistant); 151 assistant turns used tools |
+| Tool calls | 2,722: Bash 1,793, Read 344, Edit 227, skill 122, Grep 86, Write 73, Glob 30, other 47 |
+| Per tool-using turn | mean 18.0, median 13, max 71 |
+| Failed tool calls | 235 (8.6%) |
+| Repeated commands inside one turn | 555 (20.4%) |
+| Scheduled jobs / runs | 1 / 0 (11 jobs were proposed through the scheduler tool; 1 remains) |
+| Spend (TokenUsage ledger) | $47.50: GLM-5.2 $46.40 (214 rows, 6.0M in, 1.04M out, 108.2M cache reads), Opus 4.8 $0.75, GLM-5.1 $0.32, Haiku $0.02, big-pickle and Nemotron $0 |
+| Cost per metered turn | median $0.074, mean $0.21, max $1.55 |
+| Heaviest user-days | Wayne 10-12 $8.45, 10-06 $5.70, 10-08 $5.32, 10-09 $4.90; Burhan 10-01 $3.66. 14 of 25 user-days with spend exceeded $0.50 |
+| Turn time (ledger timestamp minus the prompt, 136 metered turns) | median 91 s, 90th percentile 11.6 min, max 27 min; 18 turns over 10 min, 9 over 20 min |
 
-Turn latency could not be measured: the assistant message carries the user
-message's timestamp (`persist-turn.ts`), so every turn reads as 0 s.
+All four users are on the `unlimited` plan, so no shared-pool budget applies to
+anyone today. The $0.50 cap tripped once (Burhan, 2026-10-01, at $0.58), before
+that changed.
 
 ### By model
 
-| Model | Turns | Tool calls | Failed calls | Repeats | Notable |
+| Model | Turns | Tool calls | Failed calls | Repeats | Blank replies |
 |---|---|---|---|---|---|
-| opencode/big-pickle (free) | 25 | 254 | 36 (14%) | 82 | Named real contacts in chat twice (08-19, 09-25); created an Instantly draft on an ambiguous ask (09-25); one turn ended after loading a skill with "I'll start by exploring" and no work (09-22); 300 s header timeout (09-25) |
-| opencode-go/glm-5.2 | 34 | 220 | 13 (6%) | 71 | Honest counts, refused to print the token 3×, previews before every push; hit the 25-min limit polling an enrich job (10-01); edited 5 skills + a script when asked "can you add that in the sequence" |
-| opencode-go/glm-5.1 | 5 | 25 | 1 | 1 | Pricing bot: read the scripts, logged into the CRM with the credentials hardcoded in `crm_pricing_bot.py`, flagged that they are hardcoded |
-| claude-code (default/opus/haiku) | 9 | 38 | 4 | 10 | 6 further chats errored with no reply ("Not logged in", 08-18; status `error`, 0 messages, 08-20/08-31/09-22×3/09-24) |
-| nemotron-3-ultra-free | 4 | 0 | 0 | 0 | Greetings only; one "model request failed" |
+| opencode-go/glm-5.2 | 181 | 2,426 | 196 (8.1%) | 472 | 3 |
+| opencode/big-pickle (free) | 28 | 261 | 36 (13.8%) | 82 | 4 |
+| claude-code (default/haiku) | 6 | 10 | 2 | 0 | 0 |
+| opencode-go/glm-5.1 | 5 | 25 | 1 (4%) | 1 | 0 |
+| nemotron-3-ultra-free | 4 | 0 | 0 | 0 | 0 |
+
+The three Opus turns in the first version (a 2026-10-26 home-page session) were
+a local-dev chat that exists only in the Neon copy.
 
 ### Where users were failed
 
-- **Blank replies.** Wayne's first three messages (pricing-bot, 2026-09-22, same
-  prompt three times over 2.5 h) each got an empty assistant message. Cause in
-  `ActivityLog`: `Error from provider (Console): OpenCode 1.18.0 or newer is
-  required to use the free tier`. Nothing told him. He got his first real
-  answer on 09-25 on GLM-5.2. 2 of his 6 messages were answered.
-- **Repeated prompts.** Burhan re-sent the pricing-bot prompt (09-22) and the
-  "write a campaign sequence" prompt (09-25) after a dead first turn.
-- **"Did you do it?"** Four times a user had to ask whether an action had
-  happened ("did you create the draft campaign", "did you put that on
-  instantly", "did u update the campaign", "name of campaign that u created").
-  Once the answer was "no, when you asked it wasn't there, I created it just
-  now".
-- **Turn killed mid-task.** 10-01, "do it" → 40-building enrichment; the turn
-  polled `/api/jobs/{id}` in 40+55-iteration curl loops, hit the 25-minute hard
-  timeout (`agent-lifecycle/route.ts:169`) and, two seconds earlier, the shared
-  OpenCode daily cap of $0.50 (`usage-budgets.ts:38`, marked PLACEHOLDER; the
-  ledger shows $0.58 used). The user typed "continue".
-- **Lost context between chats.** A new chat is a fresh sparse clone of `main`,
-  but agents commit to `agent/<branch>` and must ask the user to merge. On
-  10-01 Wayne's agent found "the campaign spec isn't in the repo (sandbox is
-  fresh)" and reconstructed state from Instantly; two LEARNINGS commits ended
-  with "please merge it to main".
-- **Environment friction.** `python` not found (2), `jq` not found (3 turns),
-  `requests` missing (2), `/tmp/opencode` permission denied (5 occurrences in 3
-  chats; OpenCode's own tool-output dir is root-owned in the snapshot),
-  `nslookup`/`ping` missing, and an egress firewall that reset TLS to
-  `api.instantly.ai` on 08-20 and 09-11 (21 tool calls spent diagnosing it).
-- **Stale and divergent skills.** The workspace's `lead-engine-api` skill
-  differs from the engine repo's own copy by 688 diff lines. The workspace
-  copy still says `POST /api/leads/push` is "inert today" and to "push through
-  `scripts/push_to_instantly.py` instead" (SKILL.md:66), mentions `chain` once
-  (the engine's says six times), and `push_to_instantly.py` has no `chain`
-  filter at all. Its "store today" table (518 leads, 2026-09-26) was 6.5× out
-  of date by 10-26 (3,390). `pricing-bot-guide/SKILL.md` is still the scaffold
-  placeholder; the Pricing Bot system prompt is one sentence.
-- **Guardrail drift.** The "only when the user asks in that turn" rule is prose
-  repeated in five skills; LEARNINGS entry 29 records the day two copies
-  disagreed and a request to enrich came back with nothing done.
+- **Turns killed at 25 minutes: 17.** Fifteen were Wayne's. Nine were in
+  pricing-bot: pricing runs over 267 and 102 opportunities, a daily
+  spreadsheet update, a merge conflict. Seven were the 10-12 to 10-15
+  enrichment push ("please enrich the leads and get them put into instantly",
+  "keep adding leads until the qualified lead count is around 1100"), and one
+  was Burhan's 10-01 "do it". In 16 of the 17 the agent was sleeping or polling
+  a job inside the turn. Each ended with "Agent stopped: Run exceeded 25 minute
+  limit" and a person typing "please continue".
+- **Blank replies: 7**, all with `isError = false`. Wayne's first three
+  pricing-bot messages (09-22, 09-24 twice) hit "OpenCode 1.18.0 or newer is
+  required to use the free tier"; Burhan's "hi" the same day; and three on
+  GLM-5.2 (Wayne, 10-06 and 10-12 twice). The activity log holds 10 provider
+  errors in all.
+- **"Did you do it?" questions: 5** (Burhan four times, 09-25 to 10-01; Wayne
+  once, 10-14: "I still show just 119 leads in the campaign … have you
+  enriched"). Three prompts were re-sent word for word.
+- **Environment.** 114 tool outputs show an environment failure: the pricing
+  bot's Chrome driver 69 (it downloads a driver with `ChromeDriverManager` and
+  calls `win32process`), `/tmp/opencode` permission denied 25, a missing Python
+  module 10 (2 of them `requests`), a network reset or timeout 5, `jq` 3,
+  `python` 2.
+- **Re-reading.** 122 skill-tool loads and 55 raw `Read SKILL.md` calls in 151
+  tool-using turns (up to 10 in one turn); the campaign list fetched 120 times
+  in 46 turns (up to 7 in one); the lead store read 159 times in 46 turns (up
+  to 10 in one); 55 job polls in 16 turns.
+- **The 1,016-contact enrolment** (all in Wayne's chat `cmuwx5cs`, GLM-5.2):
+
+  | When (UTC) | Asked | Instantly accepted |
+  |---|---|---|
+  | 10-06 18:03 | "Please build an identical campaign … name it Lead Engine campaign. Once it is built, please add …" | 42 (`--include-pushed`) |
+  | 10-12 17:37 | "can you move the rest of the enriched leads into instantly campaign Lead Engine campaign?" | 61 |
+  | 10-14 20:55 | "I want the leads to go into the Lead Engine campaign not the already running Verified Bill campaign." | 401 |
+  | 10-15 15:38 | "keep adding leads until the qualified lead count is around 1100" | 173 |
+  | 10-15 17:16 | "The lead engine shows that it has 1147 enriched leads. Instantly … only shows 693. Please …" | 323 (`--limit 2000`) |
+
+  Two further runs on 10-15 uploaded nothing. The same chat activated campaign
+  `da6bed9e` on 10-06 and ran four paid `/api/run` driver scripts on 10-14 and
+  10-15, each on request. The rule "only when the user asks in that turn" was
+  followed every time; the damage came from the path the script took.
+- **Privacy.** 16 GLM-5.2 replies name 18 third-party email addresses, 10 of
+  them in pricing-bot reports of who a proposal went to; none prints more than
+  three. The first version credited GLM-5.2 with keeping names out of chat;
+  that holds for lead lists, not for proposal reports.
+- **Stale and divergent skills; guardrail drift.** Unchanged from the first
+  version (repository facts, not database facts): the workspace
+  `lead-engine-api` skill differed from the engine's by 688 diff lines and told
+  agents to push around the engine; `pricing-bot-guide` was a placeholder; the
+  "asked in that turn" rule was prose in five skills and drifted once
+  (LEARNINGS 29).
 
 ### What worked
 
-- Dry-run-first scripts (`push_to_instantly.py`, `create_campaign.py`) and the
-  preview checks: every push in the record was previewed and approved.
+- Every write in the record was asked for in the turn it happened, and the
+  dry-run-first scripts showed a preview first.
 - The agents found real bugs in their own tools (unsorted paging returned 518
   rows with 305 unique leads; Cloudflare 403 on Python's User-Agent; the
   `campaign_id` filter that Instantly silently ignores) and fixed them.
-- The `campaign-review` / LEARNINGS loop produced the dead-sending-domain
-  finding that months of manual review had missed.
-- `pin_to_home` on 10-26 (Opus): a nine-widget home page from live reads in
-  25 tool calls, nothing written.
+- The scheduler tool was used as intended: Wayne's agents proposed 11 jobs for
+  daily spreadsheet updates, each waiting for approval.
+- On 10-27 a GLM-5.2 turn built the gtm-lead-engine home page from live reads
+  (6 widgets pinned, 2 updated), nothing written outside Switchboard.
 
 ## 2. The changes, ranked by impact
 
@@ -131,8 +145,8 @@ how to tell. Nothing here needs a new service.
 ### 2.1 Never return an empty turn (highest impact, lowest cost)
 
 **Problem.** A provider error produces an assistant message with empty
-content and `isError = false` (Wayne's three blank replies; the 09-25 header
-timeout; the 10-01 nemotron failure). PROGRESS.md "Next" item 4 ("fail loud on
+content and `isError = false`: seven in production, three of them Wayne's first
+pricing-bot messages on the free tier and three on GLM-5.2. PROGRESS.md "Next" item 4 ("fail loud on
 bootstrap") is the same gap.
 
 **Change.** In the turn persister (`messages/_lib/persist-turn.ts`) and the
@@ -174,9 +188,19 @@ type.
 **Expected effect.** "Did you…" questions disappear; every external write is
 auditable from Switchboard, not only from Instantly's audit log.
 
-**Verify.** Replay the 150 stored messages through the classifier: it must tag
-the 09-25 draft creation, the 09-25 and 10-01 pushes, the 10-01 enrichment and
-the 9-building skip, and nothing in the read-only chats.
+**Verify.** Replay the stored messages through the classifier: it must tag
+every push, draft creation, activation and paid run, and nothing in the
+read-only chats.
+
+**Result on production (2026-10-28, after shipping).** 40 calls tagged in 25
+turns across 9 of the 32 chats that used tools. About 36 are real writes. It
+**misses** about 8: three campaign activate or pause calls made through the
+`_http.request("POST", f"{base}/campaigns/{cid}/activate")` helper (the path
+pattern rejects a second `{…}`), one `urllib.request.Request(…/api/enrich,
+method="POST")`, and four runs of driver scripts the agent first wrote to
+`/tmp/logs/*.py`. It **mislabels** commands that chain several curl calls,
+taking the verb from one and the URL from another (a `/leads/list` read shown
+as a write to `/campaigns`). Fixes are listed in 2b.
 
 ### 2.3 One source of truth for the Lead Engine skill, and close the bypass
 
@@ -216,8 +240,11 @@ still passes.
 
 ### 2.4 Long jobs: wait outside the turn
 
-**Problem.** Polling an enrich job inside one turn burned 1,602 s, hit the
-25-minute limit and the daily cap, and the user had to say "continue".
+**Problem.** 17 turns were killed at the 25-minute limit, 15 of them
+Wayne's, and in 16 the agent was sleeping or polling inside the turn. Seven were
+enrichment and paid-run loops in gtm-lead-engine; nine were pricing-bot runs
+over hundreds of opportunities, which `wait_job.py` does not cover because they
+are local Selenium loops, not engine jobs.
 
 **Change.** Two options, pick one:
 - **Small:** a `scripts/wait_job.py <job_id> --max-minutes 12` helper that
@@ -236,18 +263,32 @@ Neon idle cost).
 waiting; enrichment of 100 buildings fits in one request.
 
 **Verify.** Re-run the 10-01 "do it" scenario against a test ZIP with `cap` 1:
-the turn ends under 2 minutes and the follow-up turn reports the result.
+the turn ends under 2 minutes and the follow-up turn reports the result. In
+production, "Run exceeded 25 minute limit" messages per week fall from the
+October rate (17 in 26 days). The pricing-bot runs need the same treatment:
+batch the run and end the turn, or run it as a scheduled job.
 
 ### 2.5 Budgets and timeouts set from the ledger, not placeholders
 
-**Problem.** `usage-budgets.ts:38` caps the shared OpenCode pool at $0.50/day
-per user and says so is a placeholder. The whole history cost $5.69; the one
-day a user did real work it tripped. The 25-minute interactive limit is right
-for a runaway, wrong for a sanctioned enrichment.
+**Problem.** `usage-budgets.ts:38` capped the shared OpenCode pool at
+$0.50/day per user as a placeholder; it tripped on the one day it applied. The
+25-minute interactive limit is right for a runaway, wrong for a sanctioned
+enrichment.
 
-**Change.** Set the OpenCode budget from the ledger: the heaviest real day
-(10-01, Burhan) was about $2.50 across two chats; a $5/day cap per user with a
-warning at 80% shown in the composer. Show the remaining budget and the
+**Corrected by the production recompute.** The heaviest real day was $8.45
+(Wayne, 10-12), not about $2.50, and three user-days exceeded $5, so the $5
+figure shipped in 2b was set from the stale data. It binds nobody today because
+all four users are on the `unlimited` plan, but it is wrong for any future free
+user. A second problem: metering backdates a session's first ledger rows to
+1970 whenever the chat already has turns (`lib/server/token-metering.ts:164`),
+to avoid charging pre-metering backlog. In production that fired for **61
+separate sessions in 13 chats**, including fresh sessions started mid-chat,
+which hides **$23.46 of the $47.50** from every daily budget window.
+
+**Change.** Set the OpenCode budget from the ledger: about $10/day (just
+above the heaviest real day, $8.45), with a warning at 80% shown in the
+composer. Backdate only a session that existed before metering, not every
+session that is new to the ledger. Show the remaining budget and the
 turn's running time in the UI. Keep the 25-minute limit but make the warning
 appear in chat at 20 minutes so the agent can wrap up.
 
@@ -257,7 +298,7 @@ appear in chat at 20 minutes so the agent can wrap up.
 on purpose rather than by kill.
 
 **Verify.** `daily_limit_reached` rows in `ActivityLog` stay at zero over a
-month of normal use; `TokenUsage` daily sums stay under $5.
+month of normal use; no `TokenUsage` row created after the fix is dated 1970.
 
 ### 2.6 Carry work between chats
 
@@ -287,8 +328,9 @@ characters (about 9.5 KB of catalog in every prompt), a 4.3 KB workspace
 prompt, and for OpenCode the whole system prompt is prepended to the user
 message every turn (`packages/sdk/src/background/session.ts:135-137`). The
 first turn of the 09-25 campaign chat loaded seven skills and three reference
-files, about 130 KB, before its first data call. GLM's 10.0M cache-read tokens
-against 511K input tokens is this pattern.
+files, about 130 KB, before its first data call. In production GLM-5.2 read 108.2M cached
+tokens against 6.0M fresh input tokens (18:1) for $46.40; that ratio is this
+pattern.
 
 **Change.**
 1. Cut each SKILL.md to the rules and the commands; move tables, histories and
@@ -298,7 +340,7 @@ against 511K input tokens is this pattern.
 3. Give the scripts a compact summary mode (`instantly_report.py --brief`,
    `push_to_instantly.py --counts`) and have the skills prefer it, so an answer
    to "how many can we email" is one call and one screen, not a 442 KB fetch
-   parsed in Python heredocs.
+   parsed in Python heredocs (the lead store was read 159 times in production).
 
 **Cost.** Medium: editing eleven skills, with the skill harness as the safety
 net. No code in `packages/web` changes.
@@ -322,21 +364,26 @@ nothing records where).
 **Cost.** Small; needs one snapshot rebuild, which already runs the skill
 harness before promoting.
 
-**Expected effect.** About 20 of the 54 failed tool calls in the record do
-not happen.
+**Expected effect.** The `/tmp/opencode` (25), `requests`, `jq` and `python`
+failures stop. The largest environment failure, the pricing bot's Chrome driver
+(69 tool outputs), is not an image problem: the image already ships
+`/usr/bin/chromium` and `/usr/bin/chromedriver`, but `crm_pricing_bot.py`
+downloads its own driver and imports `win32process`. That needs a change in the
+script, which the pricing-bot guide now describes.
 
 **Verify.** `which python jq` and `python3 -c "import requests"` succeed in
 `scripts/slice-zero.mjs`; `touch /tmp/opencode/x` succeeds.
 
 ### 2.9 Model choice per agent: keep GLM-5.2 for reads, test Claude on writes
 
-**Evidence.** GLM-5.2 behaved well on reads and reports at $0.12 a turn. The
-free models were where the sloppiness lived (14% failed tool calls, names in
-chat, a draft created on an ambiguous ask, an empty "I'll start by exploring"
-turn). Claude Code was unusable for most of the period for credential reasons
-(personal Max subscription, PROGRESS.md "Known risks"), so there is no evidence
-in these transcripts that Claude would have changed an outcome; the one Opus
-session (10-26) was good but read-only.
+**Evidence (production).** GLM-5.2 ran 81% of turns at a median $0.074 a
+metered turn, with 8.1% failed tool calls against 13.8% on free big-pickle. So
+the free models were worse per call, but most of what went wrong in absolute
+terms happened on GLM-5.2: 196 of 235 failed calls, 15 of 17 timeouts, 3 blank
+replies, 16 replies naming third-party addresses. Claude Code ran 6 turns, all
+in August, mostly blocked by credentials (personal Max subscription,
+PROGRESS.md "Known risks"), so there is no production evidence either way on
+whether Claude would have changed an outcome.
 
 **Change.**
 1. Remove `requiresKey: "none"` models from the picker when the workspace has
@@ -345,9 +392,10 @@ session (10-26) was good but read-only.
 3. Run a bounded experiment: for four weeks, campaign-builder and any turn that
    will call `--apply`, `/api/enrich` or `create_campaign.py --apply` runs on
    Claude (Sonnet 5.5 via the org key once PROGRESS.md's credential item is
-   done). Success criterion: fewer than one unapproved write and fewer than one
-   "did you…" question per ten write turns, and no privacy slip, versus the
-   GLM baseline measured here. If GLM matches it, stay on GLM.
+   done). Success criterion, against the GLM-5.2 baseline above: fewer turns
+   killed at 25 minutes per hundred long turns, fewer than one "did you…"
+   question per ten write turns, failed calls under 8%, and no third-party
+   address in a reply. If GLM matches it, stay on GLM.
 
 **Cost.** Small for the picker change; the experiment needs the org-billed
 Anthropic key, which is a prerequisite already listed in PROGRESS.md.
@@ -370,7 +418,10 @@ approval id is single-use and bound to the chat and the action string.
 Approvals are already a concept (`ScheduledJob.approvedAt`).
 
 **Expected effect.** No write without a click; the rule leaves the prose and
-stops drifting.
+stops drifting. It would **not** have prevented the 1,016-contact enrolment:
+Wayne asked for every one of those pushes and would have clicked Approve. What
+prevents a repeat is 2.3, which sends the push through the engine's
+verification, CRM record and `pushed` stamp.
 
 **Verify.** `push_to_instantly.py --apply` without the variable exits non-zero
 in the test suite; a real run on the harness shows the Approve button and
@@ -388,7 +439,24 @@ auto-merge), 2.7 partially (descriptions under 300 characters, `--counts`; the
 SKILL.md bodies are still 11-26 KB and `instantly_report.py --brief` is not
 done), 2.8 (image tooling; snapshot rebuild pending), 2.9 picker change (free
 models hidden; the Claude experiment waits on the org key), 2.10 (approval gate
-end to end). See PROGRESS.md for what was and was not verified.
+end to end). See PROGRESS.md for what was and was not verified. The snapshot
+was rebuilt and promoted the same day after the skill harness passed.
+
+**Defects the production recompute found in what shipped:**
+
+1. **2.2 classifier.** Misses `_http.request` calls whose path has two `{…}`
+   placeholders (the 10-06 campaign activation), `urllib.request.Request`
+   POSTs, and runs of scripts the agent wrote to `/tmp`; mislabels chained curl
+   commands by pairing one call's verb with another's URL. Fix: split a command
+   into curl invocations before pairing verb and URL, accept any f-string path,
+   recognise `urllib.request.Request(..., method="POST")` and `data=` without a
+   method, and tag `python3 /tmp/**.py` runs whose source the same turn wrote
+   with a write call in it.
+2. **2.5 budget figure.** $5/day was set from the stale heaviest day; the real
+   one is $8.45. Move to $10.
+3. **Metering backdating.** `token-metering.ts:164` backdates every
+   ledger-new session in a chat that already has turns; 61 sessions and $23.46
+   (49% of all spend) sit outside every daily window.
 
 ## 3. Order of work
 
@@ -402,12 +470,13 @@ end to end). See PROGRESS.md for what was and was not verified.
 
 ## 4. Known gaps in this investigation
 
-- Turn latency is not recorded, so "slow" could not be measured; 2.2's
-  classifier should also store turn start and end times on the message.
-- The 1,016-contact enrolment was done with an API key outside Switchboard.
-  Which key and which machine is not in any record this task could read;
-  rotating the Instantly key in the workspace connection would tell whether the
-  external runner shares it.
+- Turn time is estimated from the ledger row's timestamp minus the prompt,
+  for the 136 turns that were metered; the message itself still carries the
+  prompt's timestamp (`persist-turn.ts`).
+- `packages/web/.env.local` points at a stale Neon copy, not production. Any
+  future measurement should use the Supabase URL from Vercel's production env.
+- The 2b classifier figures (about 36 true writes, about 8 misses) come from
+  reading the flagged commands by hand, not from a labelled set.
 - The Instantly audit log was read for 4-28 October only.
 - The marketing-automation workspace runs on fixtures (`MARKETING_MOCK=1`),
   so its chats say nothing about live behaviour and were excluded from the
