@@ -28,6 +28,7 @@ import {
 } from "@/lib/db/token-usage"
 import { isFreeModel } from "@/lib/server/usage-budgets"
 import { readUsageMeta } from "@/lib/server/shared-pool"
+import { shouldBackdateBaseline } from "@/lib/server/metering-baseline"
 
 /** `tokscale models --json --group-by session,model` entry shape (subset). */
 interface TokscaleEntry {
@@ -156,12 +157,22 @@ async function meterTurnUsage(
   // filters createdAt >= start of day). Only turns after the baseline charge.
   let baselineAt: Date | undefined
   if (prior.size === 0) {
-    const assistantTurns = await prisma.message.count({
-      where: { chatId, role: "assistant" },
-    })
-    // >1 ⇒ turns existed before this one (and before metering) ⇒ pre-existing
-    // chat. Exactly 1 ⇒ this is the chat's first turn ⇒ charge normally.
-    if (assistantTurns > 1) baselineAt = new Date(0)
+    // Read before this turn's finaliser writes the new session id: every path
+    // meters first and releases the chat afterwards.
+    const [assistantTurns, chat] = await Promise.all([
+      prisma.message.count({ where: { chatId, role: "assistant" } }),
+      prisma.chat.findUnique({ where: { id: chatId }, select: { sessionId: true } }),
+    ])
+    if (
+      shouldBackdateBaseline({
+        priorCaptures: prior.size,
+        assistantTurns,
+        chatSessionBefore: chat?.sessionId,
+        sessionId,
+      })
+    ) {
+      baselineAt = new Date(0)
+    }
   }
 
   const rows: TokenUsageInsert[] = []
