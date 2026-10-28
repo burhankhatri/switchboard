@@ -211,3 +211,12 @@ describe("classifyWrite — urllib one-segment paths", () => {
     ).toEqual({ verb: "POST", target: "/campaigns" })
   })
 })
+
+describe("writeOutcome — timestamps are not counts", () => {
+  it("does not read an updated timestamp as a count", () => {
+    // Real output from the 2026-10-06 activation: "status: 1 | updated: 2026-10-06T16:…"
+    expect(writeOutcome("activate response: status: 1 | updated: 2026-10-06T16:02:11Z")).toBeNull()
+    expect(writeOutcome('{"id":"x","timestamp_updated":"2026-10-06T17:00:00Z"}')).toBeNull()
+    expect(writeOutcome('{"updated": 9}')).toEqual({ count: 9, label: "updated" })
+  })
+})
