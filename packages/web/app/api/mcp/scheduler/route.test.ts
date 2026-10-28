@@ -8,15 +8,21 @@ const m = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   event: vi.fn(),
+  approvalCount: vi.fn(),
+  approvalCreate: vi.fn(),
+  chatUpdate: vi.fn(),
+  notify: vi.fn(),
 }))
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     workspace: { findFirst: m.workspace },
     workspaceWidget: { count: m.count, findFirst: m.widgetFindFirst, create: m.create, update: m.update },
     workspaceEvent: { create: m.event },
+    chatApproval: { count: m.approvalCount, create: m.approvalCreate },
+    chat: { update: m.chatUpdate },
   },
 }))
-vi.mock("@/lib/db/notifications", () => ({ notifyAsync: vi.fn() }))
+vi.mock("@/lib/db/notifications", () => ({ notifyAsync: m.notify }))
 import { POST } from "./route"
 import { mintRunToken } from "@/lib/mcp/run-token"
 
@@ -47,6 +53,54 @@ beforeEach(() => {
   m.create.mockResolvedValue({ id: "w1", key: "weekly-leads" })
   m.update.mockResolvedValue({})
   m.event.mockResolvedValue({})
+  m.approvalCount.mockResolvedValue(0)
+  m.approvalCreate.mockResolvedValue({ id: "apr_1" })
+  m.chatUpdate.mockResolvedValue({})
+})
+
+describe("request_approval", () => {
+  // The write gate: the agent asks, a person clicks, the next turn carries
+  // SWITCHBOARD_APPROVAL. Nothing here grants anything by itself.
+  it("records a pending approval, parks the chat as awaiting input and tells the agent to stop", async () => {
+    const res = await call(interactive, "tools/call", {
+      name: "request_approval",
+      arguments: { action: "add leads to campaign", count: 16, campaign: "DFW industrial (7c08d5fb)" },
+    })
+    expect(res.result.isError).toBe(false)
+    expect(res.result.content[0].text).toMatch(/stop|end this turn/i)
+    expect(res.result.content[0].text).toMatch(/SWITCHBOARD_APPROVAL/)
+    expect(m.approvalCreate.mock.calls[0][0].data).toMatchObject({
+      chatId: "c1",
+      userId: "u1",
+      action: "add leads to campaign",
+      count: 16,
+      campaign: "DFW industrial (7c08d5fb)",
+      status: "pending",
+    })
+    expect(m.chatUpdate.mock.calls[0][0]).toMatchObject({ where: { id: "c1" }, data: { awaitingInput: true } })
+    expect(m.notify).toHaveBeenCalledTimes(1)
+    expect(m.notify.mock.calls[0][0]).toMatchObject({ userId: "u1", kind: "approval_requested", chatId: "c1" })
+  })
+
+  it("needs an action", async () => {
+    const res = await call(interactive, "tools/call", { name: "request_approval", arguments: { count: 3 } })
+    expect(res.result.isError).toBe(true)
+    expect(m.approvalCreate).not.toHaveBeenCalled()
+  })
+
+  it("refuses to pile up requests", async () => {
+    m.approvalCount.mockResolvedValue(3)
+    const res = await call(interactive, "tools/call", { name: "request_approval", arguments: { action: "x" } })
+    expect(res.result.isError).toBe(true)
+    expect(res.result.content[0].text).toMatch(/already waiting/i)
+  })
+
+  it("is not offered to a scheduled run, which has nobody to click", async () => {
+    const list = await call(scheduled, "tools/list")
+    expect(list.result.tools.map((t: { name: string }) => t.name)).not.toContain("request_approval")
+    const res = await call(scheduled, "tools/call", { name: "request_approval", arguments: { action: "x" } })
+    expect(res.error.code).toBe(-32602)
+  })
 })
 
 describe("tools/list", () => {
@@ -54,6 +108,7 @@ describe("tools/list", () => {
     const res = await call(interactive, "tools/list")
     expect(res.result.tools.map((t: { name: string }) => t.name)).toEqual([
       "create_scheduled_job",
+      "request_approval",
       "pin_to_home",
       "update_home_widget",
     ])
