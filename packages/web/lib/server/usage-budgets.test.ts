@@ -2,19 +2,18 @@ import { describe, it, expect } from "vitest"
 import { BUDGET_WARN_FRACTION, budgetWarning, getProviderBudget } from "./usage-budgets"
 
 /**
- * The OpenCode cap was a $0.50/day placeholder. The whole first two months of
- * use cost $5.69 in total, and the one day someone did real work (2026-10-01,
- * about $2.50 across two chats) the cap tripped mid-enrichment, two seconds
- * before the hard timeout killed the turn. The number is now set from the
- * ledger: twice the heaviest real day.
+ * The OpenCode cap was a $0.50/day placeholder that tripped mid-enrichment on
+ * 2026-10-01. The first replacement ($5) was set from a stale copy of the
+ * ledger. Production's heaviest real day was $8.45 (2026-10-12), and three
+ * user-days exceeded $5, so the budget sits just above that: $10.
  */
 describe("shared-pool budgets", () => {
-  it("gives OpenCode a $5 daily budget on the free plan", () => {
-    expect(getProviderBudget("opencode", "free")).toEqual({ unit: "cost", limit: 5 })
+  it("gives OpenCode a $10 daily budget on the free plan", () => {
+    expect(getProviderBudget("opencode", "free")).toEqual({ unit: "cost", limit: 10 })
   })
 
   it("doubles it on pro and lifts it on unlimited", () => {
-    expect(getProviderBudget("opencode", "pro")).toEqual({ unit: "cost", limit: 10 })
+    expect(getProviderBudget("opencode", "pro")).toEqual({ unit: "cost", limit: 20 })
     expect(getProviderBudget("opencode", "unlimited")).toBeNull()
   })
 })
@@ -23,6 +22,11 @@ describe("budgetWarning", () => {
   it("is quiet under 80% of the budget", () => {
     expect(BUDGET_WARN_FRACTION).toBe(0.8)
     expect(budgetWarning({ used: 3.9, limit: 5, unit: "cost" })).toBeNull()
+  })
+
+  it("would not have warned on the heaviest real day until it was nearly over", () => {
+    expect(budgetWarning({ used: 7.9, limit: 10, unit: "cost" })).toBeNull()
+    expect(budgetWarning({ used: 8.45, limit: 10, unit: "cost" })).toMatch(/\$1\.55 left/)
   })
 
   it("warns at 80% with what is used and what is left", () => {

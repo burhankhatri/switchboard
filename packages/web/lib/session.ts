@@ -20,7 +20,7 @@ import { PATHS, SANDBOX_CONFIG } from "./constants"
 import { basename } from "./format"
 import { isDirectoryReadOutput } from "./tool-output"
 import { extractNeedsInput, NEEDS_INPUT_MARKER } from "./needs-input"
-import { classifyWrite } from "./write-classifier"
+import { WriteTracker } from "./write-classifier"
 
 // =============================================================================
 // Tool Name Mapping (SDK uses lowercase, UI expects PascalCase)
@@ -235,6 +235,8 @@ export interface BuildContentBlocksResult {
 }
 
 export function buildContentBlocks(events: Event[]): BuildContentBlocksResult {
+  // A snapshot covers one turn, so one tracker sees every call in it.
+  const writes = new WriteTracker()
   const blocks: ContentBlock[] = []
   let pendingText = ""
   let pendingToolCalls: ToolCall[] = []
@@ -268,7 +270,7 @@ export function buildContentBlocks(events: Event[]): BuildContentBlocksResult {
       const toolCall: ToolCall = { tool, summary, fullSummary, filePath }
       // Tagged here, at the one place every agent's events become ToolCalls,
       // so the transcript and the workspace feed agree on what was written.
-      const write = classifyWrite(tool, toolEvent.input) ?? classifyWrite(toolEvent.name, toolEvent.input)
+      const write = writes.observe(tool, toolEvent.input)
       if (write) toolCall.write = write
       pendingToolCalls.push(toolCall)
       allToolCalls.push(toolCall)

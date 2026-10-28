@@ -442,21 +442,33 @@ models hidden; the Claude experiment waits on the org key), 2.10 (approval gate
 end to end). See PROGRESS.md for what was and was not verified. The snapshot
 was rebuilt and promoted the same day after the skill harness passed.
 
-**Defects the production recompute found in what shipped:**
+**Defects the production recompute found, and their fixes (2026-10-28):**
 
-1. **2.2 classifier.** Misses `_http.request` calls whose path has two `{…}`
-   placeholders (the 10-06 campaign activation), `urllib.request.Request`
-   POSTs, and runs of scripts the agent wrote to `/tmp`; mislabels chained curl
-   commands by pairing one call's verb with another's URL. Fix: split a command
-   into curl invocations before pairing verb and URL, accept any f-string path,
-   recognise `urllib.request.Request(..., method="POST")` and `data=` without a
-   method, and tag `python3 /tmp/**.py` runs whose source the same turn wrote
-   with a write call in it.
-2. **2.5 budget figure.** $5/day was set from the stale heaviest day; the real
-   one is $8.45. Move to $10.
-3. **Metering backdating.** `token-metering.ts:164` backdates every
-   ledger-new session in a chat that already has turns; 61 sessions and $23.46
-   (49% of all spend) sit outside every daily window.
+1. **2.2 classifier — fixed.** Curl calls are judged one at a time; any helper
+   called with a write verb and a path is tagged whatever its placeholders;
+   urllib `Request`s with `data=` or a write `method=` and a literal path are
+   tagged; a per-turn tracker tags running a script written earlier in the turn
+   whose source makes writes; and an `updated: 2026-…` timestamp is no longer
+   read as a count. Replayed over production: 45 writes tagged in 28 turns
+   (was 40), now including the 10-06 activation of `da6bed9e`, the 10-15
+   activation of `9e8897c8`, two urllib `/api/enrich` calls and five driver
+   runs; the four chained-curl and probe mislabels are gone. **Still missed:**
+   a script written in one turn and run in a later one (`enrich_run.py`, 10-14),
+   because the tracker's memory is the turn.
+2. **2.5 budget figure — fixed.** OpenCode is $10/day, just above the heaviest
+   real day ($8.45).
+3. **Metering backdating — fixed.** Backdating now requires the session to be
+   the one the chat was already resuming. Of the 61 sessions backdated in
+   production, 60 began after another session had been metered in the same
+   chat, so the new rule would have charged them; the remaining one is a chat's
+   first metered session. Rows already in the ledger are not rewritten.
+
+**New finding from that check:** OpenCode starts a fresh session in most turns
+instead of resuming the chat's one (61 new sessions in 13 chats, 60 of them
+mid-chat). Each fresh session re-reads the replayed history and the whole
+system prompt, which is part of the 18:1 cache-read ratio in 2.7. Why the
+session is not resumed (a new sandbox per turn, the session file not carried
+over, or `-s` failing) is not yet known.
 
 ## 3. Order of work
 

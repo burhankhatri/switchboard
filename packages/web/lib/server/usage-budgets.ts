@@ -10,12 +10,12 @@
  *                spans many models with wildly different per-token prices.
  *   - gemini   → "messages": number of assistant turns, a simple message cap.
  *
- * The OpenCode figure is set from the TokenUsage ledger (2026-10-28): the whole
- * first two months cost $5.69 in total, and the heaviest real day (2026-10-01,
- * one user, two chats, an approved 40-building enrichment) was about $2.50. The
- * old $0.50 placeholder tripped on that day, two seconds before the hard
- * timeout killed the same turn. Twice the heaviest day leaves room for a long
- * session and still bounds a runaway. The claude and gemini figures remain
+ * The OpenCode figure is set from the production TokenUsage ledger
+ * (2026-10-28): $47.50 in two months, and the heaviest real user-day $8.45
+ * (2026-10-12, an enrichment-and-push session); three user-days passed $5. The
+ * old $0.50 placeholder tripped mid-enrichment on 2026-10-01. $10 sits just
+ * above the heaviest real day and still bounds a runaway. (A first replacement
+ * of $5 was set from a stale database copy.) The claude and gemini figures remain
  * placeholders: nothing in the ledger has exercised them yet. Omit a provider
  * to leave it unlimited.
  */
@@ -41,7 +41,7 @@ export const PRO_BUDGET_MULTIPLIER = 2
 const FREE_DAILY_BUDGETS: Partial<Record<ProviderName, ProviderBudget>> = {
   // TODO(token-budgets): claude and gemini are still placeholders.
   claude: { unit: "tokens", limit: 100_000 },
-  opencode: { unit: "cost", limit: 5 },
+  opencode: { unit: "cost", limit: 10 },
   gemini: { unit: "messages", limit: 100 },
 }
 
