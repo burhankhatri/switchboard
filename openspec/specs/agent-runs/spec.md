@@ -150,3 +150,49 @@ reason survives a reload and is not only in the live banner or the activity log.
 #### Scenario: Partial output before the failure
 - **WHEN** a turn ends in error after the model had written some text
 - **THEN** that text is kept and the stop line is appended below it
+
+### Requirement: External writes are receipted
+Every tool call that changes something outside the sandbox (an HTTP POST, PUT,
+PATCH or DELETE to a workspace API, a script run with `--apply`, a script that
+writes by default) SHALL be tagged when the agent's events are parsed, listed
+under the assistant message as "Writes this turn" with what the response
+reported, and recorded once per turn as an `external_write` event in the
+workspace feed. Reads, including Instantly's POST-shaped list endpoints, are
+not tagged.
+
+#### Scenario: A push through a script
+- **WHEN** a turn runs `python3 scripts/push_to_instantly.py --campaign <id> --apply`
+- **THEN** the message shows `apply push_to_instantly.py --campaign <id>` with the
+  count the script reported, and the feed shows the same line attributed to the
+  person whose chat it was
+
+#### Scenario: A read-only turn
+- **WHEN** a turn only ran `GET` requests and dry runs
+- **THEN** nothing is listed and no feed event is written
+
+#### Scenario: A write before a crash
+- **WHEN** a turn makes a write and then ends in error
+- **THEN** the write is still receipted; the error does not hide it
+
+### Requirement: Documentation-only commits land on the base branch
+After a successful auto-push of an agent branch in a workspace, the system SHALL
+merge that branch into the workspace's base branch through the GitHub API when
+every change since the merge base is under the workspace folder and matches
+`campaigns/**`, `LEARNINGS.md`, `HOME.md` or `.claude/skills/**/reference/**`.
+Any other change, including a `SKILL.md`, a script, a test or `workspace.yaml`,
+leaves the branch for a person to merge. A merge is recorded as a
+`branch_merged` feed event; a refusal is logged and is not an error.
+
+#### Scenario: A campaign spec and a LEARNINGS entry
+- **WHEN** an agent commits `campaigns/<slug>/campaign.json` and `LEARNINGS.md`
+  and the push succeeds
+- **THEN** the branch is merged into the base branch and the next chat's fresh
+  clone contains both files
+
+#### Scenario: A script changed alongside the docs
+- **WHEN** the same commit also touches `scripts/push_to_instantly.py`
+- **THEN** nothing is merged and the branch waits for review
+
+#### Scenario: GitHub reports a conflict
+- **WHEN** the merges API answers 409
+- **THEN** the push is still reported as a success and the branch is left as it is
