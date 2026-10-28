@@ -20,3 +20,8 @@ export function longTurnNotice(minutesRunning: number): LongTurnNotice | null {
       "Long jobs are better started and then checked in a later turn.",
   }
 }
+
+/** What a turn stopped at the hard limit says, from the limit itself. */
+export function interactiveTimeoutMessage(): string {
+  return `Run exceeded ${INTERACTIVE_HARD_TIMEOUT} minute limit`
+}

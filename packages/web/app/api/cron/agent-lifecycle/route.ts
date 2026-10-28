@@ -10,7 +10,7 @@ import { INTERACTIVE_HARD_TIMEOUT, SCHEDULED_HARD_TIMEOUT } from "./_lib/constan
 import { monitorAgent, stopAgent } from "./_lib/monitor"
 import { startJobExecution, finalizeScheduledRun, failScheduledRun } from "./_lib/scheduled"
 import { finalizeInteractiveChat, markChatError, warnLongTurnOnce } from "./_lib/interactive"
-import { longTurnNotice } from "./_lib/long-turn"
+import { interactiveTimeoutMessage, longTurnNotice } from "./_lib/long-turn"
 
 // Vercel Pro plan allows up to 5 minutes for cron jobs
 export const maxDuration = 300
@@ -167,10 +167,10 @@ export async function GET(req: Request) {
         const runStartedAt = chat.messages[0]?.createdAt ?? chat.lastActiveAt
         const totalMinutes = differenceInMinutes(now, runStartedAt)
 
-        // Hard timeout: 25 minutes
+        // Hard timeout: INTERACTIVE_HARD_TIMEOUT minutes
         if (totalMinutes > INTERACTIVE_HARD_TIMEOUT) {
           await stopAgent(chat.sandboxId!, chat.backgroundSessionId!, daytona)
-          await markChatError(chat.id, "Run exceeded 25 minute limit")
+          await markChatError(chat.id, interactiveTimeoutMessage())
           results.timedOutInteractive++
           continue
         }

@@ -121,8 +121,8 @@ async function writeOpencodeConfig(
  * Per-attempt limits for OpenCode's own providers (Zen = `opencode`, Go =
  * `opencode-go`). OpenCode's default is 300s to first headers and 300s between
  * stream chunks, and it makes up to 6 attempts a step: a stalled provider could
- * hold a turn for ~31 minutes, past Switchboard's 20/25 minute hard timeouts,
- * before OpenCode gave up. At these values the worst case is ~10-13 minutes,
+ * hold a turn for ~31 minutes, past Switchboard's 20-minute scheduled limit and
+ * a third of the 90-minute interactive one, before OpenCode gave up. At these values the worst case is ~10-13 minutes,
  * and a real response starts well inside them (headers usually in 1-10s).
  * Positive milliseconds or `false` only: 0 fails OpenCode's config validation
  * and breaks every run.

@@ -153,7 +153,7 @@ describe("opencodeSetup — standard path", () => {
 
   it("pins provider timeouts for Zen and Go so a stalled request fails fast enough to retry", async () => {
     // OpenCode's default is 300s per attempt with up to 6 attempts: ~31 min
-    // before it gives up, past Switchboard's 20/25 min hard timeouts.
+    // before it gives up, past Switchboard's 20-minute scheduled limit.
     const fs = fakeSandbox({ [GLOBAL_PATH]: JSON.stringify({ mcp: mcp("github") }) })
 
     await runSetup(fs)
