@@ -9,6 +9,8 @@ import { stripNullBytes, stripNullBytesDeep } from "@/lib/db/pg-sanitize"
 import { finalTurnContent } from "@/lib/turn-outcome"
 
 import { autoPushChat } from "@/lib/git/auto-push"
+import { notifyAsync } from "@/lib/db/notifications"
+import type { LongTurnNotice } from "./long-turn"
 import type { ChatWithMessages } from "./types"
 
 // =============================================================================
@@ -116,5 +118,35 @@ export async function markChatError(chatId: string, reason: string) {
       timestamp: BigInt(Date.now()),
       isError: true,
     },
+  })
+}
+
+/**
+ * Tell the chat's owner once that this turn is close to the hard stop. "Once"
+ * is kept on the assistant message's metadata, because the cron runs every
+ * minute and the turn can last another five.
+ */
+export async function warnLongTurnOnce(chat: ChatWithMessages, notice: LongTurnNotice) {
+  const assistantMessage = chat.messages[0]
+  if (!assistantMessage) return
+  const metadata = (assistantMessage.metadata ?? {}) as Record<string, unknown>
+  if (metadata.longTurnWarnedAt) return
+
+  await prisma.message.update({
+    where: { id: assistantMessage.id },
+    data: {
+      metadata: {
+        ...metadata,
+        longTurnWarnedAt: new Date().toISOString(),
+      } as unknown as Prisma.InputJsonValue,
+    },
+  })
+  notifyAsync({
+    userId: chat.userId,
+    kind: "agent_long_turn",
+    title: notice.title,
+    body: notice.body,
+    chatId: chat.id,
+    workspaceId: chat.workspaceId ?? undefined,
   })
 }

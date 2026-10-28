@@ -20,6 +20,8 @@ import { BranchCombobox } from "./BranchCombobox"
 import { SlashCommandMenu, type SlashCommandType } from "../SlashCommandMenu"
 import { MobileSelect } from "../ui/MobileBottomSheet"
 import { useUploadProgressStore } from "@/lib/stores/upload-progress-store"
+import { useUsageQuery } from "@/lib/query/hooks/useUsageQuery"
+import { budgetWarning } from "@/lib/server/usage-budgets"
 
 // =============================================================================
 // ChatInput - The main chat input area with all controls
@@ -250,6 +252,13 @@ export function ChatInput({
   // Mobile
   isMobile,
 }: ChatInputProps) {
+  // The shared pool used to announce its cap only by refusing the send. This
+  // line appears at 80% so the person knows before starting a turn that will
+  // be cut short. Own-key runs have no shared budget and show nothing.
+  const { data: usage } = useUsageQuery()
+  const budgetPool = usage?.pools.find((p) => p.agent === currentAgent)
+  const budgetLine = budgetPool && !budgetPool.ownKey ? budgetWarning(budgetPool) : null
+
   const uploadProgress = useUploadProgressStore(state => state.chats[chat.id])
   const modals = useModals()
   const [showModeDropdown, setShowModeDropdown] = useState(false)
@@ -530,6 +539,18 @@ export function ChatInput({
           <div className="mx-2 mb-2 text-xs text-muted-foreground" role="status">
             Uploading attachments… {uploadProgress.total ? Math.round(uploadProgress.bytes / uploadProgress.total * 100) : 100}%
             <progress className="mt-1 h-1 w-full" max={Math.max(1, uploadProgress.total)} value={uploadProgress.bytes} />
+          </div>
+        )}
+        {budgetLine && (
+          <div
+            className={cn(
+              "relative z-10 flex items-start gap-2 text-amber-700 dark:text-amber-300 bg-amber-500/10 rounded-chip",
+              isMobile ? "mx-1 mb-1 px-2 py-1.5 text-sm" : "mx-1 mb-1 px-2 py-1.5 text-xs"
+            )}
+            role="status"
+          >
+            <AlertTriangle className={cn("shrink-0 mt-0.5", isMobile ? "h-4 w-4" : "h-3.5 w-3.5")} />
+            <span className="flex-1">{budgetLine}</span>
           </div>
         )}
         {/* File upload error message */}

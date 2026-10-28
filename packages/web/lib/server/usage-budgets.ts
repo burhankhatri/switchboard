@@ -10,8 +10,14 @@
  *                spans many models with wildly different per-token prices.
  *   - gemini   → "messages": number of assistant turns, a simple message cap.
  *
- * NOTE: numbers below are PLACEHOLDERS. Tune them once real usage has been
- * logged to the TokenUsage ledger. Omit a provider to leave it unlimited.
+ * The OpenCode figure is set from the TokenUsage ledger (2026-10-28): the whole
+ * first two months cost $5.69 in total, and the heaviest real day (2026-10-01,
+ * one user, two chats, an approved 40-building enrichment) was about $2.50. The
+ * old $0.50 placeholder tripped on that day, two seconds before the hard
+ * timeout killed the same turn. Twice the heaviest day leaves room for a long
+ * session and still bounds a runaway. The claude and gemini figures remain
+ * placeholders: nothing in the ledger has exercised them yet. Omit a provider
+ * to leave it unlimited.
  */
 
 import type { ProviderName } from "@switchboard/common"
@@ -33,9 +39,9 @@ export const PRO_BUDGET_MULTIPLIER = 2
 
 /** Free-tier daily budget per shared-pool provider, with its unit. */
 const FREE_DAILY_BUDGETS: Partial<Record<ProviderName, ProviderBudget>> = {
-  // TODO(token-budgets): replace placeholders with tuned values.
+  // TODO(token-budgets): claude and gemini are still placeholders.
   claude: { unit: "tokens", limit: 100_000 },
-  opencode: { unit: "cost", limit: 0.5 },
+  opencode: { unit: "cost", limit: 5 },
   gemini: { unit: "messages", limit: 100 },
 }
 
@@ -55,6 +61,36 @@ export function getProviderBudget(
     return { unit: base.unit, limit: base.limit * PRO_BUDGET_MULTIPLIER }
   }
   return base
+}
+
+/** Fraction of the daily budget at which the composer starts warning. */
+export const BUDGET_WARN_FRACTION = 0.8
+
+function fmtAmount(value: number, unit: BudgetUnit): string {
+  if (unit === "cost") return `$${value.toFixed(2)}`
+  const n = Math.round(value).toLocaleString("en-US")
+  return unit === "tokens" ? `${n} tokens` : `${n} messages`
+}
+
+/**
+ * One line for the composer once a shared pool is nearly spent, or null while
+ * there is nothing to say. The cap used to announce itself only by refusing the
+ * send; this tells the person before they start a turn that will be cut short.
+ */
+export function budgetWarning(pool: {
+  used: number
+  limit: number | null
+  unit: BudgetUnit
+}): string | null {
+  if (pool.limit == null || pool.limit <= 0) return null
+  if (pool.used < pool.limit * BUDGET_WARN_FRACTION) return null
+  const used = fmtAmount(pool.used, pool.unit)
+  const limit = fmtAmount(pool.limit, pool.unit)
+  if (pool.used >= pool.limit) {
+    return `Today's shared budget is spent: ${used} of ${limit}. It resets at midnight UTC.`
+  }
+  const left = fmtAmount(pool.limit - pool.used, pool.unit)
+  return `Shared budget: ${used} of ${limit} used today, ${left} left.`
 }
 
 /**

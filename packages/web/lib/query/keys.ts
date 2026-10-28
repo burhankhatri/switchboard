@@ -19,6 +19,11 @@ export const queryKeys = {
     all: ["settings"] as const,
   },
 
+  // Shared-pool usage for today
+  usage: {
+    all: ["usage"] as const,
+  },
+
   // GitHub
   github: {
     all: ["github"] as const,

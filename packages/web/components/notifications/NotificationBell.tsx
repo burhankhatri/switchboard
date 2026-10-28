@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Bell, MessageCircleQuestion, UserPlus, UserMinus } from "lucide-react"
+import { Bell, CalendarClock, Hourglass, MessageCircleQuestion, UserPlus, UserMinus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { pushTargetUrl } from "@/lib/push"
 import { anchoredPanelPosition, type PanelPosition } from "@/lib/anchored-panel"
@@ -15,6 +15,8 @@ import {
 
 const ICONS = {
   agent_needs_input: MessageCircleQuestion,
+  agent_long_turn: Hourglass,
+  scheduled_job_proposed: CalendarClock,
   workspace_member_added: UserPlus,
   workspace_member_removed: UserMinus,
 } as const

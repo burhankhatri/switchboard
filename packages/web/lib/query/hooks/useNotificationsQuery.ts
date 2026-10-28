@@ -5,7 +5,12 @@ import { useEffect, useState } from "react"
 
 export interface NotificationItem {
   id: string
-  kind: "workspace_member_added" | "workspace_member_removed" | "agent_needs_input"
+  kind:
+    | "workspace_member_added"
+    | "workspace_member_removed"
+    | "agent_needs_input"
+    | "agent_long_turn"
+    | "scheduled_job_proposed"
   title: string
   body: string | null
   chatId: string | null
