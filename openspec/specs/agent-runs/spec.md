@@ -126,3 +126,27 @@ workspace and to execute one.
 - **THEN** repo, branch and agent are denormalised from the workspace, so the
   run clones what the job was written against rather than taking the
   repo-less path and starting with no skills or scripts
+
+### Requirement: A finished turn is never a blank reply
+When a turn ends with no text from the model, the system SHALL write the reason
+into the assistant message itself and flag the message as an error, so the
+reason survives a reload and is not only in the live banner or the activity log.
+
+#### Scenario: The provider rejects the run before the first token
+- **WHEN** a turn ends in error with empty content
+- **THEN** the persisted assistant message reads `Agent stopped: <reason>`, is
+  flagged `isError`, and names the fix where one is known (the free-tier version
+  gate points at the model menu and an image rebuild)
+
+#### Scenario: The model says nothing and does nothing
+- **WHEN** a turn completes with no text and no tool calls
+- **THEN** the message says so and is flagged `isError`, rather than persisting
+  as an empty string
+
+#### Scenario: A quiet tool-only turn
+- **WHEN** a turn completes with tool calls but no prose
+- **THEN** the message is left as the agent produced it; it is not an error
+
+#### Scenario: Partial output before the failure
+- **WHEN** a turn ends in error after the model had written some text
+- **THEN** that text is kept and the stop line is appended below it

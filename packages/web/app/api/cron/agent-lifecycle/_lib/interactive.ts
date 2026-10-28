@@ -6,6 +6,7 @@ import { PATHS } from "@/lib/constants"
 import { finalizeTurn, type AgentSnapshot } from "@/lib/agent-session"
 import { meterAssistantTurn } from "@/lib/server/token-metering"
 import { stripNullBytes, stripNullBytesDeep } from "@/lib/db/pg-sanitize"
+import { finalTurnContent } from "@/lib/turn-outcome"
 
 import { autoPushChat } from "@/lib/git/auto-push"
 import type { ChatWithMessages } from "./types"
@@ -25,11 +26,13 @@ export async function finalizeInteractiveChat(
   const assistantMessage = chat.messages[0]
 
   if (assistantMessage) {
+    const final = finalTurnContent(snapshot)
     try {
       await prisma.message.update({
         where: { id: assistantMessage.id },
         data: {
-          content: stripNullBytes(snapshot.content),
+          content: stripNullBytes(final.content),
+          ...(final.isError ? { isError: true } : {}),
           toolCalls:
             snapshot.toolCalls.length > 0
               ? (stripNullBytesDeep(snapshot.toolCalls) as unknown as Prisma.InputJsonValue)
