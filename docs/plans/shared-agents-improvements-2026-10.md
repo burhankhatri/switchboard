@@ -512,9 +512,12 @@ continue" from the conversation instead of asking what it was about.
 stop is now 90 minutes, up from 25; the warning comes at 85 and the stop
 message is built from the constant. The per-minute lifecycle cron is also what
 keeps a running sandbox from idling out, so nothing else needed to change.
-Scheduled runs keep their 20 minutes. The workspace's `wait_job.py` still gives
-up after 12 minutes and its skill still says to end the turn, which was sized
-for the old limit.
+Scheduled runs keep their 20 minutes. The agent's shell still kills any one
+command after 2 minutes (OpenCode 1.18.32 in the sandbox and Claude Code both
+default to 120,000 ms), which the workspace's 12-minute `wait_job.py` had never
+fit. It now waits 90 seconds per call and the agent repeats it within the turn,
+until the job is done or the turn has waited an hour (exit 3: end the turn);
+agent-workspaces `1be304c`.
 
 ## 3. Order of work
 
