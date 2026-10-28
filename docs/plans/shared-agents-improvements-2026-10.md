@@ -492,15 +492,21 @@ pricing-bot agent reinstalled LibreOffice and re-downloaded supplier sheets into
 each "fresh sandbox". It also feeds the 18:1 cache-read ratio and the 18 tool
 calls per turn, since each fresh turn re-explores.
 
-**Proposed fix, not yet made:** when `ensureSandboxForChat` recreates a sandbox
-for a chat that already has assistant turns, replay the chat's history through
-the existing agent-switch path in `history.ts`, capped to the most recent
-messages so the prompt stays bounded. It is agent-agnostic and reuses tested
-code. A fuller fix would carry OpenCode's session store across sandboxes and
-resume with `-s`; it is OpenCode-specific and can follow if replay proves too
-lossy. Keeping sandboxes longer is not an option under the six-sandbox cap.
-LibreOffice belongs in the sandbox image so the pricing bot stops reinstalling
-it.
+**Fixed (2026-10-28).** `history.ts` now replays the chat's own history
+whenever the chat has earlier assistant turns but no session to resume, which
+is what `ensureSandboxForChat` leaves after it rebuilds a sandbox for a message
+or for a git action. The replay is capped to the most recent messages that fit
+in 40,000 characters, any single message over 8,000 characters is clipped, and
+it always opens on a user message. Only message text carries over; tool results
+from earlier turns do not, so an agent may still re-run a lookup. Agent switch
+and fork replays are unchanged. Carrying OpenCode's session store across
+sandboxes and resuming with `-s` stays the fuller option if replay proves too
+lossy; keeping sandboxes longer is not an option under the six-sandbox cap.
+The sandbox image now ships `libreoffice-calc-nogui`, so the pricing bot's
+`soffice --convert-to pdf` works in a fresh sandbox; it takes effect at the
+next snapshot rebuild. The check after release: in production, turns sent more
+than 5 minutes after the previous one should answer follow-ups such as "please
+continue" from the conversation instead of asking what it was about.
 
 ## 3. Order of work
 

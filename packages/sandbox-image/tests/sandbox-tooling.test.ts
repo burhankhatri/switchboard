@@ -18,6 +18,14 @@ describe("sandbox tooling", () => {
     for (const pkg of SANDBOX_APT_TOOLS) expect(cmd).toContain(pkg)
   })
 
+  // The pricing bot exports each quote's .xlsx to PDF with
+  // `soffice --headless --convert-to pdf`. With sandboxes deleted after 5 idle
+  // minutes, every pricing turn found soffice missing and reinstalled it.
+  it("installs headless LibreOffice Calc so soffice can turn .xlsx into PDF", () => {
+    expect(SANDBOX_APT_TOOLS).toContain("libreoffice-calc-nogui")
+    expect(sandboxToolingCommand()).toContain("libreoffice-calc-nogui")
+  })
+
   it("pre-creates OpenCode's temp dirs owned by the sandbox user", () => {
     const cmd = sandboxToolingCommand()
     expect(cmd).toMatch(/mkdir -p \/tmp\/opencode \/tmp\/logs/)

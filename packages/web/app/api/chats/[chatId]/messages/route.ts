@@ -202,7 +202,8 @@ export async function POST(
         uploadedFilePaths.map((p) => `- ${p}`).join("\n")
     }
 
-    // Decide what prior conversation to replay (agent switch / chat fork).
+    // Decide what prior conversation to replay (agent switch, a session lost
+    // with a rebuilt sandbox, or a chat fork).
     const { history, isAgentSwitch } = await buildAgentHistory(chatId, chat, payload)
 
     // ── Stage 4: spin up the background session (does NOT start the agent yet) ──

@@ -151,6 +151,31 @@ reason survives a reload and is not only in the live banner or the activity log.
 - **WHEN** a turn ends in error after the model had written some text
 - **THEN** that text is kept and the stop line is appended below it
 
+### Requirement: A chat keeps its conversation when its sandbox is rebuilt
+Sandboxes are deleted when they stop, and the agent's saved conversation goes
+with them. When a chat already has assistant turns but no session to resume,
+the system SHALL replay the chat's own message history to the agent, capped to
+the most recent messages that fit a fixed character budget.
+
+#### Scenario: A reply after the sandbox was deleted
+- **WHEN** a person replies in a chat whose sandbox was deleted while idle
+- **THEN** the sandbox is rebuilt, the session pointer is cleared, and the
+  agent's first prompt carries the chat's earlier messages before the new one
+
+#### Scenario: A git action rebuilt the sandbox first
+- **WHEN** a git action rebuilt the sandbox and cleared the session pointer, and
+  the person then sends a message to that sandbox
+- **THEN** the history is replayed, because there is still no session to resume
+
+#### Scenario: A long chat
+- **WHEN** the chat's history is longer than the budget
+- **THEN** only the most recent messages that fit are replayed, an overlong
+  message is clipped rather than dropped, and the replay opens on a user message
+
+#### Scenario: The agent can resume its own session
+- **WHEN** the chat has a session pointer and the same agent answers
+- **THEN** nothing is replayed; the agent resumes its session
+
 ### Requirement: External writes are receipted
 Every tool call that changes something outside the sandbox (an HTTP POST, PUT,
 PATCH or DELETE to a workspace API, a script run with `--apply`, a script that
