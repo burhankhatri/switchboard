@@ -3,11 +3,26 @@
 Scope: the GTM Lead Engine and Pricing Bot workspaces as run through Switchboard
 (`packages/web`, `packages/sdk`, the `burhankhatri/agent-workspaces` repo). This
 is an investigation and a plan, not a code change. Every number below was
-measured on 2026-10-28 from the production Neon database (read-only), the
+measured on 2026-10-28 from the Neon database that `packages/web/.env.local`
+points at (read-only), the
 `agent-workspaces` repo at `2585d59`, this repo at `a60c021`, and Instantly's
 audit log (read-only). Nothing was sent, pushed, enriched or changed.
 
 ## 0. The question, and the verdict
+
+> **Correction (2026-10-28, after deploy).** The database read for this plan
+> (`packages/web/.env.local`, Neon) is not production. Production is the
+> Supabase database in Vercel's env: 53 chats and 423 messages against the 38
+> and 150 counted here, with activity through 2026-10-28. Every number in
+> sections 0 and 1 is therefore a subset. The one conclusion this overturns is
+> the last row of the table below: production holds Wayne's chat `cmuwx5cs`
+> (GLM-5.2) running `push_to_instantly.py --campaign 9e8897c8… --apply
+> --include-pushed` on 2026-10-06 18:03 UTC and again on 2026-10-12, plus
+> Python heredocs posting to Instantly on 10-12, 10-13 and 10-14. The 1,016
+> contacts were enrolled by a Switchboard agent after all, through the old
+> script's direct `/leads/add` call, which 2.3 has since removed. The
+> remaining measurements should be recomputed against Supabase before the
+> 2.9 experiment is judged.
 
 Burhan's hypothesis: *shared-agents is defaulted at GLM, and the way it accesses
 data is not optimised; the agents need to be considerably better.*
@@ -20,7 +35,7 @@ that hurt users most.**
 | "Defaulted at GLM" | **True.** `DEFAULT_HARNESS` is OpenCode on `opencode-go/glm-5.2` (`packages/web/lib/default-harness.ts:8`, `packages/common/src/agents.ts:464`); all 4 workspaces in the DB carry `model = opencode-go/glm-5.2`. But GLM-5.2 ran only 34 of the 77 assistant turns on record. 25 turns ran on the **free** `opencode/big-pickle` (an older default-model bug saved the first model in the list, see `default-model.ts:5-10`), 9 on Claude, 4 on `nemotron-3-ultra-free`, 5 on GLM-5.1. |
 | "Data access is not optimised" | **True, but second-order.** The agents re-read 15-26 KB skill files on every turn (31 skill loads + 22 raw `Read SKILL.md` in 46 tool-using turns), re-fetch the 120 KB campaign list (16 times across chats) and the 442 KB lead store (9 dry runs across chats, 3 inside one chat), and poll long jobs inside a single turn (one turn died at the 25-minute limit after 1,602 s of polling). Total model spend across the whole history is **$5.69**, so cost is not the problem; turn length, the $0.50/day shared cap and lost context are. |
 | "The agents are poor" | **Mixed.** GLM-5.2 turns were careful: honest zero counts, three refusals to print the token, every push preceded by a preview and a yes. What users actually hit was **harness reliability** (Wayne's first three messages got three blank replies; six Claude Code chats errored with no reply), **not knowing whether an action happened** (four "did you create / did you put / did you update" questions), **stale and contradictory skills**, and **environment friction** (about 20 of the 54 failed tool calls were `jq`/`python`/`requests` missing or a root-owned `/tmp/opencode`). |
-| "A teammate's Switchboard agent enrolled 1,016 contacts" (background given to this task) | **Not supported by Switchboard's records.** The DB has no chat, no scheduled run (0 runs ever) and no chat deletion on 6, 12, 14 or 15 October. Instantly's audit log shows campaign `9e8897c8` created by an API key on 2026-10-06 18:08 UTC and filled by API in batches of 42, 61, 401, 173 and 323 (6, 12, 14, 15 Oct), every row `from_api: true` with no user. The same key also removed the 16 leads Switchboard had pushed into draft `7c08d5fb` on 13 Oct. The field mapping (`place_id`, `maps_link`, `contact_source`) is `push_to_instantly.py`'s, which anyone with the workspaces repo can run locally. The bypass is real; attributing it to Switchboard is not. |
+| "A teammate's Switchboard agent enrolled 1,016 contacts" (background given to this task) | **Wrong as first written; see the correction above. In production it is supported.** The text that follows was measured against the stale Neon copy. **Not supported by Switchboard's records (Neon copy).** The DB has no chat, no scheduled run (0 runs ever) and no chat deletion on 6, 12, 14 or 15 October. Instantly's audit log shows campaign `9e8897c8` created by an API key on 2026-10-06 18:08 UTC and filled by API in batches of 42, 61, 401, 173 and 323 (6, 12, 14, 15 Oct), every row `from_api: true` with no user. The same key also removed the 16 leads Switchboard had pushed into draft `7c08d5fb` on 13 Oct. The field mapping (`place_id`, `maps_link`, `contact_source`) is `push_to_instantly.py`'s, which anyone with the workspaces repo can run locally. The bypass is real; attributing it to Switchboard is not. |
 
 Judgment on the ask: **JUSTIFIED** for a plan; **SIMPLIFY** the model part
 (drop the free models, keep GLM-5.2, run a bounded Claude experiment on the
