@@ -213,8 +213,17 @@ export const PYTHON_PACKAGES: Record<string, string> = {
  * import, and `/tmp/opencode: Permission denied` — OpenCode's own tool-output
  * directory ends up root-owned in the image while the agent runs as `daytona`.
  * python-is-python3 is Debian's own answer to the first one.
+ *
+ * libreoffice-calc-nogui gives the pricing bot `soffice --headless
+ * --convert-to pdf` for its .xlsx quotes. Sandboxes are deleted after 5 idle
+ * minutes, so installing it at run time cost every pricing turn a reinstall.
  */
-export const SANDBOX_APT_TOOLS = ["jq", "python3-requests", "python-is-python3"] as const
+export const SANDBOX_APT_TOOLS = [
+  "jq",
+  "python3-requests",
+  "python-is-python3",
+  "libreoffice-calc-nogui",
+] as const
 
 /** Bump to force the tooling layer to rebuild; see BROWSER_LAYER_PIN for why. */
 export const TOOLING_LAYER_PIN = "2026-10-28"
