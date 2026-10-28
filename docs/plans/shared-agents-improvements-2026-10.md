@@ -463,12 +463,44 @@ was rebuilt and promoted the same day after the skill harness passed.
    chat, so the new rule would have charged them; the remaining one is a chat's
    first metered session. Rows already in the ledger are not rewritten.
 
-**New finding from that check:** OpenCode starts a fresh session in most turns
-instead of resuming the chat's one (61 new sessions in 13 chats, 60 of them
-mid-chat). Each fresh session re-reads the replayed history and the whole
-system prompt, which is part of the 18:1 cache-read ratio in 2.7. Why the
-session is not resumed (a new sandbox per turn, the session file not carried
-over, or `-s` failing) is not yet known.
+**New finding from that check, root-caused (2026-10-28): agents forget the
+conversation after 5 idle minutes.** Commit `0027bf0` (2026-09-22) made every
+GitHub-backed chat's sandbox delete itself when it stops, and it stops after 5
+idle minutes (`lib/sandbox.ts`, `autoStopInterval: 5`, `autoDeleteInterval: 0`),
+to stay under Daytona's six-sandbox cap. The commit treated the sandbox as a
+cache of the git branch, but OpenCode keeps the conversation in the sandbox's
+home directory. On the next message `ensure-sandbox.ts` recreates the sandbox,
+clears `Chat.sessionId`, and replays no history (`history.ts` replays only on an
+agent switch or a fork), so the agent starts with the system prompt and the new
+message alone.
+
+Evidence from production, consecutive metered turns since 2026-09-22:
+
+| Idle gap before the next message | Turns that started a fresh session |
+|---|---|
+| under 5 min | 0 of 63 |
+| 5-10 min | 7 of 9 |
+| 10 min or more | 25 of 26 |
+
+Before 2026-09-22, 0 of 3 did. 35 of 98 replies came more than 5 minutes after
+the previous turn ended. The 60 fresh mid-chat sessions are exactly the 60
+backdated sessions in defect 3. In those turns: "can you check again" got
+"What specifically would you like me to check again?"; Wayne's "please
+continue" after a 25-minute stop got "The session has no prior context to
+continue from"; others opened by rebuilding context from `git log`, and the
+pricing-bot agent reinstalled LibreOffice and re-downloaded supplier sheets into
+each "fresh sandbox". It also feeds the 18:1 cache-read ratio and the 18 tool
+calls per turn, since each fresh turn re-explores.
+
+**Proposed fix, not yet made:** when `ensureSandboxForChat` recreates a sandbox
+for a chat that already has assistant turns, replay the chat's history through
+the existing agent-switch path in `history.ts`, capped to the most recent
+messages so the prompt stays bounded. It is agent-agnostic and reuses tested
+code. A fuller fix would carry OpenCode's session store across sandboxes and
+resume with `-s`; it is OpenCode-specific and can follow if replay proves too
+lossy. Keeping sandboxes longer is not an option under the six-sandbox cap.
+LibreOffice belongs in the sandbox image so the pricing bot stops reinstalling
+it.
 
 ## 3. Order of work
 
