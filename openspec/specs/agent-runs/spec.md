@@ -174,6 +174,16 @@ not tagged.
 - **WHEN** a turn makes a write and then ends in error
 - **THEN** the write is still receipted; the error does not hide it
 
+#### Scenario: A driver script written and run in the same turn
+- **WHEN** the agent writes a script to a file (a heredoc or the Write tool)
+  whose source posts to an API, then runs it in a later call of the same turn
+- **THEN** the run is receipted as `run <script> (<verb> <path>)`
+
+#### Scenario: Chained shell commands
+- **WHEN** one command chains several curl calls
+- **THEN** each call's verb is paired only with its own URL, so a POST-shaped
+  list read followed by a GET is not a write
+
 ### Requirement: Documentation-only commits land on the base branch
 After a successful auto-push of an agent branch in a workspace, the system SHALL
 merge that branch into the workspace's base branch through the GitHub API when
