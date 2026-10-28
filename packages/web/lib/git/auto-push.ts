@@ -8,6 +8,7 @@ import {
   createPushFailedMessage,
 } from "@/lib/db/git-messages"
 import { recordWorkspaceEventAsync } from "@/lib/workspace-home/events"
+import { mergeDocOnlyBranch } from "@/lib/git/auto-merge"
 
 /** Client-notification payload for a push that advanced the remote. */
 export interface PushInfo {
@@ -62,7 +63,11 @@ export async function autoPushChat(params: {
       }),
       prisma.chat.findUnique({
         where: { id: chatId },
-        select: { repo: true, workspaceId: true },
+        select: {
+          repo: true,
+          workspaceId: true,
+          workspace: { select: { path: true, baseBranch: true } },
+        },
       }),
     ])
     const token = chat
@@ -119,6 +124,37 @@ export async function autoPushChat(params: {
         chatId,
         meta: { commitCount: commits, branch },
       })
+    }
+
+    // Documentation-only commits land on the base branch now, so the next
+    // chat's fresh clone sees them. Anything else waits for a person. Never
+    // fatal: the push already happened and is what this function reports.
+    if (chat?.workspaceId && chat.workspace && commits > 0) {
+      try {
+        const merge = await mergeDocOnlyBranch({
+          sandbox,
+          repoPath,
+          repo: chat.repo,
+          branch,
+          baseBranch: chat.workspace.baseBranch,
+          workspacePath: chat.workspace.path,
+          token,
+        })
+        if (merge.merged) {
+          recordWorkspaceEventAsync({
+            workspaceId: chat.workspaceId,
+            kind: "branch_merged",
+            summary: `Merged ${merge.files} documentation change${merge.files === 1 ? "" : "s"} from ${branch} into ${chat.workspace.baseBranch}`,
+            actorUserId: userId,
+            chatId,
+            meta: { branch, files: merge.files, baseBranch: chat.workspace.baseBranch },
+          })
+        } else {
+          console.log(`[auto-push] ${branch} not auto-merged: ${merge.reason}`)
+        }
+      } catch (err) {
+        console.error(`[auto-push] doc-only merge failed for ${branch}:`, err)
+      }
     }
 
     return { branch, commits, commitSha }

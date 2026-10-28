@@ -361,6 +361,20 @@ stops drifting.
 in the test suite; a real run on the harness shows the Approve button and
 proceeds only after the click.
 
+## 2b. Status (2026-10-28, same day)
+
+Shipped on `main` of this repo and of `agent-workspaces`:
+2.1 (blank turns), 2.2 (write receipts and `external_write` feed events),
+2.3 (push through `/api/leads/push` with `chain=false`, skill synced from the
+engine repo by `scripts/sync_workspace_skill.py`, store tables replaced by
+commands, pricing-bot guide), 2.4 small option (`wait_job.py` and the skill
+rule), 2.5 ($5 budget, 80% composer line, 20-minute notice), 2.6 (doc-only
+auto-merge), 2.7 partially (descriptions under 300 characters, `--counts`; the
+SKILL.md bodies are still 11-26 KB and `instantly_report.py --brief` is not
+done), 2.8 (image tooling; snapshot rebuild pending), 2.9 picker change (free
+models hidden; the Claude experiment waits on the org key), 2.10 (approval gate
+end to end). See PROGRESS.md for what was and was not verified.
+
 ## 3. Order of work
 
 1. 2.1 blank turns, 2.8 image, 2.5 budgets — one short PR each, no behaviour

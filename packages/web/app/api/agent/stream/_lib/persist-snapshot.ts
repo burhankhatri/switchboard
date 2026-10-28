@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client"
 import type { AgentSnapshot } from "@/lib/agent-session"
 import { stripNullBytes, stripNullBytesDeep } from "@/lib/db/pg-sanitize"
 import type { NotifyInput } from "@/lib/db/notifications"
+import { finalTurnContent } from "@/lib/turn-outcome"
 
 /**
  * Minimal slice of PrismaClient this module needs. Declared structurally so the
@@ -52,12 +53,17 @@ export async function persistAgentSnapshot(params: {
   const { prisma, chatId, assistantMessageId, snapshot, isFinal, userId, chatName, notify } =
     params
 
-  // 1. Persist the message body (best-effort, NUL-sanitized).
+  // 1. Persist the message body (best-effort, NUL-sanitized). On the final
+  //    write the body is what the person will read on every later load, so a
+  //    turn that ended in error or in silence is written as a visible stop
+  //    line rather than the empty string it would otherwise be.
+  const final = isFinal ? finalTurnContent(snapshot) : null
   try {
     await prisma.message.update({
       where: { id: assistantMessageId },
       data: {
-        content: stripNullBytes(snapshot.content),
+        content: stripNullBytes(final ? final.content : snapshot.content),
+        ...(final?.isError ? { isError: true } : {}),
         toolCalls:
           snapshot.toolCalls.length > 0
             ? (stripNullBytesDeep(snapshot.toolCalls) as unknown as Prisma.InputJsonValue)

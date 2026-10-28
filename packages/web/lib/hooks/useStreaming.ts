@@ -225,6 +225,11 @@ export function useStreaming(options: UseStreamingOptions = {}) {
             })
           }
 
+          // The turn just spent budget; the composer's budget line reads this key.
+          void queryClient.invalidateQueries({ queryKey: queryKeys.usage.all })
+          // The agent may have asked for an approval during this turn.
+          void queryClient.invalidateQueries({ queryKey: queryKeys.chats.approvals(chatId) })
+
           // Fetch any new messages created by the backend (delta sync)
           try {
             const chatData = await fetchChat(chatId, { afterMessageId: assistantMessageId })

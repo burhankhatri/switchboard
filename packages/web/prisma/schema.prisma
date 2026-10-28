@@ -204,6 +204,7 @@ model Chat {
   messages   Message[]
   notifications Notification[]
   mcpServers McpServerConnection[]
+  approvals  ChatApproval[]
 
   // Link back to scheduled run (if this chat belongs to one)
   scheduledJobRun ScheduledJobRun?
@@ -824,6 +825,7 @@ model WorkspaceEvent {
 
   /// "job_created" | "job_approved" | "job_enabled" | "job_disabled" |
   /// "job_deleted" | "run_completed" | "run_failed" | "files_committed" |
+  /// "external_write" | "branch_merged" |
   /// "widget_created" | "widget_updated" | "widget_removed" |
   /// "member_joined" | "member_left" | "chat_shared"
   kind String
@@ -893,4 +895,31 @@ model WorkspaceWidget {
 
   @@unique([workspaceId, key])
   @@index([workspaceId, position])
+}
+
+/// A write the agent asked permission for. The agent calls `request_approval`
+/// (run-scoped MCP), the chat owner clicks Approve or Decline, and the next turn
+/// on the chat receives the approved row's id as SWITCHBOARD_APPROVAL, which the
+/// workspace scripts require before `--apply`. Single use: the turn that
+/// receives it marks it `used`.
+model ChatApproval {
+  id     String @id @default(cuid())
+  chatId String
+  userId String
+
+  /// What the agent wants to do, in the person's terms: "add leads to campaign".
+  action   String
+  count    Int?
+  campaign String?
+
+  /// "pending" | "approved" | "declined" | "used"
+  status String @default("pending")
+
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+  usedAt    DateTime?
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, status])
 }

@@ -11,6 +11,8 @@ import {
   Loader2,
   MessageSquare,
   UserPlus,
+  GitMerge,
+  PenLine,
   type LucideIcon,
 } from "lucide-react"
 import type { FeedEvent } from "@/lib/workspace-home/feed"
@@ -22,6 +24,8 @@ const ICON: Record<string, LucideIcon> = {
   run_completed: CheckCircle2,
   run_failed: AlertTriangle,
   files_committed: FileText,
+  external_write: PenLine,
+  branch_merged: GitMerge,
   chat_shared: MessageSquare,
   member_joined: UserPlus,
   member_left: UserPlus,

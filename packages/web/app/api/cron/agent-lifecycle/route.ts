@@ -9,7 +9,8 @@ import { logLlmProviderError } from "@/lib/db/activity-log"
 import { INTERACTIVE_HARD_TIMEOUT, SCHEDULED_HARD_TIMEOUT } from "./_lib/constants"
 import { monitorAgent, stopAgent } from "./_lib/monitor"
 import { startJobExecution, finalizeScheduledRun, failScheduledRun } from "./_lib/scheduled"
-import { finalizeInteractiveChat, markChatError } from "./_lib/interactive"
+import { finalizeInteractiveChat, markChatError, warnLongTurnOnce } from "./_lib/interactive"
+import { longTurnNotice } from "./_lib/long-turn"
 
 // Vercel Pro plan allows up to 5 minutes for cron jobs
 export const maxDuration = 300
@@ -172,6 +173,17 @@ export async function GET(req: Request) {
           await markChatError(chat.id, "Run exceeded 25 minute limit")
           results.timedOutInteractive++
           continue
+        }
+
+        // Five minutes before the stop, the owner hears about it. Best-effort:
+        // a failed notice must not stop the turn being monitored.
+        const notice = longTurnNotice(totalMinutes)
+        if (notice) {
+          try {
+            await warnLongTurnOnce(chat, notice)
+          } catch (err) {
+            console.error(`[agent-lifecycle] long-turn notice failed for chat ${chat.id}:`, err)
+          }
         }
 
         // Monitor and check completion

@@ -20,6 +20,7 @@ import { PATHS, SANDBOX_CONFIG } from "./constants"
 import { basename } from "./format"
 import { isDirectoryReadOutput } from "./tool-output"
 import { extractNeedsInput, NEEDS_INPUT_MARKER } from "./needs-input"
+import { classifyWrite } from "./write-classifier"
 
 // =============================================================================
 // Tool Name Mapping (SDK uses lowercase, UI expects PascalCase)
@@ -265,6 +266,10 @@ export function buildContentBlocks(events: Event[]): BuildContentBlocksResult {
       const summary = detail ? `${tool}: ${detail}` : tool
       const fullSummary = fullDetail ? `${tool}: ${fullDetail}` : undefined
       const toolCall: ToolCall = { tool, summary, fullSummary, filePath }
+      // Tagged here, at the one place every agent's events become ToolCalls,
+      // so the transcript and the workspace feed agree on what was written.
+      const write = classifyWrite(tool, toolEvent.input) ?? classifyWrite(toolEvent.name, toolEvent.input)
+      if (write) toolCall.write = write
       pendingToolCalls.push(toolCall)
       allToolCalls.push(toolCall)
     } else if (event.type === "tool_end") {

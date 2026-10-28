@@ -204,6 +204,35 @@ export const PYTHON_PACKAGES: Record<string, string> = {
   openpyxl: "3.1.5",
 }
 
+/**
+ * Command-line tools the workspace scripts and the models reach for.
+ *
+ * Measured, not guessed: about 20 of the 54 failed tool calls in the first two
+ * months of transcripts were the sandbox rather than the model. `python` (the
+ * scripts say `python3`, models type `python`), `jq`, a Python `requests`
+ * import, and `/tmp/opencode: Permission denied` — OpenCode's own tool-output
+ * directory ends up root-owned in the image while the agent runs as `daytona`.
+ * python-is-python3 is Debian's own answer to the first one.
+ */
+export const SANDBOX_APT_TOOLS = ["jq", "python3-requests", "python-is-python3"] as const
+
+/** Bump to force the tooling layer to rebuild; see BROWSER_LAYER_PIN for why. */
+export const TOOLING_LAYER_PIN = "2026-10-28"
+
+/**
+ * Install the tools and hand OpenCode's temp dirs to the sandbox user. Must run
+ * after `useradd daytona` and before `USER daytona` (apt needs root).
+ */
+export function sandboxToolingCommand(): string {
+  return (
+    `: tooling layer pin ${TOOLING_LAYER_PIN} && ` +
+    "apt-get update && apt-get install -y --no-install-recommends " +
+    `${SANDBOX_APT_TOOLS.join(" ")} ` +
+    "&& rm -rf /var/lib/apt/lists/* && " +
+    "mkdir -p /tmp/opencode /tmp/logs && chown -R daytona:daytona /tmp/opencode /tmp/logs"
+  )
+}
+
 /** Install the browser and its matching driver, plus the fonts pages need. */
 export function browserInstallCommand(): string {
   // The pin token rides as a comment: it changes the command string (busting
@@ -302,6 +331,10 @@ export function getAgentSandboxImage(): Image {
       .runCommands(
         "useradd -m -s /bin/bash daytona || true && " +
           "echo 'daytona ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers"
+      )
+      .runCommands(
+        // jq, requests, `python`, and OpenCode's temp dirs owned by daytona.
+        sandboxToolingCommand()
       )
       .runCommands(
         // Install Kimi Code CLI (Moonshot). Shell-script installer, not npm —

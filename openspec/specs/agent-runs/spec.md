@@ -126,3 +126,105 @@ workspace and to execute one.
 - **THEN** repo, branch and agent are denormalised from the workspace, so the
   run clones what the job was written against rather than taking the
   repo-less path and starting with no skills or scripts
+
+### Requirement: A finished turn is never a blank reply
+When a turn ends with no text from the model, the system SHALL write the reason
+into the assistant message itself and flag the message as an error, so the
+reason survives a reload and is not only in the live banner or the activity log.
+
+#### Scenario: The provider rejects the run before the first token
+- **WHEN** a turn ends in error with empty content
+- **THEN** the persisted assistant message reads `Agent stopped: <reason>`, is
+  flagged `isError`, and names the fix where one is known (the free-tier version
+  gate points at the model menu and an image rebuild)
+
+#### Scenario: The model says nothing and does nothing
+- **WHEN** a turn completes with no text and no tool calls
+- **THEN** the message says so and is flagged `isError`, rather than persisting
+  as an empty string
+
+#### Scenario: A quiet tool-only turn
+- **WHEN** a turn completes with tool calls but no prose
+- **THEN** the message is left as the agent produced it; it is not an error
+
+#### Scenario: Partial output before the failure
+- **WHEN** a turn ends in error after the model had written some text
+- **THEN** that text is kept and the stop line is appended below it
+
+### Requirement: External writes are receipted
+Every tool call that changes something outside the sandbox (an HTTP POST, PUT,
+PATCH or DELETE to a workspace API, a script run with `--apply`, a script that
+writes by default) SHALL be tagged when the agent's events are parsed, listed
+under the assistant message as "Writes this turn" with what the response
+reported, and recorded once per turn as an `external_write` event in the
+workspace feed. Reads, including Instantly's POST-shaped list endpoints, are
+not tagged.
+
+#### Scenario: A push through a script
+- **WHEN** a turn runs `python3 scripts/push_to_instantly.py --campaign <id> --apply`
+- **THEN** the message shows `apply push_to_instantly.py --campaign <id>` with the
+  count the script reported, and the feed shows the same line attributed to the
+  person whose chat it was
+
+#### Scenario: A read-only turn
+- **WHEN** a turn only ran `GET` requests and dry runs
+- **THEN** nothing is listed and no feed event is written
+
+#### Scenario: A write before a crash
+- **WHEN** a turn makes a write and then ends in error
+- **THEN** the write is still receipted; the error does not hide it
+
+### Requirement: Documentation-only commits land on the base branch
+After a successful auto-push of an agent branch in a workspace, the system SHALL
+merge that branch into the workspace's base branch through the GitHub API when
+every change since the merge base is under the workspace folder and matches
+`campaigns/**`, `LEARNINGS.md`, `HOME.md` or `.claude/skills/**/reference/**`.
+Any other change, including a `SKILL.md`, a script, a test or `workspace.yaml`,
+leaves the branch for a person to merge. A merge is recorded as a
+`branch_merged` feed event; a refusal is logged and is not an error.
+
+#### Scenario: A campaign spec and a LEARNINGS entry
+- **WHEN** an agent commits `campaigns/<slug>/campaign.json` and `LEARNINGS.md`
+  and the push succeeds
+- **THEN** the branch is merged into the base branch and the next chat's fresh
+  clone contains both files
+
+#### Scenario: A script changed alongside the docs
+- **WHEN** the same commit also touches `scripts/push_to_instantly.py`
+- **THEN** nothing is merged and the branch waits for review
+
+#### Scenario: GitHub reports a conflict
+- **WHEN** the merges API answers 409
+- **THEN** the push is still reported as a success and the branch is left as it is
+
+### Requirement: A write needs a click
+An interactive run SHALL be offered a `request_approval` tool on the run-scoped
+MCP endpoint. Calling it records a pending approval on the chat (action, count,
+campaign), parks the chat as awaiting input and notifies the owner; the agent is
+told to end the turn. The owner approves or declines from the chat. The next
+turn on that chat receives the oldest approved, unspent approval's id as
+`SWITCHBOARD_APPROVAL` in the agent's environment and marks it used. The
+variable is set by the platform only; user and workspace variables cannot
+supply it. Scheduled runs are not offered the tool. The workspace scripts that
+write (`push_to_instantly.py --apply`, `create_campaign.py --apply`) refuse
+without the variable.
+
+#### Scenario: The agent wants to push
+- **WHEN** the agent calls `request_approval` with "add leads to campaign", 16
+  and a campaign, then ends the turn
+- **THEN** the chat shows an Approve button with that line, and
+  `push_to_instantly.py --apply` run in that same turn exits non-zero naming the
+  tool
+
+#### Scenario: The owner approves
+- **WHEN** the owner clicks Approve and sends the next message
+- **THEN** that turn's environment carries `SWITCHBOARD_APPROVAL` once, the
+  approval is marked used, and a later turn does not receive it again
+
+#### Scenario: A double click
+- **WHEN** a decision is posted for an approval that is no longer pending
+- **THEN** the request is refused with 400 and nothing changes
+
+#### Scenario: An agent that keeps asking
+- **WHEN** three requests are already pending on the chat
+- **THEN** a fourth is refused and the agent is told to stop

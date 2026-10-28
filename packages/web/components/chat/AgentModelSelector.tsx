@@ -7,6 +7,7 @@ import { useModals } from "@/lib/contexts"
 import type { Agent, ModelOption, CredentialFlags, Chat } from "@/lib/types"
 import { getAgentModels, agentLabels, getModelLabel, hasCredentialsForModel, agentHasFreeUsage, agentIsReady, agentSharedPoolExhausted, resolveModelForAgent, ALL_AGENTS } from "@/lib/types"
 import { useSettingsQuery } from "@/lib/query/hooks/useSettingsQuery"
+import { visibleModelOptions } from "@/lib/model-visibility"
 import { AgentIcon } from "../icons/agent-icons"
 import { PillButton } from "../glass-ui/Buttons"
 import { AnchoredMenu } from "../ui/AnchoredMenu"
@@ -106,7 +107,13 @@ export function AgentModelSelector({
   const [showModelSheet, setShowModelSheet] = useState(false)
   const [search, setSearch] = useState("")
 
-  const availableModels = getAgentModels(currentAgent, endpoints)
+  // Free models are hidden once the shared key exists (lib/model-visibility).
+  const availableModels = visibleModelOptions(
+    currentAgent,
+    getAgentModels(currentAgent, endpoints),
+    credentialFlags,
+    currentModel
+  )
   const selectedModelConfig = availableModels.find(m => m.value === currentModel)
   const hasRequiredCredentials = selectedModelConfig
     ? hasCredentialsForModel(selectedModelConfig, credentialFlags, currentAgent)

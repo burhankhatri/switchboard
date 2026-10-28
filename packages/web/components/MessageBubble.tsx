@@ -1,7 +1,8 @@
 "use client"
 
 import { useMemo, memo } from "react"
-import { GitMerge, FileText, AlertTriangle, CalendarClock, Pin } from "lucide-react"
+import { GitMerge, FileText, AlertTriangle, CalendarClock, Pin, PenLine } from "lucide-react"
+import { summarizeWrites } from "@/lib/write-classifier"
 import { cn } from "@/lib/utils"
 import { LoadingState } from "@/components/ui/LoadingState"
 import type { Message } from "@/lib/types"
@@ -212,6 +213,11 @@ function AssistantContent({ message, isStreaming, isMobile = false, repo, onOpen
     return hasBlocks ? mergeConsecutiveToolCalls(message.contentBlocks!) : null
   }, [hasBlocks, message.contentBlocks])
 
+  // What this turn changed outside the sandbox, as a receipt under the reply.
+  // People asked "did you actually do it" four times in two months because a
+  // POST looks like every other chip.
+  const writes = useMemo(() => summarizeWrites(message.toolCalls ?? []), [message.toolCalls])
+
   return (
     <div className={cn(
       "w-full leading-relaxed",
@@ -247,6 +253,23 @@ function AssistantContent({ message, isStreaming, isMobile = false, repo, onOpen
             />
           )}
         </>
+      )}
+
+      {writes.length > 0 && (
+        <div
+          className="rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5"
+          data-testid="writes-this-turn"
+        >
+          <div className="flex items-center gap-1.5 text-[12px] font-medium text-amber-700 dark:text-amber-300">
+            <PenLine className="h-3 w-3" />
+            Writes this turn
+          </div>
+          <ul className="mt-0.5 space-y-0.5 font-mono text-[11.5px] text-muted-foreground">
+            {writes.map((line, i) => (
+              <li key={i} className="break-all">{line}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {/* Streaming indicator. An elapsed counter rather than a static ellipsis:

@@ -226,3 +226,55 @@ describe("persistAgentSnapshot — notifying", () => {
     expect(notify).not.toHaveBeenCalled()
   })
 })
+
+describe("persistAgentSnapshot — the final write never leaves a blank reply", () => {
+  it("persists the error text and isError on a final errored turn", async () => {
+    // Before this, an errored turn persisted content "" and isError unset: the
+    // SSE banner showed the error once and a reload showed an empty bubble.
+    const { client, message } = makeClient()
+
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot({ status: "error", content: "", error: "Error from provider: 402" }),
+      isFinal: true,
+    })
+
+    const data = message.update.mock.calls[0][0].data as { content: string; isError?: boolean }
+    expect(data.isError).toBe(true)
+    expect(data.content).toContain("Agent stopped: Error from provider: 402")
+  })
+
+  it("explains a completed turn that produced nothing", async () => {
+    const { client, message } = makeClient()
+
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot({ content: "", toolCalls: [] }),
+      isFinal: true,
+    })
+
+    const data = message.update.mock.calls[0][0].data as { content: string; isError?: boolean }
+    expect(data.isError).toBe(true)
+    expect(data.content.trim().length).toBeGreaterThan(0)
+  })
+
+  it("leaves an interim (non-final) write untouched", async () => {
+    const { client, message } = makeClient()
+
+    await persistAgentSnapshot({
+      prisma: client,
+      chatId: "chat-1",
+      assistantMessageId: "msg-1",
+      snapshot: completedSnapshot({ status: "running", content: "" }),
+      isFinal: false,
+    })
+
+    const data = message.update.mock.calls[0][0].data as { content: string; isError?: boolean }
+    expect(data.content).toBe("")
+    expect(data.isError).toBeUndefined()
+  })
+})
