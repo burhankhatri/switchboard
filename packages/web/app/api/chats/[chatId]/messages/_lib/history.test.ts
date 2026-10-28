@@ -27,7 +27,10 @@ import {
 } from "./history"
 import type { ChatRecord, MessagePayload } from "./types"
 
-const chat = { id: "chat-1", parentChatId: null } as unknown as ChatRecord
+// ensureSandboxForChat sets sessionId to null whenever it builds a sandbox, for
+// a message or for a git action, so "no session to resume" is the signal.
+const lostSession = { id: "chat-1", parentChatId: null, sessionId: null } as unknown as ChatRecord
+const liveSession = { id: "chat-1", parentChatId: null, sessionId: "ses_abc" } as unknown as ChatRecord
 const payload = { agent: "opencode" } as unknown as MessagePayload
 
 const priorMessages = [
@@ -43,11 +46,11 @@ beforeEach(() => {
   findMany.mockResolvedValue(priorMessages)
 })
 
-describe("buildAgentHistory — sandbox recreated mid-chat", () => {
-  it("replays the chat's own history when the sandbox was just recreated", async () => {
+describe("buildAgentHistory — session lost mid-chat", () => {
+  it("replays the chat's own history when there is no session to resume", async () => {
     findFirst.mockResolvedValue({ agent: "opencode" })
 
-    const result = await buildAgentHistory("chat-1", chat, payload, { sandboxRecreated: true })
+    const result = await buildAgentHistory("chat-1", lostSession, payload)
 
     expect(result.isAgentSwitch).toBe(false)
     expect(result.history).toEqual(priorMessages)
@@ -59,15 +62,15 @@ describe("buildAgentHistory — sandbox recreated mid-chat", () => {
   it("replays nothing on a chat's first message, even though its sandbox is new", async () => {
     findFirst.mockResolvedValue(null)
 
-    const result = await buildAgentHistory("chat-1", chat, payload, { sandboxRecreated: true })
+    const result = await buildAgentHistory("chat-1", lostSession, payload)
 
     expect(result.history).toBeUndefined()
   })
 
-  it("replays nothing when the sandbox survived, so the agent resumes its own session", async () => {
+  it("replays nothing when the agent can resume its own session", async () => {
     findFirst.mockResolvedValue({ agent: "opencode" })
 
-    const result = await buildAgentHistory("chat-1", chat, payload, { sandboxRecreated: false })
+    const result = await buildAgentHistory("chat-1", liveSession, payload)
 
     expect(result.history).toBeUndefined()
     expect(findMany).not.toHaveBeenCalled()
@@ -76,7 +79,7 @@ describe("buildAgentHistory — sandbox recreated mid-chat", () => {
   it("keeps the agent-switch replay as before", async () => {
     findFirst.mockResolvedValue({ agent: "claude-code" })
 
-    const result = await buildAgentHistory("chat-1", chat, payload, { sandboxRecreated: false })
+    const result = await buildAgentHistory("chat-1", liveSession, payload)
 
     expect(result.isAgentSwitch).toBe(true)
     expect(result.history).toEqual(priorMessages)
@@ -90,7 +93,7 @@ describe("buildAgentHistory — sandbox recreated mid-chat", () => {
     }))
     findMany.mockResolvedValue(long)
 
-    const { history } = await buildAgentHistory("chat-1", chat, payload, { sandboxRecreated: true })
+    const { history } = await buildAgentHistory("chat-1", lostSession, payload)
 
     const total = history!.reduce((n, m) => n + m.content.length, 0)
     expect(total).toBeLessThanOrEqual(REPLAY_MAX_CHARS)
@@ -110,9 +113,13 @@ describe("capHistory", () => {
 
   it("clips one overlong message instead of dropping it", () => {
     const huge = "y".repeat(REPLAY_MAX_MESSAGE_CHARS * 3)
-    const [only] = capHistory([{ role: "assistant", content: huge }])
-    expect(only.content.length).toBeLessThanOrEqual(REPLAY_MAX_MESSAGE_CHARS)
-    expect(only.content).toMatch(/truncated/)
+    const [question, reply] = capHistory([
+      { role: "user", content: "summarise the sheet" },
+      { role: "assistant", content: huge },
+    ])
+    expect(question.content).toBe("summarise the sheet")
+    expect(reply.content.length).toBeLessThanOrEqual(REPLAY_MAX_MESSAGE_CHARS)
+    expect(reply.content).toMatch(/truncated/)
   })
 
   it("starts the replay on a user message so the agent never sees a reply without its question", () => {
