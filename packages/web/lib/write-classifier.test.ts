@@ -201,3 +201,13 @@ describe("WriteTracker — scripts the agent writes and then runs", () => {
     })
   })
 })
+
+describe("classifyWrite — urllib one-segment paths", () => {
+  it("keeps a one-segment path such as /campaigns", () => {
+    expect(
+      classifyWrite("Bash", {
+        command: "python3 - <<'EOF'\nreq = urllib.request.Request(base.rstrip('/') + '/campaigns', data=json.dumps(spec).encode())\nEOF",
+      })
+    ).toEqual({ verb: "POST", target: "/campaigns" })
+  })
+})
