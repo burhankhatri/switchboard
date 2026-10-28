@@ -508,6 +508,14 @@ next snapshot rebuild. The check after release: in production, turns sent more
 than 5 minutes after the previous one should answer follow-ups such as "please
 continue" from the conversation instead of asking what it was about.
 
+**Turn limit raised (2026-10-28).** At the user's request the interactive hard
+stop is now 90 minutes, up from 25; the warning comes at 85 and the stop
+message is built from the constant. The per-minute lifecycle cron is also what
+keeps a running sandbox from idling out, so nothing else needed to change.
+Scheduled runs keep their 20 minutes. The workspace's `wait_job.py` still gives
+up after 12 minutes and its skill still says to end the turn, which was sized
+for the old limit.
+
 ## 3. Order of work
 
 1. 2.1 blank turns, 2.8 image, 2.5 budgets — one short PR each, no behaviour
