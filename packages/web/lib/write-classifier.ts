@@ -205,7 +205,9 @@ const COUNT_KEYS = ["leads_uploaded", "pushed", "enrolled", "updated", "queued",
 export function writeOutcome(output: string | undefined): WriteOutcome | null {
   if (!output) return null
   for (const key of COUNT_KEYS) {
-    const m = new RegExp(`"?${key}"?\\s*:\\s*(\\d+)`).exec(output)
+    // A bare key and a whole number: "updated: 2026-10-06T…" is a timestamp
+    // and "timestamp_updated" is a different field.
+    const m = new RegExp(`(?<![\\w])"?${key}"?\\s*:\\s*(\\d+)(?![\\d.:T-])`).exec(output)
     if (m) return { count: Number(m[1]), label: key }
   }
   const status = /\bHTTP[:\s]+(\d{3})\b/.exec(output)
