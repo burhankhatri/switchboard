@@ -288,3 +288,20 @@ describe("buildContentBlocks — needs-input marker", () => {
     expect(content.trim()).toBe("Done — pushed and green.")
   })
 })
+
+describe("buildContentBlocks — a driver script written and run in one turn", () => {
+  it("tags the run as a write", () => {
+    const { toolCalls } = buildContentBlocks([
+      {
+        type: "tool_start",
+        name: "bash",
+        input: { command: "cat > /tmp/logs/engine_driver.py <<'PYEOF'\ncall(\"POST\", \"/api/run\", {\"zips\": z})\nPYEOF" },
+      },
+      { type: "tool_end", output: "" },
+      { type: "tool_start", name: "bash", input: { command: "python3 /tmp/logs/engine_driver.py" } },
+      { type: "tool_end", output: "job a1 started" },
+    ] as Parameters<typeof buildContentBlocks>[0])
+    expect(toolCalls[0].write).toBeUndefined()
+    expect(toolCalls[1].write).toEqual({ verb: "run", target: "engine_driver.py (POST /api/run)" })
+  })
+})
