@@ -12,6 +12,11 @@ export interface ToolCall {
   fullSummary?: string
   filePath?: string
   output?: string
+  /**
+   * Set when the call changed something outside the sandbox (a POST to a
+   * workspace API, a script run with --apply). See web/lib/write-classifier.
+   */
+  write?: { verb: string; target: string }
 }
 
 export type ContentBlock =

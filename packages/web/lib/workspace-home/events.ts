@@ -18,6 +18,8 @@ export type WorkspaceEventKind =
   | "run_completed"
   | "run_failed"
   | "files_committed"
+  | "external_write"
+  | "branch_merged"
   | "widget_created"
   | "widget_updated"
   | "widget_removed"

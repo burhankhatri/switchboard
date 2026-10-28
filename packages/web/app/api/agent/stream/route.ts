@@ -13,6 +13,7 @@ import { logLlmProviderError } from "@/lib/db/activity-log"
 import { isAuthError, requireChatStreamAccess } from "@/lib/db/api-helpers"
 import { meterAssistantTurn } from "@/lib/server/token-metering"
 import { autoPushChat, type PushInfo } from "@/lib/git/auto-push"
+import { recordExternalWritesAsync } from "@/lib/write-receipts"
 import { persistAgentSnapshot } from "./_lib/persist-snapshot"
 import { notifyAsync } from "@/lib/db/notifications"
 
@@ -255,13 +256,24 @@ export async function GET(req: Request) {
             // to the cron, which finalizes identically. Populated when the push
             // advances the remote, so the client can raise a "new push" toast.
             let pushInfo: PushInfo | undefined
-            if (lastSnap.status === "completed" && chatId) {
+            if (chatId) {
               const chat = await prisma.chat.findUnique({
                 where: { id: chatId },
-                select: { branch: true, repo: true, userId: true },
+                select: { branch: true, repo: true, userId: true, workspaceId: true },
               })
 
-              if (chat?.branch && chat.repo && chat.repo !== "__new__") {
+              // Receipted whether or not the turn finished cleanly: a write
+              // made before a crash is still a write.
+              if (chat) {
+                recordExternalWritesAsync({
+                  workspaceId: chat.workspaceId,
+                  chatId,
+                  userId: chat.userId,
+                  toolCalls: lastSnap.toolCalls,
+                })
+              }
+
+              if (lastSnap.status === "completed" && chat?.branch && chat.repo && chat.repo !== "__new__") {
                 pushInfo =
                   (await autoPushChat({
                     sandbox,

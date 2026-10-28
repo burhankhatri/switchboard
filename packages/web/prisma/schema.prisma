@@ -824,6 +824,7 @@ model WorkspaceEvent {
 
   /// "job_created" | "job_approved" | "job_enabled" | "job_disabled" |
   /// "job_deleted" | "run_completed" | "run_failed" | "files_committed" |
+  /// "external_write" | "branch_merged" |
   /// "widget_created" | "widget_updated" | "widget_removed" |
   /// "member_joined" | "member_left" | "chat_shared"
   kind String

@@ -10,6 +10,7 @@ import { finalTurnContent } from "@/lib/turn-outcome"
 
 import { autoPushChat } from "@/lib/git/auto-push"
 import { notifyAsync } from "@/lib/db/notifications"
+import { recordExternalWritesAsync } from "@/lib/write-receipts"
 import type { LongTurnNotice } from "./long-turn"
 import type { ChatWithMessages } from "./types"
 
@@ -49,6 +50,14 @@ export async function finalizeInteractiveChat(
       console.error(`[agent-lifecycle] Failed to persist message for chat ${chat.id}:`, err)
     }
   }
+
+  // 1b. Receipt what the turn wrote outside the sandbox, for the feed.
+  recordExternalWritesAsync({
+    workspaceId: chat.workspaceId,
+    chatId: chat.id,
+    userId: chat.userId,
+    toolCalls: snapshot.toolCalls,
+  })
 
   // 2. Finalize the turn
   if (chat.sandboxId && chat.backgroundSessionId) {
