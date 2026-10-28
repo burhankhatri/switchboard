@@ -82,7 +82,15 @@ cd packages/web && GH_TOKEN=$(gh auth token) npx dotenv -e .env.local -- node ..
   body and exits before a pipe drains, so piped output stops at exactly 64KB and
   most skills look missing. Write it to a file and read it whole (the skill harness does).
 - **Rebuilding the sandbox image** (`npm run build:snapshot`) is only needed when
-  `packages/sandbox-image` changes. The image has `python3` but **no `pip`** and
-  **no `gh`**. The rebuild runs the skill harness against the new image before it
+  `packages/sandbox-image` changes. The image has `python3` (and `python`, via
+  python-is-python3), `jq`, Python `requests`, selenium and pandas, but **no
+  `gh`**. `/tmp/opencode` and `/tmp/logs` are pre-created owned by `daytona`;
+  they used to be root-owned, which broke every OpenCode tool call that wrote
+  there. The rebuild runs the skill harness against the new image before it
   replaces the live one, so it needs the harness's credentials too; a failure
   leaves the live image serving.
+- **Sandbox egress.** Daytona sandboxes reach the public internet; a firewall
+  reset TLS to `api.instantly.ai` on 2026-08-20 and 2026-09-11 and 21 tool calls
+  went on diagnosing it before anyone looked outside the sandbox. It has worked
+  since 2026-09-15. If a workspace API starts failing with connection resets
+  from every sandbox at once, suspect the network before the script.
