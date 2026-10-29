@@ -69,6 +69,11 @@ export function createSandboxJobs(sandbox: Sandbox): SandboxJobs {
     )
     const cgroup = setup.includes(`CGROUP:${candidate}`) ? candidate : null
     const processTag = `SWITCHBOARD_JOB_ID=${jobId}`
+    const inputFile = `${dir}/stdin.txt`
+    if (opts.stdin !== undefined) {
+      await sandbox.fs.uploadFile(Buffer.from(opts.stdin, "utf8"), inputFile)
+      await checkedExec(`chmod 600 ${q(inputFile)}`, "job input permissions")
+    }
 
     const envExports = Object.entries(opts.env ?? {})
       .map(([k, v]) => `export ${k}=${q(v)}; `)
@@ -94,7 +99,8 @@ export function createSandboxJobs(sandbox: Sandbox): SandboxJobs {
     // Inner program: join cgroup; change cwd; export env; run; record true exit.
     // `setsid` detaches the job into its own session and gives a stable leader
     // pid (== pgid) for liveness/crash detection.
-    const inner = `${cgJoin}${cd}${envExports}export SWITCHBOARD_JOB_ID=${q(jobId)}; ${userCmd} >> ${q(outputFile)} 2>&1; echo $? > ${q(exitFile)}`
+    const input = opts.stdin !== undefined ? ` < ${q(inputFile)}` : ""
+    const inner = `${cgJoin}${cd}${envExports}export SWITCHBOARD_JOB_ID=${q(jobId)}; ${userCmd}${input} >> ${q(outputFile)} 2>&1; echo $? > ${q(exitFile)}`
     // CRITICAL: the backgrounded part must be a SIMPLE command so the shell
     // exec-replaces it into a single detached process whose std fds point to
     // /dev/null or the log. If we background a COMPOUND like `mkdir && setsid …`,

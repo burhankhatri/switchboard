@@ -97,6 +97,8 @@ export interface JobRead {
 }
 
 export interface StartJobOptions {
+  /** UTF-8 input staged in a file, never embedded in process arguments. */
+  readonly stdin?: string
   /** Shell command line to run (its stdout+stderr are captured combined). */
   readonly command: string
   /** Working directory to run the command in. */
