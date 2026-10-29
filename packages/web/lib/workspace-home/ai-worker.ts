@@ -65,10 +65,11 @@ export async function runHomeOperation(id: string) {
     }
     op = await prisma.homeOperation.findUniqueOrThrow({ where: { id } })
     const plan = planSchema.parse(op.plan)
+    let refused: string | null = null
     if (op.kind !== "suggestions") {
       for (let i = op.cursor; i < plan.changes.length + plan.insights.length; i++) {
         await stage(id, token, plan.changes[i] ? `Saving ${plan.changes[i].title}` : "Updating workspace findings")
-        await prisma.$transaction(async tx => {
+        const skipped = await prisma.$transaction(async tx => {
           await tx.$queryRaw`SELECT "id" FROM "HomeOperation" WHERE "id" = ${id} FOR UPDATE`
           const current = await tx.homeOperation.findUniqueOrThrow({ where: { id } })
           if (current.status !== "running" || current.leaseToken !== token) throw new Error("Operation stopped")
@@ -87,7 +88,14 @@ export async function runHomeOperation(id: string) {
             const result = change.targetId
               ? await updateWidget(ws, { id: change.targetId }, change, actor, tx)
               : await createWidget(ws, { ...change, content: change.content }, actor, tx)
-            if (!result.ok) throw new Error(result.error)
+            if (!result.ok) {
+              // Accepting is a person's explicit choice, so they hear why it failed.
+              // In a generated run the store's refusal (a missing file, a key taken
+              // meanwhile, a full home) costs only that component.
+              if (op.kind === "accept") throw new Error(result.error)
+              await tx.homeOperation.update({ where: { id }, data: { cursor: i + 1 } })
+              return result.error
+            }
             receipt = { id: result.value.id, title: change.title }
           } else {
             const insight = plan.insights[i - plan.changes.length]
@@ -102,19 +110,30 @@ export async function runHomeOperation(id: string) {
             receipt = { id: saved.id, title: saved.title }
           }
           await tx.homeOperation.update({ where: { id }, data: { cursor: i + 1, receipts: json([...(current.receipts as unknown[]), receipt]) } })
+          return null
         }, { timeout: 15_000 })
+        refused = skipped ?? refused
       }
     }
     if (!op.generationComplete && op.kind !== "accept") {
       await prisma.homeOperation.updateMany({ where: { id, leaseToken: token, status: "running" }, data: { leaseToken: null, leaseUntil: null } })
       return
     }
+    const saved = await prisma.homeOperation.findUniqueOrThrow({ where: { id } })
+    if (op.kind !== "suggestions" && plan.changes.length + plan.insights.length && !(saved.receipts as unknown[]).length) {
+      // Every record was refused. Replaying them would be refused again, so a
+      // retry starts the generation over instead of reporting "Up to date".
+      await prisma.homeOperation.updateMany({ where: { id, leaseToken: token, status: "running" },
+        data: { cursor: 0, plan: json({ changes: [], insights: [] }), generationComplete: false } })
+      throw new Error(refused ?? "None of the agent's changes could be saved. Retry to regenerate them.")
+    }
     await stage(id, token, op.kind === "suggestions" ? (plan.changes.length ? "Suggestions ready" : "No new suggestions from the available evidence") : "Up to date")
     await prisma.homeOperation.updateMany({ where: { id, leaseToken: token, status: "running" }, data: { status: "completed", leaseToken: null, leaseUntil: null } })
   } catch (error) {
     const op = await prisma.homeOperation.findUnique({ where: { id } })
     await prisma.homeOperation.updateMany({ where: { id, leaseToken: token, status: "running" }, data: {
-      status: op?.cursor ? "partial" : "failed", stage: "Needs attention", leaseToken: null, leaseUntil: null,
+      // The cursor also advances past refused records, so only receipts mean something was saved.
+      status: (op?.receipts as unknown[] | undefined)?.length ? "partial" : "failed", stage: "Needs attention", leaseToken: null, leaseUntil: null,
       error: error instanceof Error ? error.message.slice(0, 500) : "Home AI could not finish. Please retry.",
     } })
   } finally {

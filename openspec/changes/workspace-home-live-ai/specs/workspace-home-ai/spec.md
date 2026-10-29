@@ -26,6 +26,10 @@ The system SHALL show actual execution stages and affected-card activity while c
 - **WHEN** generation fails or the target has changed since work began
 - **THEN** existing content remains intact, successful writes remain identified, and the UI offers a safe retry or regeneration without duplicate writes
 
+#### Scenario: Agent output is partly unusable
+- **WHEN** a generated record overshoots a length or count limit, adds unknown fields, cites a conversation outside the context, duplicates another record, or is refused when saved
+- **THEN** overshoots are shortened and unknown fields dropped, unusable records are left out without failing the others, citations outside the context are never kept, and the operation fails with a readable reason only when no record could be used
+
 ### Requirement: Suggestions consider the current home
 The system SHALL offer suggestions regardless of widget count, using workspace conversations and current components. Suggestions SHALL identify create versus update, explain the benefit, provide a preview and supporting evidence, and require acceptance before modifying widgets. Repeated acceptance SHALL be idempotent; stale suggestions SHALL be revalidated.
 
