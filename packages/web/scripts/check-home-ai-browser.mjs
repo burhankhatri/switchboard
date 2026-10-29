@@ -28,9 +28,14 @@ const server = createServer(async (req, res) => {
   if (req.method === "POST") {
     let raw = ""; for await (const chunk of req) raw += chunk
     const body = JSON.parse(raw); requests.push(body)
-    const op = { id: `op-${operations.length}`, kind: body.kind ?? body.action, targetId: body.targetId ?? null, status: "running", stage: "Reading workspace conversations", sequence: 1, error: null, plan: null, dismissed: [], receipts: [], canManage: true, createdAt: new Date().toISOString() }
+    const kind = body.kind ?? body.action
+    const op = { id: `op-${operations.length}`, kind, targetId: body.targetId ?? null, request: ["create", "edit", "edit-insight"].includes(kind) ? body.prompt : null, status: "running", stage: "Reading workspace conversations", sequence: 1, error: null, plan: null, dismissed: [], receipts: [], canManage: true, createdAt: new Date().toISOString() }
     operations.unshift(op)
-    if (body.action === "accept") operations.find(o => o.id === body.operationId).dismissed.push(body.index)
+    if (body.action === "accept") {
+      const suggested = operations.find(o => o.id === body.operationId)
+      suggested.dismissed.push(body.index)
+      op.plan = { changes: [suggested.plan.changes[body.index]], insights: [] }
+    }
     res.end(JSON.stringify({ operationId: op.id })); signal()
     setTimeout(() => { op.stage = "Preparing changes"; op.sequence = 2; signal() }, 300)
     setTimeout(() => {
@@ -82,6 +87,8 @@ try {
     await desktop.mouse.up()
   await desktop.getByRole("button", { name: "Send", exact: true }).click()
   await desktop.getByText("Reading workspace conversations", { exact: true }).waitFor()
+  await desktop.getByText("Updating the home page", { exact: true }).waitFor()
+  await desktop.getByText("“Summarise the team's most important priorities.”", { exact: true }).waitFor()
   await desktop.getByText("A clear picture of the workspace").waitFor()
   await mobile.getByText("A clear picture of the workspace").waitFor()
   assert.equal(desktop.url(), url + "/")
@@ -90,6 +97,7 @@ try {
   await textbox.fill("Make the summary shorter and focus on unresolved issues.")
   await desktop.getByRole("button", { name: "Send", exact: true }).click()
   await desktop.getByText("Reading workspace conversations", { exact: true }).first().waitFor()
+  await desktop.getByText("Editing “Workspace summary”", { exact: true }).waitFor()
   assert.equal(await desktop.getByText("A clear picture of the workspace").count(), 1)
   await desktop.getByText("Updated summary from your instructions").waitFor()
   await mobile.getByRole("button", { name: "Edit CRM sync needs attention with AI" }).click()
@@ -108,6 +116,7 @@ try {
   assert.ok(alpha >= 0.8, `hovered Accept keeps a solid primary background behind its text (got ${hovered})`)
   await desktop.screenshot({ path: path.join(out, "accept-hover.png") })
   await accept.click()
+  await desktop.getByText("Updating “Workspace summary” from a suggestion", { exact: true }).waitFor()
   await desktop.getByText("Team priorities and next steps", { exact: true }).waitFor()
   await mobile.getByText("Team priorities and next steps", { exact: true }).waitFor()
   assert.equal(widgets.length, 1, "accept updates instead of duplicating")

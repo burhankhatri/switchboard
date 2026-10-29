@@ -4,15 +4,16 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowUp, Check, CircleAlert, Lightbulb, Loader2, Pencil, Sparkles, X } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { workspaceHomeKey } from "@/lib/query/hooks/useWorkspaceHome"
+import { useWorkspaceHome, workspaceHomeKey } from "@/lib/query/hooks/useWorkspaceHome"
 import { isHomeActive, type HomeEvidence } from "@/lib/workspace-home/ai-contract"
+import { describeOperation } from "@/lib/workspace-home/ai-describe"
 import type { HomeAiView } from "@/lib/workspace-home/ai-view"
 import type { WidgetDto } from "@/lib/workspace-home/widget-dto"
 import { cn } from "@/lib/utils"
 import { ago } from "./time"
 import { WidgetPreview } from "./widgets/WidgetPreview"
 
-type AiContext = { data?: HomeAiView; send: (body: Record<string, unknown>) => Promise<void>; error: string | null }
+type AiContext = { workspaceId: string; data?: HomeAiView; send: (body: Record<string, unknown>) => Promise<void>; error: string | null }
 const Context = createContext<AiContext | null>(null)
 export const useHomeAi = () => useContext(Context)
 
@@ -45,7 +46,7 @@ export function HomeAiProvider({ workspaceId, children }: { workspaceId: string;
       await cache.invalidateQueries({ queryKey })
     } catch (e) { const message = e instanceof Error ? e.message : "Unable to start home AI"; setError(message); throw e }
   }
-  return <Context.Provider value={{ data: query.data, send, error: error ?? query.error?.message ?? null }}>{children}</Context.Provider>
+  return <Context.Provider value={{ workspaceId, data: query.data, send, error: error ?? query.error?.message ?? null }}>{children}</Context.Provider>
 }
 
 const buttonClass = "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium hover:bg-hover disabled:opacity-50 cursor-pointer"
@@ -121,6 +122,7 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
   const loaded = useRef<Set<string> | null>(null)
   const watched = useRef(new Set<string>())
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set())
+  const home = useWorkspaceHome(ai?.workspaceId)
   const operations = ai?.data?.operations
   if (operations) {
     loaded.current ??= new Set(operations.map(o => o.id))
@@ -128,6 +130,7 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
   }
   if (!ai) return null
   const act = (body: Record<string, unknown>) => { void ai.send(body).catch(() => {}) }
+  const titles = { widgets: home.data?.widgets ?? [], insights: ai.data?.insights ?? [] }
   const latest = ai.data?.operations.find(o => o.kind === "suggestions" && o.status === "completed")
   const active = ai.data?.operations.filter(o => isHomeActive(o.status)) ?? []
   const failed = ai.data?.operations.filter(o => ["failed", "partial"].includes(o.status) && !closed.has(o.id)
@@ -147,7 +150,11 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
     {ai.error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-xs text-destructive">{ai.error}</p>}
     {ai.data && !ai.data.enabled && <p className="text-xs text-ink-3">Home AI is unavailable until the server’s AI provider is configured.</p>}
     {active.map(op => <div key={op.id} className="relative overflow-hidden rounded-2xl border border-primary/25 bg-primary/5 p-4" role="status" aria-live="polite">
-      <div className="flex items-center gap-3"><Loader2 className="h-5 w-5 text-primary motion-safe:animate-spin" /><div className="min-w-0 flex-1"><p className="text-sm font-medium">{op.stage}</p><p className="mt-0.5 text-xs text-ink-3">{op.receipts.length ? `${op.receipts.length} changes saved · ` : ""}You can keep working while AI updates this page.</p></div>
+      <div className="flex items-start gap-3"><Loader2 className="mt-0.5 h-5 w-5 shrink-0 text-primary motion-safe:animate-spin" /><div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{describeOperation(op, titles)}</p>
+        {op.request && <p className="mt-1 line-clamp-2 break-words text-xs text-ink-2">“{op.request}”</p>}
+        <p className="mt-1 text-xs text-ink-2"><span>{op.stage}</span>{op.receipts.length > 0 && <span className="text-ink-3"> · Saved {op.receipts.map(r => r.title).join(", ")}</span>}</p>
+        <p className="mt-0.5 text-xs text-ink-3">You can keep working while AI updates this page.</p></div>
         {op.canManage && <button className={buttonClass} onClick={() => act({ action: "cancel", operationId: op.id })}>Stop</button>}</div>
       <ol className="mt-3 flex gap-2 text-[10px] text-ink-3">{["Read context", "Prepare", "Save"].map((s, i) => <li key={s} className={cn("flex-1 border-t-2 pt-2", (op.stage.startsWith("Saving") || op.stage.startsWith("Updating") ? 2 : /[Pp]repar/.test(op.stage) ? 1 : 0) >= i ? "border-primary text-ink" : "border-line")}>{s}</li>)}</ol>
     </div>)}
@@ -175,7 +182,7 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
       <HomeAiCardProgress widgetId={insight.id} />
       <h3 className="mt-2 text-sm font-medium">{insight.title}</h3><p className="mt-1 text-xs leading-relaxed text-ink-2">{insight.detail}</p><Sources evidence={insight.evidence} onOpenChat={onOpenChat} /><p className="mt-2 text-[10px] text-ink-3">Updated {ago(insight.updatedAt)}</p>
     </article>)}</div></div>}
-    {history && <ul className="divide-y divide-line rounded-xl border border-line p-3">{ai.data?.operations.map(op => <li key={op.id} className="py-2 text-xs"><span className="font-medium">{op.kind} · {op.status}</span><p className="text-ink-3">{op.stage} · {ago(op.createdAt)}</p>{op.receipts.map(r => <p key={r.id} className="mt-1 text-ink-2">✓ {r.title}</p>)}</li>)}</ul>}
+    {history && <ul className="divide-y divide-line rounded-xl border border-line p-3">{ai.data?.operations.map(op => <li key={op.id} className="py-2 text-xs"><span className="font-medium">{describeOperation(op, titles)}</span><span className="text-ink-3"> · {op.status}</span><p className="text-ink-3">{op.stage} · {ago(op.createdAt)}</p>{op.receipts.map(r => <p key={r.id} className="mt-1 text-ink-2">✓ {r.title}</p>)}</li>)}</ul>}
   </section>
 }
 

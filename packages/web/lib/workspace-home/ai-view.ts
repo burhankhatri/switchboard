@@ -4,7 +4,7 @@ import { planSchema, type HomeEvidence, type HomePlan } from "./ai-contract"
 
 export interface HomeAiView {
   enabled: boolean
-  operations: { id: string; kind: string; targetId: string | null; status: string; stage: string; sequence: number; error: string | null;
+  operations: { id: string; kind: string; targetId: string | null; request: string | null; status: string; stage: string; sequence: number; error: string | null;
     plan: HomePlan | null; dismissed: number[]; receipts: { id: string; title: string }[]; canManage: boolean; createdAt: string }[]
   insights: { id: string; key: string; title: string; detail: string; kind: string; status: string; evidence: HomeEvidence[]; updatedAt: string }[]
 }
@@ -22,7 +22,10 @@ export async function homeAiView(workspaceId: string, userId: string, enabled: b
   return { enabled, operations: operations.map(op => {
     const plan = plans.get(op.id) ?? null
     if (plan) { plan.changes.forEach(c => { c.evidence = safe(c.evidence) }); plan.insights.forEach(i => { i.evidence = safe(i.evidence) }) }
-    return { id: op.id, kind: op.kind, targetId: op.targetId, status: op.status, stage: op.stage, sequence: op.sequence,
+    // Only the requester sees what they typed; other members see what the work is for.
+    const typed = op.userId === userId && ["create", "edit", "edit-insight"].includes(op.kind)
+    const request = typed ? (op.prompt.length > 160 ? `${op.prompt.slice(0, 159).trimEnd()}…` : op.prompt) : null
+    return { id: op.id, kind: op.kind, targetId: op.targetId, request, status: op.status, stage: op.stage, sequence: op.sequence,
       error: op.error, plan, dismissed: op.dismissed as number[], receipts: op.receipts as { id: string; title: string }[], canManage: op.userId === userId, createdAt: op.createdAt.toISOString() }
   }), insights: insights.map(i => ({ id: i.id, key: i.key, title: i.title, detail: i.detail, kind: i.kind, status: i.status, evidence: safe(i.evidence as HomeEvidence[]), updatedAt: i.updatedAt.toISOString() })) }
 }
