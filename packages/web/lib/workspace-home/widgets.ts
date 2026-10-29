@@ -267,6 +267,10 @@ function firstIssue(err: z.ZodError): string {
   return `${where}${issue.message}`
 }
 
+export function widgetContentSchema(type: WidgetType): z.ZodTypeAny {
+  return CONTENT[type]
+}
+
 export function isWidgetType(value: unknown): value is WidgetType {
   return typeof value === "string" && (WIDGET_TYPES as readonly string[]).includes(value)
 }

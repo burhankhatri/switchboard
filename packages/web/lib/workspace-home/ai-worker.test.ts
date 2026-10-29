@@ -82,6 +82,29 @@ describe("durable home writes", () => {
     expect(op.status).toBe("completed")
     expect(mocks.create).not.toHaveBeenCalled()
   })
+  it("skips a component the store refuses in a generated run and saves the rest", async () => {
+    op.kind = "create"
+    mocks.create.mockResolvedValueOnce({ ok: false, error: "No such file" }).mockResolvedValueOnce({ ok: true, value: { id: "two" } })
+    await runHomeOperation("op")
+    expect(op.status).toBe("completed")
+    expect(op.receipts).toEqual([{ id: "two", title: "two" }])
+  })
+  it("fails with the reason, and regenerates on retry, when every component is refused", async () => {
+    op.kind = "create"
+    mocks.create.mockResolvedValue({ ok: false, error: "No such file" })
+    await runHomeOperation("op")
+    expect(op.status).toBe("failed")
+    expect(op.error).toMatch(/No such file/)
+    expect(op).toMatchObject({ cursor: 0, generationComplete: false, plan: { changes: [], insights: [] } })
+  })
+  it("shows supported suggestions and leaves out the unsupported one", async () => {
+    const source = { chatId: "c", messageId: "m", author: "A", date: "d" }
+    Object.assign(op, { kind: "suggestions", generationComplete: false, plan: null, context: { sources: [source], widgets: [], insights: [] } })
+    mocks.generate.mockResolvedValue({ plan: { changes: [change("one"), { ...change("two"), evidence: [source] }], insights: [] }, complete: true })
+    await runHomeOperation("op")
+    expect(op.status).toBe("completed")
+    expect(op.plan.changes.map((c: { key: string }) => c.key)).toEqual(["two"])
+  })
   it("accepts just the selected suggestion", () => {
     expect(oneChangePlan(op.plan, 1).changes.map(c => c.key)).toEqual(["two"])
     expect(() => oneChangePlan(op.plan, 5)).toThrow(/no longer exists/)
