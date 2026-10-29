@@ -3,6 +3,7 @@
 import { HomeAiPrompt, HomeAiCardProgress } from "../HomeAi"
 import dynamic from "next/dynamic"
 import { Clock, MoreHorizontal } from "lucide-react"
+import { homeItemId } from "@/lib/workspace-home/ai-describe"
 import type { HomeJob } from "@/lib/workspace-home/home"
 import type { WidgetDto } from "@/lib/workspace-home/widget-dto"
 import type {
@@ -123,6 +124,7 @@ export function WidgetCard({
   return (
     <div
       {...dragProps}
+      id={homeItemId(widget.id)}
       className={cn(
         "group flex min-w-0 flex-col rounded-2xl border border-line bg-surface shadow-hairline transition-shadow hover:shadow-raised",
         hero ? "p-6 sm:p-7" : "p-5",
