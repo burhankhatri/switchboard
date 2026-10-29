@@ -4,11 +4,12 @@ import { validateWidgetContent, WIDGET_TYPES } from "./widgets"
 export const evidenceSchema = z.object({
   chatId: z.string(), messageId: z.string(), author: z.string().max(100), date: z.string().max(40),
 }).strict()
+export const MAX_EVIDENCE = 8
 export const changeSchema = z.object({
   targetId: z.string().nullable(), version: z.string().nullable(),
   key: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/),
   type: z.enum(WIDGET_TYPES), title: z.string().min(1).max(120),
-  content: z.unknown(), reason: z.string().max(300), evidence: z.array(evidenceSchema).max(8),
+  content: z.unknown(), reason: z.string().max(300), evidence: z.array(evidenceSchema).max(MAX_EVIDENCE),
 }).strict().superRefine((c, ctx) => {
   const result = validateWidgetContent(c.type, c.content)
   if (!result.ok) ctx.addIssue({ code: "custom", message: result.error })
@@ -16,10 +17,12 @@ export const changeSchema = z.object({
 export const insightSchema = z.object({
   key: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/), title: z.string().min(1).max(120),
   detail: z.string().max(400), kind: z.enum(["issue", "blocker", "decision"]),
-  status: z.enum(["open", "resolved", "noted"]), evidence: z.array(evidenceSchema).min(1).max(8),
+  status: z.enum(["open", "resolved", "noted"]), evidence: z.array(evidenceSchema).min(1).max(MAX_EVIDENCE),
 }).strict()
+export const MAX_CHANGES = 6
+export const MAX_INSIGHTS = 12
 export const planSchema = z.object({
-  changes: z.array(changeSchema).max(6), insights: z.array(insightSchema).max(12),
+  changes: z.array(changeSchema).max(MAX_CHANGES), insights: z.array(insightSchema).max(MAX_INSIGHTS),
 }).strict()
 export type HomeChange = z.infer<typeof changeSchema>
 export type HomePlan = z.infer<typeof planSchema>
