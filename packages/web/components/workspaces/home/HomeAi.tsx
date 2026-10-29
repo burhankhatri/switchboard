@@ -83,7 +83,8 @@ export function HomeAiPrompt({ prompt: initial, widget, insight, children, class
         className="min-h-32 w-full resize-y rounded-xl border border-line bg-inset p-3 text-sm outline-none focus:border-primary" />
       <p className="mt-2 text-[11px] text-ink-3">Uses conversations from everyone in this workspace. Changes appear here as they are saved.</p>
       {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
-      <div className="mt-3 flex justify-end"><button onClick={() => void submit()} disabled={sending || !prompt.trim()} className={cn(buttonClass, "bg-primary text-primary-foreground hover:opacity-90")}>
+      <div className="mt-3"><button type="button" onClick={() => void submit()} disabled={sending || !prompt.trim()} aria-busy={sending}
+        className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,box-shadow,transform] hover:bg-primary/90 hover:shadow-md active:scale-[0.98] active:bg-primary/80 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none">
         {sending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <ArrowUp className="h-4 w-4" />} {sending ? "Starting…" : "Send"}
       </button></div>
     </PopoverContent>
