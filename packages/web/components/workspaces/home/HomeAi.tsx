@@ -2,17 +2,18 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowUp, Check, CircleAlert, Lightbulb, Loader2, Pencil, Sparkles, X } from "lucide-react"
+import { ArrowDown, ArrowUp, Check, CircleAlert, Lightbulb, Loader2, Pencil, Sparkles, X } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { workspaceHomeKey } from "@/lib/query/hooks/useWorkspaceHome"
+import { useWorkspaceHome, workspaceHomeKey } from "@/lib/query/hooks/useWorkspaceHome"
 import { isHomeActive, type HomeEvidence } from "@/lib/workspace-home/ai-contract"
+import { describeOperation, describeResult, homeItemId } from "@/lib/workspace-home/ai-describe"
 import type { HomeAiView } from "@/lib/workspace-home/ai-view"
 import type { WidgetDto } from "@/lib/workspace-home/widget-dto"
 import { cn } from "@/lib/utils"
 import { ago } from "./time"
 import { WidgetPreview } from "./widgets/WidgetPreview"
 
-type AiContext = { data?: HomeAiView; send: (body: Record<string, unknown>) => Promise<void>; error: string | null }
+type AiContext = { workspaceId: string; data?: HomeAiView; send: (body: Record<string, unknown>) => Promise<void>; error: string | null }
 const Context = createContext<AiContext | null>(null)
 export const useHomeAi = () => useContext(Context)
 
@@ -45,10 +46,14 @@ export function HomeAiProvider({ workspaceId, children }: { workspaceId: string;
       await cache.invalidateQueries({ queryKey })
     } catch (e) { const message = e instanceof Error ? e.message : "Unable to start home AI"; setError(message); throw e }
   }
-  return <Context.Provider value={{ data: query.data, send, error: error ?? query.error?.message ?? null }}>{children}</Context.Provider>
+  return <Context.Provider value={{ workspaceId, data: query.data, send, error: error ?? query.error?.message ?? null }}>{children}</Context.Provider>
 }
 
 const buttonClass = "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium hover:bg-hover disabled:opacity-50 cursor-pointer"
+const dismissClass = "absolute right-1 top-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+// Filled actions keep a primary background in every state; the neutral
+// hover:bg-hover would put light grey behind white text.
+const primaryButtonClass = "bg-primary text-primary-foreground shadow-sm transition-[background-color,box-shadow,transform] hover:bg-primary/90 hover:shadow-md active:scale-[0.98] active:bg-primary/80 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
 
 export function HomeAiPrompt({ prompt: initial, widget, insight, children, className, label }: {
   prompt: string; widget?: WidgetDto; insight?: HomeAiView["insights"][number]; children?: ReactNode; className?: string; label?: string
@@ -84,7 +89,7 @@ export function HomeAiPrompt({ prompt: initial, widget, insight, children, class
       <p className="mt-2 text-[11px] text-ink-3">Uses conversations from everyone in this workspace. Changes appear here as they are saved.</p>
       {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
       <div className="mt-3"><button type="button" onClick={() => void submit()} disabled={sending || !prompt.trim()} aria-busy={sending}
-        className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,box-shadow,transform] hover:bg-primary/90 hover:shadow-md active:scale-[0.98] active:bg-primary/80 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none">
+        className={cn("inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium", primaryButtonClass)}>
         {sending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <ArrowUp className="h-4 w-4" />} {sending ? "Starting…" : "Send"}
       </button></div>
     </PopoverContent>
@@ -117,6 +122,7 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
   const loaded = useRef<Set<string> | null>(null)
   const watched = useRef(new Set<string>())
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set())
+  const home = useWorkspaceHome(ai?.workspaceId)
   const operations = ai?.data?.operations
   if (operations) {
     loaded.current ??= new Set(operations.map(o => o.id))
@@ -124,10 +130,26 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
   }
   if (!ai) return null
   const act = (body: Record<string, unknown>) => { void ai.send(body).catch(() => {}) }
+  const titles = { widgets: home.data?.widgets ?? [], insights: ai.data?.insights ?? [] }
   const latest = ai.data?.operations.find(o => o.kind === "suggestions" && o.status === "completed")
   const active = ai.data?.operations.filter(o => isHomeActive(o.status)) ?? []
   const failed = ai.data?.operations.filter(o => ["failed", "partial"].includes(o.status) && !closed.has(o.id)
     && (!loaded.current?.has(o.id) || watched.current.has(o.id))) ?? []
+  // Same rule as failures: only work this visit watched. Ready suggestions need
+  // no notice while their panel is already showing them.
+  const done = ai.data?.operations.filter(o => o.status === "completed" && watched.current.has(o.id) && !closed.has(o.id)
+    && !(o.kind === "suggestions" && suggestionsOpen)) ?? []
+  const close = (ids: string[]) => setClosed(prev => new Set([...prev, ...ids]))
+  const closeSuggestions = () => {
+    setSuggestionsOpen(false)
+    close(ai.data?.operations.filter(o => o.kind === "suggestions" && o.status === "completed").map(o => o.id) ?? [])
+  }
+  const reveal = (id: string) => {
+    const el = document.getElementById(homeItemId(id))
+    if (!el) return
+    el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" })
+    el.animate?.([{ boxShadow: "0 0 0 3px var(--primary)" }, { boxShadow: "0 0 0 3px transparent" }], { duration: 1800, easing: "ease-out" })
+  }
   const suggest = async () => {
     setSuggestionsOpen(true); setBusy(true)
     try { await ai.send({ action: "start", kind: "suggestions", prompt: "Suggest useful home improvements based on workspace conversations and current components. Prefer updating existing components when relevant; include a summary if missing. Use real evidence only.", requestKey: crypto.randomUUID() }) } catch { /* Error is rendered below. */ }
@@ -143,26 +165,37 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
     {ai.error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-xs text-destructive">{ai.error}</p>}
     {ai.data && !ai.data.enabled && <p className="text-xs text-ink-3">Home AI is unavailable until the server’s AI provider is configured.</p>}
     {active.map(op => <div key={op.id} className="relative overflow-hidden rounded-2xl border border-primary/25 bg-primary/5 p-4" role="status" aria-live="polite">
-      <div className="flex items-center gap-3"><Loader2 className="h-5 w-5 text-primary motion-safe:animate-spin" /><div className="min-w-0 flex-1"><p className="text-sm font-medium">{op.stage}</p><p className="mt-0.5 text-xs text-ink-3">{op.receipts.length ? `${op.receipts.length} changes saved · ` : ""}You can keep working while AI updates this page.</p></div>
+      <div className="flex items-start gap-3"><Loader2 className="mt-0.5 h-5 w-5 shrink-0 text-primary motion-safe:animate-spin" /><div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{describeOperation(op, titles)}</p>
+        {op.request && <p className="mt-1 line-clamp-2 break-words text-xs text-ink-2">“{op.request}”</p>}
+        <p className="mt-1 text-xs text-ink-2"><span>{op.stage}</span>{op.receipts.length > 0 && <span className="text-ink-3"> · Saved {op.receipts.map(r => r.title).join(", ")}</span>}</p>
+        <p className="mt-0.5 text-xs text-ink-3">You can keep working while AI updates this page.</p></div>
         {op.canManage && <button className={buttonClass} onClick={() => act({ action: "cancel", operationId: op.id })}>Stop</button>}</div>
       <ol className="mt-3 flex gap-2 text-[10px] text-ink-3">{["Read context", "Prepare", "Save"].map((s, i) => <li key={s} className={cn("flex-1 border-t-2 pt-2", (op.stage.startsWith("Saving") || op.stage.startsWith("Updating") ? 2 : /[Pp]repar/.test(op.stage) ? 1 : 0) >= i ? "border-primary text-ink" : "border-line")}>{s}</li>)}</ol>
     </div>)}
+    {done.slice(0, 3).map(op => <div key={op.id} role="status" className="relative rounded-xl border border-emerald-600/25 bg-emerald-600/5 p-3 pr-11 text-xs">
+      <button type="button" aria-label="Dismiss notice" onClick={() => close([op.id])} className={dismissClass}><X className="h-4 w-4" /></button>
+      <p className="flex items-center gap-2 font-medium"><Check className="h-4 w-4 shrink-0 text-emerald-600" />{describeResult(op)}</p>
+      {op.kind === "suggestions"
+        ? !!op.plan?.changes.length && <button className={cn(buttonClass, "mt-2 border border-line bg-surface")} onClick={() => { setSuggestionsOpen(true); close([op.id]) }}>Review suggestions</button>
+        : op.receipts.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{op.receipts.slice(0, 6).map(r => <button key={r.id} className={cn(buttonClass, "max-w-full border border-line bg-surface")} onClick={() => reveal(r.id)}>
+          <ArrowDown className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Show “{r.title}”</span></button>)}</div>}
+    </div>)}
     {failed.slice(0, 3).map(op => <div key={op.id} role="alert" className="relative rounded-xl border border-destructive/25 p-3 pr-11 text-xs">
-      <button type="button" aria-label="Dismiss error" onClick={() => setClosed(prev => new Set(prev).add(op.id))}
-        className="absolute right-1 top-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X className="h-4 w-4" /></button>
+      <button type="button" aria-label="Dismiss error" onClick={() => close([op.id])} className={dismissClass}><X className="h-4 w-4" /></button>
       <p className="font-medium">{op.status === "partial" ? `${op.receipts.length} changes saved; remaining work needs attention` : "AI could not finish"}</p><p className="mt-1 text-ink-2">{op.error}</p>{op.canManage && <button className={buttonClass} onClick={() => act({ action: "retry", operationId: op.id })}>Retry remaining work</button>}</div>)}
     {suggestionsOpen && <div className="rounded-2xl border border-line bg-surface p-4">
-      <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-medium">Suggested improvements</h2><div className="flex items-center gap-2"><button className={buttonClass} onClick={() => void suggest()} disabled={busy || active.some(o => o.kind === "suggestions")}>Refresh</button><button aria-label="Close suggestions" onClick={() => setSuggestionsOpen(false)}><X className="h-4 w-4" /></button></div></div>
+      <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-medium">Suggested improvements</h2><div className="flex items-center gap-2"><button className={buttonClass} onClick={() => void suggest()} disabled={busy || active.some(o => o.kind === "suggestions")}>Refresh</button><button aria-label="Close suggestions" onClick={closeSuggestions}><X className="h-4 w-4" /></button></div></div>
       {!latest && <p className="text-xs text-ink-3">Reading conversations and comparing them with your current home…</p>}
       {latest && !latest.plan?.changes.filter((_, i) => !latest.dismissed.includes(i)).length && <p className="text-xs text-ink-3">No new suggestions to review. Refresh after more workspace activity.</p>}
       <div className="grid gap-3 sm:grid-cols-2">{latest?.plan?.changes.map((c, i) => latest.dismissed.includes(i) ? null : <article key={i} className="rounded-xl border border-line p-4">
         <span className="text-[10px] font-medium uppercase tracking-wide text-ink-3">{c.targetId ? "Update" : "Create"} · {c.type}</span><h3 className="mt-1 text-sm font-medium">{c.title}</h3><p className="mt-2 text-xs text-ink-2">{c.reason}</p>
         <details className="mt-3 text-xs"><summary className="cursor-pointer text-ink-2">Preview content</summary><div className="mt-3 min-w-0 rounded-lg bg-inset/40 p-3"><WidgetPreview change={c} /></div></details>
         <Sources evidence={c.evidence} onOpenChat={onOpenChat} />
-        <div className="mt-3 flex gap-2"><button className={cn(buttonClass, "bg-primary text-primary-foreground")} onClick={() => act({ action: "accept", operationId: latest.id, index: i })}><Check className="h-3.5 w-3.5" />Accept</button><button className={buttonClass} onClick={() => act({ action: "dismiss", operationId: latest.id, index: i })}>Dismiss</button></div>
+        <div className="mt-3 flex gap-2"><button className={cn(buttonClass, primaryButtonClass)} onClick={() => act({ action: "accept", operationId: latest.id, index: i })}><Check className="h-3.5 w-3.5" />Accept</button><button className={buttonClass} onClick={() => act({ action: "dismiss", operationId: latest.id, index: i })}>Dismiss</button></div>
       </article>)}</div>
     </div>}
-    {!!ai.data?.insights.length && <div><h2 className="mb-3 mt-5 text-[11px] uppercase tracking-wide text-ink-3">On the team’s radar</h2><div className="grid gap-3 sm:grid-cols-2">{ai.data.insights.map(insight => <article key={insight.id} className="rounded-2xl border border-line bg-surface p-4">
+    {!!ai.data?.insights.length && <div><h2 className="mb-3 mt-5 text-[11px] uppercase tracking-wide text-ink-3">On the team’s radar</h2><div className="grid gap-3 sm:grid-cols-2">{ai.data.insights.map(insight => <article key={insight.id} id={homeItemId(insight.id)} className="rounded-2xl border border-line bg-surface p-4">
       <div className="flex items-center gap-2">
         {insight.status === "resolved" ? <Check className="h-4 w-4 text-emerald-600" /> : <CircleAlert className="h-4 w-4 text-amber-600" />}
         <span className="text-[10px] uppercase tracking-wide text-ink-3">{insight.kind} · {insight.status}</span>
@@ -171,7 +204,7 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
       <HomeAiCardProgress widgetId={insight.id} />
       <h3 className="mt-2 text-sm font-medium">{insight.title}</h3><p className="mt-1 text-xs leading-relaxed text-ink-2">{insight.detail}</p><Sources evidence={insight.evidence} onOpenChat={onOpenChat} /><p className="mt-2 text-[10px] text-ink-3">Updated {ago(insight.updatedAt)}</p>
     </article>)}</div></div>}
-    {history && <ul className="divide-y divide-line rounded-xl border border-line p-3">{ai.data?.operations.map(op => <li key={op.id} className="py-2 text-xs"><span className="font-medium">{op.kind} · {op.status}</span><p className="text-ink-3">{op.stage} · {ago(op.createdAt)}</p>{op.receipts.map(r => <p key={r.id} className="mt-1 text-ink-2">✓ {r.title}</p>)}</li>)}</ul>}
+    {history && <ul className="divide-y divide-line rounded-xl border border-line p-3">{ai.data?.operations.map(op => <li key={op.id} className="py-2 text-xs"><span className="font-medium">{describeOperation(op, titles)}</span><span className="text-ink-3"> · {op.status}</span><p className="text-ink-3">{op.stage} · {ago(op.createdAt)}</p>{op.receipts.map(r => <p key={r.id} className="mt-1 text-ink-2">✓ {r.title}</p>)}</li>)}</ul>}
   </section>
 }
 

@@ -26,6 +26,10 @@ The system SHALL show actual execution stages and affected-card activity while c
 - **WHEN** generation fails or the target has changed since work began
 - **THEN** existing content remains intact, successful writes remain identified, and the UI offers a safe retry or regeneration without duplicate writes
 
+#### Scenario: Members can tell what AI is doing and when it is done
+- **WHEN** an operation is running or finishes while home is open
+- **THEN** it is named by purpose (suggestions, the component or finding being edited, the suggestion being applied, a findings refresh), the requester sees their own request, and on completion a dismissible notice names what was saved with a control that scrolls to each changed card; like failures, the notice is not shown again after a refresh
+
 #### Scenario: A failure has been seen
 - **WHEN** an operation fails while home is open
 - **THEN** its alert can be dismissed, and reopening or refreshing home does not show it again; the failed operation stays listed in AI activity
