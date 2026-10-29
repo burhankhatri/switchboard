@@ -52,8 +52,14 @@ export async function runHomeOperation(id: string) {
       const plan = groundPlan(generated.plan, context.sources, context.widgets, op.kind === "edit-insight" ? null : op.targetId)
       if (["insights", "edit-insight"].includes(op.kind)) plan.changes = []
       else plan.insights = []
-      if (op.kind === "edit-insight" && plan.insights.some(i => i.key !== context.insights.find(i => i.id === op.targetId)?.key)) throw new Error("Edit only the selected finding")
-      if (op.kind === "suggestions" && plan.changes.some(c => !c.evidence.length)) throw new Error("Suggestions need supporting conversation evidence. Please retry.")
+      if (op.kind === "edit-insight") {
+        const selected = context.insights.find(i => i.id === op.targetId)?.key
+        const proposed = plan.insights.length
+        plan.insights = plan.insights.filter(i => i.key === selected)
+        if (proposed && !plan.insights.length) throw new Error("Edit only the selected finding")
+      }
+      // An unsupported suggestion is not shown; it must not cost the supported ones.
+      if (op.kind === "suggestions") plan.changes = plan.changes.filter(c => c.evidence.length)
       await prisma.homeOperation.updateMany({ where: { id, leaseToken: token, status: "running" },
         data: { plan: json(plan), generationComplete: generated.complete } })
     }

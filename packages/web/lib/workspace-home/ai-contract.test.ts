@@ -6,8 +6,12 @@ const source = { chatId: "chat-a", messageId: "message-a", author: "Wayne", date
 const change = (overrides = {}): HomeChange => ({ targetId: null, version: null, key: "summary", type: "summary", title: "Overview", content: { headline: "An issue needs attention" }, reason: "Recent discussion", evidence: [source], ...overrides })
 
 describe("home AI evidence and targets", () => {
-  it("rejects references to conversations outside the retrieved workspace context", () => {
-    expect(() => groundPlan({ changes: [change({ evidence: [{ ...source, chatId: "other-workspace" }] })], insights: [] }, [source], [])).toThrow(/unavailable conversation/)
+  it("never keeps a citation outside the retrieved workspace context", () => {
+    const foreign = { ...source, chatId: "other-workspace" }
+    const insight = { key: "outage", title: "Outage", detail: "Down", kind: "issue" as const, status: "open" as const, evidence: [foreign] }
+    const plan = groundPlan({ changes: [change({ evidence: [foreign, source] })], insights: [insight] }, [source], [])
+    expect(plan.changes[0].evidence).toEqual([source])
+    expect(plan.insights).toEqual([])
   })
   it("uses server attribution instead of model-supplied names and dates", () => {
     const plan = groundPlan({ changes: [change({ evidence: [{ ...source, author: "Invented", date: "yesterday" }] })], insights: [] }, [source], [])
@@ -20,8 +24,25 @@ describe("home AI evidence and targets", () => {
     const result = groundPlan({ changes: [change({ targetId: "a", version: "invented" })], insights: [] }, [source], [{ id: "a", updatedAt: "original" }])
     expect(result.changes[0].version).toBe("original")
   })
-  it("rejects duplicate updates and duplicate creates", () => {
-    expect(() => groundPlan({ changes: [change(), change()], insights: [] }, [source], [])).toThrow(/duplicate/)
+  it("saves a duplicated component or finding once", () => {
+    const insight = { key: "outage", title: "Outage", detail: "Down", kind: "issue" as const, status: "open" as const, evidence: [source] }
+    const plan = groundPlan({ changes: [change(), change({ title: "Again" })], insights: [insight, { ...insight, title: "Again" }] }, [source], [])
+    expect(plan.changes.map(c => c.title)).toEqual(["Overview"])
+    expect(plan.insights.map(i => i.title)).toEqual(["Outage"])
+  })
+  it("updates the existing component when the agent creates a key that is taken", () => {
+    const plan = groundPlan({ changes: [change()], insights: [] }, [source], [{ id: "w1", key: "summary", updatedAt: "v1" }])
+    expect(plan.changes[0]).toMatchObject({ targetId: "w1", version: "v1" })
+  })
+  it("drops changes to components that do not exist and creates past the widget cap", () => {
+    const widgets = Array.from({ length: 39 }, (_, i) => ({ id: `w${i}`, key: null, updatedAt: "v" }))
+    const plan = groundPlan({ changes: [change({ targetId: "missing" }), change({ key: "a" }), change({ key: "b" })], insights: [] }, [source], widgets)
+    expect(plan.changes.map(c => c.key)).toEqual(["a"])
+  })
+  it("keeps only the selected component in an edit, and fails when nothing targets it", () => {
+    const widgets = [{ id: "a", key: "one", updatedAt: "v" }, { id: "b", key: "two", updatedAt: "v" }]
+    expect(groundPlan({ changes: [change({ targetId: "b", key: "two" }), change({ targetId: "a", key: "one" })], insights: [] }, [source], widgets, "a").changes.map(c => c.targetId)).toEqual(["a"])
+    expect(() => groundPlan({ changes: [change({ targetId: "b", key: "two" })], insights: [] }, [source], widgets, "a")).toThrow(/selected component/)
   })
   it("rejects invalid generated content before it can be saved", () => {
     expect(changeSchema.safeParse(change({ type: "chart", content: { kind: "line", labels: ["A"], series: [{ name: "Metric", values: [1, 2] }] } })).success).toBe(false)

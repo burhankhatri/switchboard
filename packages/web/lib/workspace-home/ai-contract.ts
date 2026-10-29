@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { validateWidgetContent, WIDGET_TYPES } from "./widgets"
+import { MAX_WIDGETS_PER_WORKSPACE, validateWidgetContent, WIDGET_TYPES } from "./widgets"
 
 export const evidenceSchema = z.object({
   chatId: z.string(), messageId: z.string(), author: z.string().max(100), date: z.string().max(40),
@@ -30,31 +30,49 @@ export type HomeEvidence = z.infer<typeof evidenceSchema>
 export const ACTIVE_HOME_STATUSES = ["queued", "running"]
 export function isHomeActive(status: string) { return ACTIVE_HOME_STATUSES.includes(status) }
 
-/** Validate identity against server context; model-supplied attribution is never trusted. */
-export function groundPlan(plan: HomePlan, sources: HomeEvidence[], widgets: { id: string; updatedAt: string }[], targetId?: string | null) {
+/**
+ * Validate identity against server context; model-supplied attribution is never
+ * trusted. A record the server cannot stand behind is dropped rather than failing
+ * the run, because one bad citation or a stale id would otherwise throw away
+ * every other correct record: citations outside the context are removed, a
+ * finding left with none is dropped, and so is a change to a component that does
+ * not exist. An edit still fails when nothing targets the selected component.
+ */
+export function groundPlan(plan: HomePlan, sources: HomeEvidence[], widgets: { id: string; updatedAt: string; key?: string | null }[], targetId?: string | null) {
   const sourceMap = new Map(sources.map(s => [s.messageId, s]))
-  const ground = (items: HomeEvidence[]) => items.map(item => {
-    const source = sourceMap.get(item.messageId)
-    if (!source || source.chatId !== item.chatId) throw new Error("AI cited an unavailable conversation. Please try again.")
-    return source
-  })
+  const ground = (items: HomeEvidence[]) => {
+    const kept = new Map<string, HomeEvidence>()
+    for (const item of items) {
+      const source = sourceMap.get(item.messageId)
+      if (source && source.chatId === item.chatId) kept.set(source.messageId, source)
+    }
+    return [...kept.values()]
+  }
   const seen = new Set<string>()
-  for (const change of plan.changes) {
-    if (targetId && change.targetId !== targetId) throw new Error("The edit must target only the selected component.")
-    if (seen.has(change.targetId ?? change.key)) throw new Error("AI proposed duplicate components. Please try again.")
+  let room = MAX_WIDGETS_PER_WORKSPACE - widgets.length
+  const proposed = plan.changes.length
+  plan.changes = plan.changes.filter(change => {
+    // Creating a key that already exists would be refused at save; it is an update.
+    const byKey = !change.targetId ? widgets.find(w => w.key && w.key === change.key) : undefined
+    if (byKey) change.targetId = byKey.id
+    if (targetId && change.targetId !== targetId) return false
+    const widget = change.targetId ? widgets.find(w => w.id === change.targetId) : undefined
+    if (change.targetId && !widget) return false
+    if (seen.has(change.targetId ?? change.key)) return false
+    if (!widget && room-- <= 0) return false
     seen.add(change.targetId ?? change.key)
-    if (change.targetId) {
-      const widget = widgets.find(w => w.id === change.targetId)
-      if (!widget) throw new Error("The target component is unavailable.")
-      change.version = widget.updatedAt
-    } else change.version = null
+    change.version = widget?.updatedAt ?? null
     change.evidence = ground(change.evidence)
-  }
+    return true
+  })
+  if (targetId && proposed && !plan.changes.length) throw new Error("The edit must target only the selected component.")
   const insightKeys = new Set<string>()
-  for (const insight of plan.insights) {
-    if (insightKeys.has(insight.key)) throw new Error("AI proposed duplicate findings. Please retry.")
-    insightKeys.add(insight.key)
+  plan.insights = plan.insights.filter(insight => {
+    if (insightKeys.has(insight.key)) return false
     insight.evidence = ground(insight.evidence)
-  }
+    if (!insight.evidence.length) return false
+    insightKeys.add(insight.key)
+    return true
+  })
   return plan
 }

@@ -82,6 +82,14 @@ describe("durable home writes", () => {
     expect(op.status).toBe("completed")
     expect(mocks.create).not.toHaveBeenCalled()
   })
+  it("shows supported suggestions and leaves out the unsupported one", async () => {
+    const source = { chatId: "c", messageId: "m", author: "A", date: "d" }
+    Object.assign(op, { kind: "suggestions", generationComplete: false, plan: null, context: { sources: [source], widgets: [], insights: [] } })
+    mocks.generate.mockResolvedValue({ plan: { changes: [change("one"), { ...change("two"), evidence: [source] }], insights: [] }, complete: true })
+    await runHomeOperation("op")
+    expect(op.status).toBe("completed")
+    expect(op.plan.changes.map((c: { key: string }) => c.key)).toEqual(["two"])
+  })
   it("accepts just the selected suggestion", () => {
     expect(oneChangePlan(op.plan, 1).changes.map(c => c.key)).toEqual(["two"])
     expect(() => oneChangePlan(op.plan, 5)).toThrow(/no longer exists/)
