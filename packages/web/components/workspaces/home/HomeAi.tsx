@@ -112,11 +112,22 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [history, setHistory] = useState(false)
+  // A failure is news only to the visit that watched the work. Anything already
+  // failed when the page loaded stays in AI activity, so a refresh starts clean.
+  const loaded = useRef<Set<string> | null>(null)
+  const watched = useRef(new Set<string>())
+  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set())
+  const operations = ai?.data?.operations
+  if (operations) {
+    loaded.current ??= new Set(operations.map(o => o.id))
+    for (const o of operations) if (isHomeActive(o.status)) watched.current.add(o.id)
+  }
   if (!ai) return null
   const act = (body: Record<string, unknown>) => { void ai.send(body).catch(() => {}) }
   const latest = ai.data?.operations.find(o => o.kind === "suggestions" && o.status === "completed")
   const active = ai.data?.operations.filter(o => isHomeActive(o.status)) ?? []
-  const failed = ai.data?.operations.filter(o => ["failed", "partial"].includes(o.status)) ?? []
+  const failed = ai.data?.operations.filter(o => ["failed", "partial"].includes(o.status) && !closed.has(o.id)
+    && (!loaded.current?.has(o.id) || watched.current.has(o.id))) ?? []
   const suggest = async () => {
     setSuggestionsOpen(true); setBusy(true)
     try { await ai.send({ action: "start", kind: "suggestions", prompt: "Suggest useful home improvements based on workspace conversations and current components. Prefer updating existing components when relevant; include a summary if missing. Use real evidence only.", requestKey: crypto.randomUUID() }) } catch { /* Error is rendered below. */ }
@@ -136,7 +147,10 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
         {op.canManage && <button className={buttonClass} onClick={() => act({ action: "cancel", operationId: op.id })}>Stop</button>}</div>
       <ol className="mt-3 flex gap-2 text-[10px] text-ink-3">{["Read context", "Prepare", "Save"].map((s, i) => <li key={s} className={cn("flex-1 border-t-2 pt-2", (op.stage.startsWith("Saving") || op.stage.startsWith("Updating") ? 2 : /[Pp]repar/.test(op.stage) ? 1 : 0) >= i ? "border-primary text-ink" : "border-line")}>{s}</li>)}</ol>
     </div>)}
-    {failed.slice(0, 3).map(op => <div key={op.id} role="alert" className="rounded-xl border border-destructive/25 p-3 text-xs"><p className="font-medium">{op.status === "partial" ? `${op.receipts.length} changes saved; remaining work needs attention` : "AI could not finish"}</p><p className="mt-1 text-ink-2">{op.error}</p>{op.canManage && <button className={buttonClass} onClick={() => act({ action: "retry", operationId: op.id })}>Retry remaining work</button>}</div>)}
+    {failed.slice(0, 3).map(op => <div key={op.id} role="alert" className="relative rounded-xl border border-destructive/25 p-3 pr-11 text-xs">
+      <button type="button" aria-label="Dismiss error" onClick={() => setClosed(prev => new Set(prev).add(op.id))}
+        className="absolute right-1 top-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-ink-3 hover:bg-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X className="h-4 w-4" /></button>
+      <p className="font-medium">{op.status === "partial" ? `${op.receipts.length} changes saved; remaining work needs attention` : "AI could not finish"}</p><p className="mt-1 text-ink-2">{op.error}</p>{op.canManage && <button className={buttonClass} onClick={() => act({ action: "retry", operationId: op.id })}>Retry remaining work</button>}</div>)}
     {suggestionsOpen && <div className="rounded-2xl border border-line bg-surface p-4">
       <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-medium">Suggested improvements</h2><div className="flex items-center gap-2"><button className={buttonClass} onClick={() => void suggest()} disabled={busy || active.some(o => o.kind === "suggestions")}>Refresh</button><button aria-label="Close suggestions" onClick={() => setSuggestionsOpen(false)}><X className="h-4 w-4" /></button></div></div>
       {!latest && <p className="text-xs text-ink-3">Reading conversations and comparing them with your current home…</p>}

@@ -34,6 +34,7 @@ const server = createServer(async (req, res) => {
     res.end(JSON.stringify({ operationId: op.id })); signal()
     setTimeout(() => { op.stage = "Preparing changes"; op.sequence = 2; signal() }, 300)
     setTimeout(() => {
+      if (body.prompt?.startsWith("Break")) { Object.assign(op, { status: "failed", stage: "Needs attention", sequence: 3, error: "The agent returned a component that could not be used." }); signal(); return }
       if (body.kind === "suggestions") op.plan = { changes: [{ targetId: "summary", version: widgets[0]?.updatedAt, key: "summary", type: "summary", title: "Workspace summary", content: { headline: "Team priorities and next steps" }, reason: "Reflect the latest team discussion", evidence: [source] }], insights: [] }
       else if (body.kind === "edit-insight") insights[0].detail = "The team is checking missing records."
       else if (body.kind === "edit") widgets[0] = widget("summary", "Updated summary from your instructions")
@@ -55,7 +56,10 @@ try {
   const desktop = await browser.newPage({ viewport: { width: 1365, height: 1000 } })
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" })
   const errors = []; desktop.on("pageerror", e => errors.push(e.message)); mobile.on("pageerror", e => errors.push(e.message))
+  operations.push({ id: "op-old", kind: "create", targetId: null, status: "failed", stage: "Needs attention", sequence: 3, error: "An earlier failure", plan: null, dismissed: [], receipts: [], canManage: true, createdAt: source.date })
   await Promise.all([desktop.goto(url), mobile.goto(url)])
+  await desktop.getByText("CRM sync needs attention", { exact: true }).first().waitFor()
+  assert.equal(await desktop.getByText("An earlier failure").count(), 0, "a failure from before this visit is not shown")
   await desktop.getByRole("button", { name: "Ask agent", exact: true }).nth(1).click()
   const textbox = desktop.getByRole("textbox", { name: "Describe the change" })
   assert.match(await textbox.inputValue(), /Summarise this workspace/)
@@ -100,6 +104,19 @@ try {
   await desktop.getByText("Team priorities and next steps", { exact: true }).waitFor()
   await mobile.getByText("Team priorities and next steps", { exact: true }).waitFor()
   assert.equal(widgets.length, 1, "accept updates instead of duplicating")
+  await desktop.getByRole("button", { name: "Ask agent", exact: true }).nth(1).click()
+  await textbox.fill("Break this run on purpose.")
+  await desktop.getByRole("button", { name: "Send", exact: true }).click()
+  const failure = desktop.getByRole("alert").filter({ hasText: "AI could not finish" })
+  await failure.waitFor()
+  assert.match(await failure.innerText(), /could not be used/)
+  await desktop.screenshot({ path: path.join(out, "failure.png") })
+  await failure.getByRole("button", { name: "Dismiss error" }).click()
+  assert.equal(await failure.count(), 0, "the cross removes the failure")
+  await desktop.reload()
+  await desktop.getByText("CRM sync needs attention", { exact: true }).first().waitFor()
+  await desktop.waitForTimeout(500)
+  assert.equal(await desktop.getByText("AI could not finish").count(), 0, "a refresh starts without old failures")
   widgets.push({ ...widget("timeline", ""), type: "timeline", title: "Recent milestones", content: { events: [{ date: "28 Oct", title: "Import issue identified", who: "Wayne and Burhan", detail: "Missing records were reported in the latest CRM import.", tone: "warn" }, { date: "27 Oct", title: "Campaign launched", who: "Burhan", tone: "good" }] } }); signal()
   await mobile.getByText("Import issue identified", { exact: true }).waitFor()
   await mobile.getByText("Import issue identified", { exact: true }).scrollIntoViewIfNeeded()
