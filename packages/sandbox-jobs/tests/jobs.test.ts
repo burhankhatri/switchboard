@@ -18,10 +18,28 @@ function fakeSandbox(cgroupAvailable = false) {
     if (command.startsWith("cat ")) return { exitCode: 0, result: JSON.stringify(meta) }
     return { exitCode: 0, result: "" }
   })
-  return { sandbox: { process: { executeCommand } } as unknown as Sandbox, executeCommand, meta: () => meta }
+  const uploadFile = vi.fn(async () => {})
+  return { sandbox: { process: { executeCommand }, fs: { uploadFile } } as unknown as Sandbox, executeCommand, uploadFile, meta: () => meta }
 }
 
 describe("job startup and cancellation modes", () => {
+  it("stages large Unicode stdin without placing it in any command argument", async () => {
+    const fake = fakeSandbox()
+    const stdin = "workspace ' \" $()\n日本語🚀".repeat(20_000)
+    const handle = await createSandboxJobs(fake.sandbox).start({ command: "cat", stdin })
+    expect(fake.uploadFile).toHaveBeenCalledWith(Buffer.from(stdin, "utf8"), `${handle.dir}/stdin.txt`)
+    const commands = fake.executeCommand.mock.calls.map(([command]) => command)
+    expect(commands.every(command => Buffer.byteLength(command) < 8192)).toBe(true)
+    expect(commands.find(command => command.startsWith("nohup"))).toContain("stdin.txt")
+    expect(commands.some(command => command.startsWith("chmod 600"))).toBe(true)
+  })
+
+  it("does not launch if staging input fails", async () => {
+    const fake = fakeSandbox()
+    fake.uploadFile.mockRejectedValueOnce(new Error("upload failed"))
+    await expect(createSandboxJobs(fake.sandbox).start({ command: "cat", stdin: "context" })).rejects.toThrow("upload failed")
+    expect(fake.executeCommand.mock.calls.some(([command]) => command.startsWith("nohup"))).toBe(false)
+  })
   it("starts without cgroups and preserves the fallback on cold attach", async () => {
     const fake = fakeSandbox()
     const jobs = createSandboxJobs(fake.sandbox)

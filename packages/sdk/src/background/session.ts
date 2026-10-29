@@ -147,11 +147,17 @@ class BackgroundSessionImpl implements BackgroundSession {
       sessionId
     )
 
-    const spec = this.agent.buildCommand(opts)
+    // These CLIs read text from stdin. Keep large prompts (including injected
+    // history/system context) out of every nested shell and CLI argument: Linux
+    // limits a single argument to ~128 KiB, even when ARG_MAX is much larger.
+    const stdin = (this.agent.name === "opencode" || this.agent.name === "claude")
+      && Buffer.byteLength(opts.prompt ?? "", "utf8") > 8192 ? opts.prompt : undefined
+    const spec = this.agent.buildCommand(stdin === undefined ? opts : { ...opts, prompt: "" })
     if (opts.cwd && !spec.cwd) spec.cwd = opts.cwd
 
     const handle = await this.jobs.start({
       command: this.renderCommand(spec),
+      stdin,
       cwd: spec.cwd,
       env: spec.env,
       processName: this.agent.name,

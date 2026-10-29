@@ -5,6 +5,7 @@ import { mkdtemp, writeFile, readFile, rename, unlink, rmdir } from "node:fs/pro
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
+import { createHash } from "node:crypto"
 import type { Sandbox } from "@daytonaio/sdk"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createSandboxJobs } from "../src/jobs.js"
@@ -63,7 +64,15 @@ describe.skipIf(process.platform !== "linux" && !useWsl)("jobs on Linux with rea
       await unlink(file)
     }
   }
-  const sandbox = { process: { executeCommand: shell } } as unknown as Sandbox
+  const sandbox = { process: { executeCommand: shell }, fs: { uploadFile: async (data: Buffer, target: string) => {
+    if (!useWsl) { await writeFile(target, data); return }
+    const source = join(scriptsDir, `upload-${callNumber++}.txt`)
+    await writeFile(source, data)
+    try {
+      const result = await shell(`cp ${q(linuxPath(source))} ${q(target)}`)
+      if (result.exitCode !== 0) throw new Error(result.result)
+    } finally { await unlink(source) }
+  } } } as unknown as Sandbox
   const jobs = createSandboxJobs(sandbox)
   const start = async (command: string, extra = {}) => {
     const handle = await jobs.start({ command, root, ...extra })
@@ -151,6 +160,15 @@ describe.skipIf(process.platform !== "linux" && !useWsl)("jobs on Linux with rea
     expect(read.raw).toBe("one\nspaces 'quoted'\n")
     expect(read.status.exitCode).toBe(3)
     expect((await cold.read(handle, read.cursor)).raw).toBe("")
+  })
+
+  it("delivers more than 128 KiB of Unicode stdin byte-for-byte through nohup", async () => {
+    const stdin = "日本語🚀 ' \" $(echo unsafe)\n".repeat(20_000)
+    const handle = await start("sha256sum", { stdin })
+    await waitUntil(async () => (await jobs.status(handle)).state === "exited")
+    const read = await jobs.read(handle)
+    expect(read.status.exitCode).toBe(0)
+    expect(read.raw.trim()).toBe(`${createHash("sha256").update(stdin).digest("hex")}  -`)
   })
 
   it("kills a reparented setsid child and a TERM-resistant child without touching another job", async () => {
