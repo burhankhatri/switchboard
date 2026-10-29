@@ -50,6 +50,10 @@ export function HomeAiProvider({ workspaceId, children }: { workspaceId: string;
 
 const buttonClass = "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium hover:bg-hover disabled:opacity-50 cursor-pointer"
 
+// Filled actions keep a primary background in every state; the neutral
+// hover:bg-hover would put light grey behind white text.
+const primaryButtonClass = "bg-primary text-primary-foreground shadow-sm transition-[background-color,box-shadow,transform] hover:bg-primary/90 hover:shadow-md active:scale-[0.98] active:bg-primary/80 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
+
 export function HomeAiPrompt({ prompt: initial, widget, insight, children, className, label }: {
   prompt: string; widget?: WidgetDto; insight?: HomeAiView["insights"][number]; children?: ReactNode; className?: string; label?: string
 }) {
@@ -84,7 +88,7 @@ export function HomeAiPrompt({ prompt: initial, widget, insight, children, class
       <p className="mt-2 text-[11px] text-ink-3">Uses conversations from everyone in this workspace. Changes appear here as they are saved.</p>
       {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
       <div className="mt-3"><button type="button" onClick={() => void submit()} disabled={sending || !prompt.trim()} aria-busy={sending}
-        className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,box-shadow,transform] hover:bg-primary/90 hover:shadow-md active:scale-[0.98] active:bg-primary/80 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none">
+        className={cn("inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium", primaryButtonClass)}>
         {sending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <ArrowUp className="h-4 w-4" />} {sending ? "Starting…" : "Send"}
       </button></div>
     </PopoverContent>
@@ -159,7 +163,7 @@ export function HomeAiPanel({ onOpenChat }: { onOpenChat: (id: string) => void }
         <span className="text-[10px] font-medium uppercase tracking-wide text-ink-3">{c.targetId ? "Update" : "Create"} · {c.type}</span><h3 className="mt-1 text-sm font-medium">{c.title}</h3><p className="mt-2 text-xs text-ink-2">{c.reason}</p>
         <details className="mt-3 text-xs"><summary className="cursor-pointer text-ink-2">Preview content</summary><div className="mt-3 min-w-0 rounded-lg bg-inset/40 p-3"><WidgetPreview change={c} /></div></details>
         <Sources evidence={c.evidence} onOpenChat={onOpenChat} />
-        <div className="mt-3 flex gap-2"><button className={cn(buttonClass, "bg-primary text-primary-foreground")} onClick={() => act({ action: "accept", operationId: latest.id, index: i })}><Check className="h-3.5 w-3.5" />Accept</button><button className={buttonClass} onClick={() => act({ action: "dismiss", operationId: latest.id, index: i })}>Dismiss</button></div>
+        <div className="mt-3 flex gap-2"><button className={cn(buttonClass, primaryButtonClass)} onClick={() => act({ action: "accept", operationId: latest.id, index: i })}><Check className="h-3.5 w-3.5" />Accept</button><button className={buttonClass} onClick={() => act({ action: "dismiss", operationId: latest.id, index: i })}>Dismiss</button></div>
       </article>)}</div>
     </div>}
     {!!ai.data?.insights.length && <div><h2 className="mb-3 mt-5 text-[11px] uppercase tracking-wide text-ink-3">On the team’s radar</h2><div className="grid gap-3 sm:grid-cols-2">{ai.data.insights.map(insight => <article key={insight.id} className="rounded-2xl border border-line bg-surface p-4">
