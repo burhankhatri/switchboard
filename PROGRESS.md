@@ -42,6 +42,17 @@ folder gets both the workspace's own skills and the shared ones for free — no
 
 ## Done
 
+**Live workspace home AI (2026-10-29)** - branch `feat/workspace-home-live-ai`, OpenSpec change `workspace-home-live-ai`.
+- Ask agent and summary/chart generation open editable prompt popovers on home. Visible pencils cover widgets, chat-derived home content and proactive findings. The original chat messages remain intact.
+- Uses the workspace-configured agent/model through the existing credential resolver, custom endpoint mapping and shared-pool budget checks; no new provider key. Complete generated records are validated and saved while the agent continues producing later components.
+- Durable operation/session state, progress events, polling fallback, transactional receipts, version checks, cancellation and retries. The lifecycle cron recovers work when home is closed. Temporary sandboxes are metered and cleaned up.
+- Suggestions work on empty and populated homes, show rendered create/update previews, consider existing widgets and apply only after acceptance. Proactive issue/blocker/decision cards correlate evidence across users and update existing findings on resolution.
+- **Approved access change:** AI may synthesize workspace-visible findings from every member's workspace chats, including unshared chats. Home discloses this; raw transcript authorization and source-link restrictions remain in place. Context is bounded to recent excerpts; see `docs/home-ai.md`.
+- Timeline uses visual milestone cards grouped by date. Initial loading and active edits have stage feedback, stable content, reduced-motion support and mobile layouts.
+- **Verified:** web typecheck clean; 851 web tests + 18 sandbox-image tests pass (Git Bash on PATH for the existing hook tests). Production home components pass the isolated Chromium fixture with two viewers and mobile/reduced-motion layouts. Scratch Postgres verifies all migrations, cross-user retrieval, isolation, concurrent claims, idempotency, stale updates, partial saves, cancellation, issue resolution and private links.
+- **To deploy / not yet verified:** apply additive migration `20261028180000_home_ai`; exercise a real workspace-agent run and deployed lifecycle cron. Browser checks use a deterministic HTTP fixture, not a live model. No sandbox-image rebuild is needed. Rollout and check commands: `docs/home-ai.md`.
+
+
 **Agent reliability, write receipts and the approval gate (2026-10-28)** — plan
 `docs/plans/shared-agents-improvements-2026-10.md`
 - Measured from the first two months of transcripts (38 chats, 537 tool calls): blank replies after provider errors, "did you do it" questions, a $0.50 placeholder budget that tripped mid-work, 20 sandbox-caused tool failures, free models doing the sloppy turns, and a workspace skill that told agents to enrol contacts around the Lead Engine.

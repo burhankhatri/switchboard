@@ -1,5 +1,6 @@
 "use client"
 
+import { HomeAiPrompt } from "../HomeAi"
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { BarChart3, CalendarClock, FileText, Hash, PenLine, Plus, Sparkles, StickyNote, TextQuote } from "lucide-react"
@@ -25,8 +26,7 @@ import { useWidgetMutations } from "./useWidgetMutations"
  * the agent answers in paragraphs.
  */
 export const SUMMARY_PROMPT =
-  "Summarise this workspace for its home page. Read the files, git history and live data " +
-  "(read-only), then pin a summary (key \"summary\"): one headline sentence on where things stand " +
+  "Summarise this workspace for its home page. Read the workspace conversations and current components, then create a summary (key \"summary\"): one headline sentence on where things stand " +
   "and up to 5 short points. Add a kpis strip of the key numbers and an actions list of anything " +
   "waiting on a person. Real data only."
 
@@ -36,15 +36,12 @@ export function WidgetGrid({
   jobs,
   onOpenChat,
   onOpenFile,
-  onAskAgent,
 }: {
   workspaceId: string
   widgets: WidgetDto[]
   jobs: HomeJob[]
   onOpenChat: (chatId: string) => void
   onOpenFile: (path: string) => void
-  /** Start a chat with this prompt in the composer. */
-  onAskAgent: (prompt: string) => void
 }) {
   // The summary leads the page wherever it was pinned: it is the answer to
   // "what is going on here", and everything else is detail under it.
@@ -100,13 +97,13 @@ export function WidgetGrid({
             anyone opening this workspace knows what is going on.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
-            <button
-              onClick={() => onAskAgent(SUMMARY_PROMPT)}
+            <HomeAiPrompt
+              prompt={SUMMARY_PROMPT}
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[13px] font-medium text-primary-foreground hover:opacity-90 cursor-pointer"
             >
               <Sparkles className="h-3.5 w-3.5" />
               Ask the agent to write it
-            </button>
+            </HomeAiPrompt>
             <button
               onClick={() => setEditor({ mode: "create", type: "summary" })}
               disabled={full}
@@ -165,6 +162,7 @@ export function WidgetGrid({
       )}
 
       <div className="mt-3 flex justify-end">
+        <HomeAiPrompt prompt="Create a chart from real metrics in the workspace conversations. Choose the clearest trend, or explain what data is missing."><Sparkles className="h-3.5 w-3.5" />Ask for a chart</HomeAiPrompt>
         <DropdownMenu>
           <DropdownMenuTrigger
             disabled={full}
@@ -196,9 +194,7 @@ export function WidgetGrid({
             >
               <CalendarClock className="mr-2 h-3.5 w-3.5" /> Job status
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onAskAgent("Put a chart on the home page showing ")}>
-              <Sparkles className="mr-2 h-3.5 w-3.5" /> Ask the agent for a chart…
-            </DropdownMenuItem>
+
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

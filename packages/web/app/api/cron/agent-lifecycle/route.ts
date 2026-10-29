@@ -1,4 +1,5 @@
 import { Daytona } from "@daytonaio/sdk"
+import { tickHomeAi } from "@/lib/workspace-home/ai-worker"
 import { cleanupExpiredUploads } from "@/lib/server/file-uploads"
 import { WORKSPACE_RUNTIME_SELECT } from "@/lib/workspace"
 import { addMinutes, differenceInMinutes } from "date-fns"
@@ -51,6 +52,7 @@ export async function GET(req: Request) {
   }
 
   const daytonaApiKey = process.env.DAYTONA_API_KEY
+  try { await tickHomeAi() } catch (error) { console.error("[home-ai] lifecycle recovery", error) }
   if (!daytonaApiKey) {
     return Response.json({ error: "DAYTONA_API_KEY not configured" }, { status: 500 })
   }

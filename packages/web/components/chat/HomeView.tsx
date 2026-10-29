@@ -1,5 +1,6 @@
 "use client"
 
+import { HomeAiProvider, HomeAiPanel, HomeSkeleton } from "@/components/workspaces/home/HomeAi"
 import { useState } from "react"
 import { Plus } from "lucide-react"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
@@ -46,12 +47,11 @@ export function HomeView({
   chats,
   onSelectChat,
   onNewChat,
-  onNewChatWithPrompt,
   onManageJob,
 }: HomeViewProps) {
   const { activeWorkspace: active, setActiveWorkspace: setActive, ready, requestOpenFile } = useWorkspace()
   const { data: overview } = useWorkspaceOverview(active?.id)
-  const { data: home } = useWorkspaceHome(active?.id)
+  const { data: home, isLoading: homeLoading, error: homeError, refetch: reloadHome } = useWorkspaceHome(active?.id)
   const [readingChat, setReadingChat] = useState<string | null>(null)
 
   if (!ready) return null
@@ -74,6 +74,7 @@ export function HomeView({
     .slice(0, 6)
 
   return (
+    <HomeAiProvider key={active.id} workspaceId={active.id}>
     <div className="flex-1 overflow-y-auto">
       <div className={cn("mx-auto w-full max-w-[60rem]", isMobile ? "p-4 pb-safe" : "px-8 py-10")}>
         <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
@@ -97,6 +98,9 @@ export function HomeView({
           </button>
         </header>
 
+        <HomeAiPanel onOpenChat={setReadingChat} />
+        {homeLoading && <HomeSkeleton />}
+        {homeError && <button className="mt-4 text-sm text-destructive" onClick={() => void reloadHome()}>Home could not load. Retry</button>}
         {home?.since && <SinceBanner since={home.since} onOpenChat={setReadingChat} />}
         {home && (
           <>
@@ -106,7 +110,6 @@ export function HomeView({
               jobs={home.jobs}
               onOpenChat={setReadingChat}
               onOpenFile={(path) => void requestOpenFile(path)}
-              onAskAgent={(prompt) => void onNewChatWithPrompt(prompt)}
             />
             <JobsSection
               jobs={home.jobs}
@@ -130,5 +133,6 @@ export function HomeView({
         onClose={() => setReadingChat(null)}
       />
     </div>
+    </HomeAiProvider>
   )
 }

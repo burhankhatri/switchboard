@@ -1,5 +1,6 @@
 "use client"
 
+import { HomeAiPrompt } from "./HomeAi"
 import { MessageSquare } from "lucide-react"
 import type { SharedChat } from "@/lib/workspace-home/home"
 import { ago } from "./time"
@@ -19,7 +20,7 @@ export function SharedChatsSection({
       <h2 className="text-[11px] uppercase tracking-wide text-ink-3">Shared with the workspace</h2>
       <ul className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface shadow-hairline">
         {chats.map((c) => (
-          <li key={c.id}>
+          <li key={c.id} className="flex items-center">
             <button
               // Your own chat opens where you can keep working in it; someone
               // else's opens read-only.
@@ -32,6 +33,7 @@ export function SharedChatsSection({
                 {c.isYours ? "you" : (c.owner.name ?? "a member")} · {ago(c.sharedAt)}
               </span>
             </button>
+            <HomeAiPrompt label="Edit chat summary on home" prompt={`Create or update a concise home component summarising conversation ${c.id}. Highlight its decisions and unresolved issues. Do not change the original messages.`} />
           </li>
         ))}
       </ul>

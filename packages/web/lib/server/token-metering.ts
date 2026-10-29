@@ -55,7 +55,7 @@ const TOKSCALE_TIMEOUT_SEC = 60
 
 export interface MeterTurnParams {
   userId: string
-  chatId: string
+  chatId?: string | null
   /** assistant Message id this turn's usage is attributed to */
   messageId?: string | null
   /** internal agent/provider id: "claude" | "gemini" | "opencode" | ... */
@@ -101,7 +101,7 @@ function parseTokscaleOutput(raw: string): TokscaleOutput | null {
  * ledger. Returns the number of rows written (0 if nothing new or on any
  * failure). Never throws.
  */
-async function meterTurnUsage(
+export async function meterTurnUsage(
   sandbox: DaytonaSandbox,
   params: MeterTurnParams
 ): Promise<number> {
@@ -156,7 +156,7 @@ async function meterTurnUsage(
   // has no date filter) but fall outside every budget window (sumSharedUsage
   // filters createdAt >= start of day). Only turns after the baseline charge.
   let baselineAt: Date | undefined
-  if (prior.size === 0) {
+  if (prior.size === 0 && chatId) {
     // Read before this turn's finaliser writes the new session id: every path
     // meters first and releases the chat afterwards.
     const [assistantTurns, chat] = await Promise.all([

@@ -274,6 +274,9 @@ model Workspace {
   assets        WorkspaceAsset[]
   events        WorkspaceEvent[]
   widgets       WorkspaceWidget[]
+  homeOperations HomeOperation[]
+  homeInsights HomeInsight[]
+  homeDigests HomeDigest[]
 
   @@index([archived, name])
 }
@@ -922,4 +925,64 @@ model ChatApproval {
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@index([chatId, status])
+}
+
+// Plans and receipts are persisted before/with writes, so a worker can resume
+// after its hosting request disappears without applying a change twice.
+model HomeOperation {
+  id String @id @default(cuid())
+  workspaceId String
+  userId String
+  requestKey String
+  kind String
+  prompt String @db.Text
+  targetId String?
+  targetVersion String?
+  status String @default("queued")
+  stage String @default("Waiting to start")
+  sequence Int @default(0)
+  events Json @default("[]")
+  plan Json?
+  context Json?
+  runtime Json?
+  generationComplete Boolean @default(false)
+  contextVersion String?
+  cursor Int @default(0)
+  receipts Json @default("[]")
+  dismissed Json @default("[]")
+  error String?
+  leaseToken String?
+  leaseUntil DateTime?
+  attempts Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, requestKey])
+  @@index([status, leaseUntil])
+  @@index([workspaceId, createdAt])
+}
+
+model HomeInsight {
+  id String @id @default(cuid())
+  workspaceId String
+  key String
+  title String
+  detail String
+  status String
+  kind String
+  evidence Json
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, key])
+}
+
+model HomeDigest {
+  id String @id @default(cuid())
+  workspaceId String
+  chatId String
+  version String
+  content Json
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, chatId])
 }

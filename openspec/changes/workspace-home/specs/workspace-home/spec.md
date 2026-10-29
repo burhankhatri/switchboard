@@ -37,14 +37,13 @@ repository.
 
 #### Scenario: A workspace without a summary
 - **WHEN** a workspace has no summary widget
-- **THEN** the home page shows an empty summary with two actions: one starts a
-  chat whose composer holds a prompt asking the agent to pin a summary, key
-  numbers and anything waiting on a person; the other opens an editor for a
+- **THEN** the home page shows an empty summary with two actions: one opens an editable home popover asking the agent to create a summary, key
+  numbers and anything waiting on a person, and sending updates home live; the other opens an editor for a
   headline and points
 
 #### Scenario: The agent keeps it current
 - **WHEN** a chat or a scheduled run updates the widget keyed "summary"
-- **THEN** the home page shows the new summary on next load, with its
+- **THEN** the home page shows the new summary live without a reload, with its
   provenance, without a commit or a merge
 
 ### Requirement: Every member sees the workspace's jobs
@@ -84,7 +83,9 @@ removed; a member joining or leaving; a chat shared to the workspace.
 #### Scenario: Private chats are not events
 - **WHEN** a member starts or messages in a chat that is not shared to the
   workspace
-- **THEN** no event names or links to that chat
+- **THEN** the raw activity feed does not name or link to that chat; home AI may
+  synthesize attributed workspace-visible findings from it under the disclosed
+  derived-content policy, without granting access to its raw transcript
 
 #### Scenario: Routine widget refreshes
 - **WHEN** a run refreshes a widget's data through the agent tools

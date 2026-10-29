@@ -145,37 +145,31 @@ export function TimelineBody({ content }: { content: TimelineContent }) {
   const [all, setAll] = useState(false)
   const events = all ? content.events : content.events.slice(0, TIMELINE_PREVIEW)
   const hidden = content.events.length - events.length
+  const dates = [...new Set(events.map(event => event.date))]
   return (
     <div>
-      <ol>
-        {events.map((e, i) => (
-          <li key={i} className="grid grid-cols-[4.5rem_1rem_1fr] gap-x-3">
-            <span className="pt-0.5 text-right text-[11px] leading-5 tabular-nums text-ink-3">{e.date}</span>
-            <span className="relative flex justify-center">
-              {/* The rail runs through every dot but the last, so the line ends where history does. */}
-              {i < events.length - 1 && <span aria-hidden className="absolute top-3 bottom-0 w-px bg-line-strong" />}
-              <span
-                aria-hidden
-                className={cn(
-                  "relative mt-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-surface",
-                  e.tone ? TONE[e.tone].dot : "bg-ink-3"
-                )}
-              />
-            </span>
-            <div className={cn("min-w-0", i < events.length - 1 ? "pb-4" : "")}>
-              <p className="flex flex-wrap items-baseline gap-x-2 text-[13px] leading-5 text-ink">
-                <span className="font-medium">{e.title}</span>
-                {e.who && <span className="text-[11px] text-ink-3">{e.who}</span>}
-              </p>
-              {e.detail && <p className="mt-0.5 text-[12px] leading-snug text-ink-2">{e.detail}</p>}
+      <ol className="space-y-4">
+        {dates.map(date => <li key={date}>
+          <h4 className="mb-2 text-[11px] font-medium text-ink-3">{date}</h4>
+          <ol className="grid gap-3 sm:grid-cols-2">
+        {events.filter(event => event.date === date).map((e, i) => (
+          <li key={i} className={cn("relative min-w-0 overflow-hidden rounded-xl border border-line p-4", e.tone ? TONE[e.tone].bg : "bg-inset/40")}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2"><ToneIcon tone={e.tone} /><time className="text-[11px] font-medium tabular-nums text-ink-2">{e.date}</time></span>
+              <span className="rounded-full border border-line bg-surface/70 px-2 py-0.5 text-[10px] text-ink-2">{e.tone === "good" ? "Progress" : e.tone === "bad" ? "Issue" : e.tone === "warn" ? "Watch" : "Milestone"}</span>
             </div>
+            <p className="mt-3 text-[14px] font-medium leading-snug text-ink">{e.title}</p>
+            {e.who && <p className="mt-2 text-[11px] text-ink-3">{e.who}</p>}
+            {e.detail && <details className="mt-3 text-[12px] text-ink-2"><summary className="cursor-pointer text-[11px]">Details</summary><p className="mt-2 leading-relaxed">{e.detail}</p></details>}
           </li>
         ))}
+          </ol>
+        </li>)}
       </ol>
       {(hidden > 0 || all) && content.events.length > TIMELINE_PREVIEW && (
         <button
           onClick={() => setAll((v) => !v)}
-          className="mt-1 ml-[6.5rem] text-[12px] text-ink-2 hover:text-ink cursor-pointer"
+          className="mt-3 text-[12px] text-ink-2 hover:text-ink cursor-pointer"
         >
           {all ? "Show fewer" : `Show ${hidden} earlier`}
         </button>

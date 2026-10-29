@@ -54,7 +54,8 @@ function provenance(actor: WidgetActor) {
 async function checkReferences(
   workspace: WidgetWorkspace,
   type: WidgetType,
-  content: unknown
+  content: unknown,
+  db: Prisma.TransactionClient = prisma
 ): Promise<string | null> {
   if (type === "file") {
     const { path } = content as { path: string }
@@ -64,7 +65,7 @@ async function checkReferences(
   }
   if (type === "job") {
     const { jobId } = content as { jobId: string }
-    const job = await prisma.scheduledJob.findFirst({
+    const job = await db.scheduledJob.findFirst({
       where: { id: jobId, workspaceId: workspace.id, isDraft: false },
       select: { id: true },
     })
@@ -87,7 +88,8 @@ export interface CreateWidgetInput {
 export async function createWidget(
   workspace: WidgetWorkspace,
   input: CreateWidgetInput,
-  actor: WidgetActor
+  actor: WidgetActor,
+  db: Prisma.TransactionClient = prisma
 ): Promise<StoreResult<{ id: string; key: string | null }>> {
   const title = validateTitle(input.title)
   if (!title.ok) return fail(400, title.error)
@@ -95,12 +97,12 @@ export async function createWidget(
   if (!key.ok) return fail(400, key.error)
   const checked = validateWidgetContent(input.type, input.content)
   if (!checked.ok) return fail(400, checked.error)
-  const refError = await checkReferences(workspace, checked.value.type, checked.value.content)
+  const refError = await checkReferences(workspace, checked.value.type, checked.value.content, db)
   if (refError) return fail(400, refError)
 
   const [count, last] = await Promise.all([
-    prisma.workspaceWidget.count({ where: { workspaceId: workspace.id } }),
-    prisma.workspaceWidget.findFirst({
+    db.workspaceWidget.count({ where: { workspaceId: workspace.id } }),
+    db.workspaceWidget.findFirst({
       where: { workspaceId: workspace.id },
       orderBy: { position: "desc" },
       select: { position: true },
@@ -114,7 +116,7 @@ export async function createWidget(
   }
 
   try {
-    const widget = await prisma.workspaceWidget.create({
+    const widget = await db.workspaceWidget.create({
       data: {
         workspaceId: workspace.id,
         key: key.value,
@@ -128,7 +130,7 @@ export async function createWidget(
       },
       select: { id: true, key: true },
     })
-    recordWorkspaceEventAsync({
+    if (db === prisma) recordWorkspaceEventAsync({
       workspaceId: workspace.id,
       kind: "widget_created",
       summary: `Pinned ${title.value} to the home page`,
@@ -171,9 +173,10 @@ export async function updateWidget(
   workspace: WidgetWorkspace,
   ref: WidgetRef,
   input: UpdateWidgetInput,
-  actor: WidgetActor
+  actor: WidgetActor,
+  db: Prisma.TransactionClient = prisma
 ): Promise<StoreResult<{ id: string }>> {
-  const existing = await prisma.workspaceWidget.findFirst({
+  const existing = await db.workspaceWidget.findFirst({
     where: { workspaceId: workspace.id, ...refWhere(ref) },
     select: { id: true, type: true, title: true },
   })
@@ -192,7 +195,7 @@ export async function updateWidget(
   if (input.content !== undefined) {
     const checked = validateWidgetContent(retype ? input.type : existing.type, input.content)
     if (!checked.ok) return fail(400, checked.error)
-    const refError = await checkReferences(workspace, checked.value.type, checked.value.content)
+    const refError = await checkReferences(workspace, checked.value.type, checked.value.content, db)
     if (refError) return fail(400, refError)
     data.content = checked.value.content as Prisma.InputJsonValue
     if (retype) data.type = checked.value.type
@@ -200,7 +203,7 @@ export async function updateWidget(
   if (Object.keys(data).length === 0) return fail(400, "Nothing to update")
 
   const p = provenance(actor)
-  await prisma.workspaceWidget.update({
+  await db.workspaceWidget.update({
     where: { id: existing.id },
     data: {
       ...data,
@@ -214,7 +217,7 @@ export async function updateWidget(
 
   // A job refreshing its numbers every morning is not news; a person
   // changing what a widget says is.
-  if (actor.via !== "agent") {
+  if (actor.via !== "agent" && db === prisma) {
     recordWorkspaceEventAsync({
       workspaceId: workspace.id,
       kind: "widget_updated",

@@ -1,5 +1,6 @@
 "use client"
 
+import { HomeAiPrompt } from "./HomeAi"
 import { MessageSquare } from "lucide-react"
 import type { Chat } from "@/lib/types"
 import { ago } from "./time"
@@ -21,7 +22,7 @@ export function RecentChatsSection({
       ) : (
         <ul className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface shadow-hairline">
           {chats.map((c) => (
-            <li key={c.id}>
+            <li key={c.id} className="flex items-center">
               <button
                 onClick={() => void onSelectChat(c.id)}
                 className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-hover cursor-pointer"
@@ -34,6 +35,7 @@ export function RecentChatsSection({
                   {ago(c.lastActiveAt ?? c.createdAt)}
                 </span>
               </button>
+            <HomeAiPrompt label="Edit chat summary on home" prompt={`Create or update a concise home component summarising conversation ${c.id}. Highlight its decisions and unresolved issues. Do not change the original messages.`} />
             </li>
           ))}
         </ul>

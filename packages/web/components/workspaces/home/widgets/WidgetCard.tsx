@@ -1,5 +1,6 @@
 "use client"
 
+import { HomeAiPrompt, HomeAiCardProgress } from "../HomeAi"
 import dynamic from "next/dynamic"
 import { Clock, MoreHorizontal } from "lucide-react"
 import type { HomeJob } from "@/lib/workspace-home/home"
@@ -141,6 +142,7 @@ export function WidgetCard({
         >
           {widget.title}
         </h3>
+        <HomeAiPrompt widget={widget} prompt={`Update this ${widget.type} (${widget.title}) using the latest workspace conversations. Preserve its purpose and change only what the evidence supports.`} />
         <DropdownMenu>
           <DropdownMenuTrigger
             className="rounded-md p-1 text-ink-3 opacity-60 transition-opacity hover:bg-hover hover:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 cursor-pointer"
@@ -161,6 +163,7 @@ export function WidgetCard({
         </DropdownMenu>
       </div>
 
+      <HomeAiCardProgress widgetId={widget.id} />
       <div className="min-w-0">
         {widget.type === "summary" && <SummaryBody content={widget.content as SummaryContent} />}
         {widget.type === "kpis" && <KpisBody content={widget.content as KpisContent} />}
