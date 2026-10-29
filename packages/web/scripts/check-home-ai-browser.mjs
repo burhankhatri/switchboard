@@ -61,6 +61,8 @@ try {
   assert.match(await textbox.inputValue(), /Summarise this workspace/)
   await textbox.fill("Summarise the team's most important priorities.")
     const send = desktop.getByRole("button", { name: "Send", exact: true })
+    // The popover opens with a zoom, so sizes are only final once it settles.
+    await desktop.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished)))
     const sendBox = await send.boundingBox(), inputBox = await textbox.boundingBox()
     assert.ok(Math.abs(sendBox.width - inputBox.width) < 2 && sendBox.height >= 44, "Send fills the popover with a touch-sized target")
     const background = () => send.evaluate(el => getComputedStyle(el).backgroundColor)
